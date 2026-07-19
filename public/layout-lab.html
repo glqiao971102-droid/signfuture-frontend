@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout Lab — Sign Studio</title>
+<style>
+  :root{
+    --bg:#030813; --panel:rgba(7,18,35,.9); --line:rgba(57,151,255,.58);
+    --line-soft:rgba(57,151,255,.24); --cyan:#35d8ff; --blue:#5a8cff; --pink:#ff5f8f;
+    --green:#42ef7d; --amber:#ffd166; --text:#f3f7ff; --muted:#8fa7c5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Arial,sans-serif;color:var(--text);
+    background:
+      linear-gradient(90deg,rgba(53,216,255,.035) 1px,transparent 1px),
+      linear-gradient(0deg,rgba(53,216,255,.035) 1px,transparent 1px),
+      radial-gradient(circle at 18% 12%,rgba(38,124,255,.2),transparent 28%),
+      var(--bg);
+    background-size:28px 28px,28px 28px,auto,auto;min-height:100vh}
+  .topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(6,16,33,.96),rgba(4,11,24,.9))}
+  .topbar h1{font-size:16px;margin:0;letter-spacing:.04em}
+  .topbar .tag{font-size:12px;color:var(--muted)}
+  .wrap{display:grid;grid-template-columns:1fr 320px;gap:0;min-height:calc(100vh - 53px)}
+  .stage{padding:30px 26px;overflow:auto}
+  .stage-inner{width:min(1180px,100%);margin:0 auto}
+  /* the live, resizable layout */
+  .hero-row{display:grid;align-items:stretch;}
+  .home-hero{border:1px solid var(--line);border-radius:var(--radius,18px);
+    background:linear-gradient(180deg,rgba(5,16,32,.92),rgba(4,11,24,.84));
+    box-shadow:0 0 34px rgba(45,111,255,.24);padding:var(--pad,48px);display:flex;align-items:center;position:relative;overflow:hidden}
+  .eyebrow{font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:var(--cyan);margin:0 0 16px}
+  .home-hero h2{margin:0 0 16px;font-size:var(--title,52px);line-height:1.03}
+  .home-hero p{margin:0;color:var(--muted);font-size:18px;line-height:1.6;max-width:560px}
+  .hero-actions{display:flex;gap:12px;margin-top:26px}
+  .btn{padding:12px 22px;border-radius:11px;font-weight:700;font-size:14px;border:1px solid var(--line)}
+  .btn.primary{background:linear-gradient(90deg,var(--blue),var(--cyan));color:#03101f;border-color:transparent}
+  .btn.ghost{background:rgba(53,216,255,.06);color:var(--text)}
+  .account{border:1px solid var(--line);border-radius:var(--radius,18px);
+    background:linear-gradient(180deg,rgba(8,22,44,.95),rgba(4,12,26,.95));
+    box-shadow:0 0 30px rgba(53,216,255,.16);padding:18px;display:flex;flex-direction:column}
+  .ahead{display:flex;align-items:center;gap:12px;padding:6px 6px 16px;border-bottom:1px solid var(--line-soft)}
+  .av{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);color:var(--cyan);font-size:20px}
+  .ahead strong{display:block;font-size:15px}.ahead span{color:var(--cyan);font-size:12.5px}
+  .alist{list-style:none;margin:14px 0;padding:0;display:flex;flex-direction:column;gap:4px}
+  .alist li{padding:12px;border-radius:10px;font-weight:600;font-size:14px;color:var(--text)}
+  .acta{margin-top:auto;padding:12px;border:0;border-radius:11px;background:linear-gradient(90deg,var(--blue),var(--cyan));color:#03101f;font-weight:800;text-align:center}
+  /* drag splitter */
+  .splitter{position:relative;cursor:col-resize;display:flex;align-items:center;justify-content:center}
+  .splitter::before{content:"";width:4px;height:60px;border-radius:4px;background:var(--cyan);box-shadow:0 0 14px var(--cyan);opacity:.55}
+  .splitter:hover::before{opacity:1}
+  .splitter .grip{position:absolute;font-size:11px;color:var(--cyan);background:rgba(3,10,22,.85);border:1px solid var(--line);border-radius:6px;padding:2px 6px;white-space:nowrap;top:8px}
+  /* control panel */
+  .controls{border-left:1px solid var(--line);background:linear-gradient(180deg,rgba(6,16,33,.9),rgba(4,11,24,.92));padding:20px 18px;overflow:auto}
+  .controls h3{margin:0 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan)}
+  .controls .hint{font-size:12px;color:var(--muted);margin:0 0 18px;line-height:1.5}
+  .ctrl{margin-bottom:16px}
+  .ctrl label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .ctrl label b{color:var(--text)}
+  .ctrl input[type=range]{width:100%;accent-color:var(--cyan)}
+  .readout{margin-top:8px;border:1px solid var(--line);border-radius:10px;background:rgba(3,10,22,.7);padding:12px;font-family:Consolas,monospace;font-size:12px;color:#bfe9ff;white-space:pre-wrap;line-height:1.5}
+  .row{display:flex;gap:8px;margin-top:12px}
+  .row button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:rgba(53,216,255,.1);color:var(--text);font-weight:700;cursor:pointer;font-size:13px}
+  .row button:hover{border-color:var(--cyan)}
+  .row button.copied{background:rgba(66,239,125,.18);border-color:var(--green);color:var(--green)}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>◇ Layout Lab</h1>
+    <span class="tag">拖中间的蓝色竖条调右框宽度，或用右侧滑杆调间距/内边距/圆角/标题字号。调好把数值发我即可。</span>
+  </div>
+
+  <div class="wrap">
+    <div class="stage">
+      <div class="stage-inner">
+        <div class="hero-row" id="row">
+          <section class="home-hero">
+            <div>
+              <p class="eyebrow">Signage &amp; Printing Studio</p>
+              <h2>Three calculators, one studio.</h2>
+              <p>Measure, configure, and price your signage in one place — inkjet banners, neon line tubing, and 3D LED box-up letters.</p>
+              <div class="hero-actions">
+                <span class="btn primary">Shop products</span>
+                <span class="btn ghost">Try a calculator</span>
+              </div>
+            </div>
+          </section>
+
+          <div class="splitter" id="split"><span class="grip" id="grip">↔ 320px</span></div>
+
+          <aside class="account">
+            <div class="ahead"><span class="av">◇</span><div><strong>Guest</strong><span>Wallet · RM 0.00</span></div></div>
+            <ul class="alist">
+              <li>→] Login</li><li>☺ My Account</li><li>⛟ Order Status</li><li>⤓ Download Invoice</li>
+            </ul>
+            <div class="acta">Sign in / Register</div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <h3>Controls</h3>
+      <p class="hint">实时预览。把下面的数值告诉我，我就照着改真实页面。</p>
+
+      <div class="ctrl">
+        <label>右框宽度 Account width <b><span id="vw">320</span>px</b></label>
+        <input type="range" id="rw" min="220" max="480" value="320">
+      </div>
+      <div class="ctrl">
+        <label>两框间距 Gap <b><span id="vg">22</span>px</b></label>
+        <input type="range" id="rg" min="0" max="60" value="22">
+      </div>
+      <div class="ctrl">
+        <label>Hero 内边距 Padding <b><span id="vp">48</span>px</b></label>
+        <input type="range" id="rp" min="20" max="80" value="48">
+      </div>
+      <div class="ctrl">
+        <label>圆角 Radius <b><span id="vr">18</span>px</b></label>
+        <input type="range" id="rr" min="6" max="30" value="18">
+      </div>
+      <div class="ctrl">
+        <label>标题字号 Title <b><span id="vt">52</span>px</b></label>
+        <input type="range" id="rt" min="32" max="80" value="52">
+      </div>
+
+      <div class="readout" id="out"></div>
+      <div class="row">
+        <button id="copy">📋 复制 CSS</button>
+        <button id="reset">↺ 重置</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const row=document.getElementById('row'), split=document.getElementById('split'),
+        grip=document.getElementById('grip'), out=document.getElementById('out');
+  const D={w:320,g:22,p:48,r:18,t:52};
+  const def={...D};
+  function apply(){
+    row.style.gridTemplateColumns=`1fr 14px ${D.w}px`;
+    row.style.gap=D.g+'px';
+    document.documentElement.style.setProperty('--pad',D.p+'px');
+    document.documentElement.style.setProperty('--radius',D.r+'px');
+    document.documentElement.style.setProperty('--title',D.t+'px');
+    grip.textContent='↔ '+D.w+'px';
+    vw.textContent=D.w; vg.textContent=D.g; vp.textContent=D.p; vr.textContent=D.r; vt.textContent=D.t;
+    rw.value=D.w; rg.value=D.g; rp.value=D.p; rr.value=D.r; rt.value=D.t;
+    out.textContent=
+`.hero-row { grid-template-columns: 1fr ${D.w}px; gap: ${D.g}px; }
+.home-hero { padding: ${D.p}px; border-radius: ${D.r}px; }
+.account-panel { border-radius: ${D.r}px; }
+.home-hero h1 { font-size: ${D.t}px; }`;
+  }
+  // sliders
+  rw.oninput=e=>{D.w=+e.target.value;apply()};
+  rg.oninput=e=>{D.g=+e.target.value;apply()};
+  rp.oninput=e=>{D.p=+e.target.value;apply()};
+  rr.oninput=e=>{D.r=+e.target.value;apply()};
+  rt.oninput=e=>{D.t=+e.target.value;apply()};
+  // drag splitter
+  let dragging=false;
+  split.addEventListener('mousedown',e=>{dragging=true;e.preventDefault();document.body.style.userSelect='none'});
+  window.addEventListener('mouseup',()=>{dragging=false;document.body.style.userSelect=''});
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const rect=row.getBoundingClientRect();
+    let w=Math.round(rect.right-e.clientX);
+    w=Math.max(220,Math.min(480,w));
+    D.w=w; apply();
+  });
+  // buttons
+  document.getElementById('copy').onclick=function(){
+    navigator.clipboard.writeText(out.textContent).then(()=>{
+      this.classList.add('copied');this.textContent='✓ 已复制';
+      setTimeout(()=>{this.classList.remove('copied');this.textContent='📋 复制 CSS'},1400);
+    });
+  };
+  document.getElementById('reset').onclick=()=>{Object.assign(D,def);apply()};
+  apply();
+</script>
+</body>
+</html>

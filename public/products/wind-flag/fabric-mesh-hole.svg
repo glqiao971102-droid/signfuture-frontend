@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150">
+  <defs>
+    <linearGradient id="mh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#4a2a9c"/></linearGradient>
+    <pattern id="holes" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="6" cy="6" r="3" fill="#0a0618" opacity="0.55"/></pattern>
+  </defs>
+  <rect x="22" y="18" width="156" height="114" rx="12" fill="url(#mh)"/>
+  <rect x="22" y="18" width="156" height="114" rx="12" fill="url(#holes)"/>
+  <rect x="22" y="18" width="156" height="114" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.2"/>
+</svg>

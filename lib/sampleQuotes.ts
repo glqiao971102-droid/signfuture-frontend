@@ -1,0 +1,115 @@
+import { type Quote } from "@/components/QuotationBrowser";
+
+// Sample quotations — replace with live data when the quote backend is wired.
+// Shared by the My Quotation page and the My Account dashboard tab.
+export const SAMPLE_QUOTES: Quote[] = [
+  {
+    ref: "Q65821",
+    date: "2026-06-18",
+    category: "Inkjet Printing",
+    product: "Loose Sheet",
+    status: "Quoted",
+    spec: [
+      { label: "Size", value: "210mm x 297mm" },
+      { label: "Paper Material", value: "Gloss Art Card 250gsm (2 sides coated)" },
+      { label: "Print Colour", value: "4C + 4C" },
+      { label: "Print Sides", value: "2" },
+      { label: "Finishing", value: "Matte Laminate (Both), Die Cutting" },
+    ],
+    quantities: ["300", "400", "500"],
+    rows: [
+      { label: "Process Days", values: ["5", "5", "6"] },
+      { label: "Price (RM)", values: ["432.00", "528.00", "610.00"] },
+      { label: "Disc. (%)", values: ["5", "5", "8"] },
+      { label: "Disc. (RM)", values: ["21.60", "26.40", "48.80"] },
+      { label: "Total Price (RM)", values: ["410.40", "501.60", "561.20"] },
+    ],
+  },
+  {
+    ref: "Q65812",
+    date: "2026-06-15",
+    category: "3D Led Box Up",
+    product: "3D LED Box Up — Frontlit",
+    status: "Quoted",
+    spec: [
+      { label: "Letter Height", value: "30cm (8 letters)" },
+      { label: "Face Material", value: "3mm White Acrylic" },
+      { label: "LED Color", value: "10000K Cool White" },
+      { label: "Side / Return", value: "10cm Stainless Steel" },
+      { label: "Mounting", value: "Wall mount + power supply" },
+    ],
+    quantities: ["1 set"],
+    rows: [
+      { label: "Process Days", values: ["10"] },
+      { label: "Price (RM)", values: ["2,480.00"] },
+      { label: "Disc. (%)", values: ["10"] },
+      { label: "Disc. (RM)", values: ["248.00"] },
+      { label: "Total Price (RM)", values: ["2,232.00"] },
+    ],
+  },
+  {
+    ref: "Q65804",
+    date: "2026-06-22",
+    category: "Led Sign",
+    product: "Neon Sign",
+    status: "Quoted",
+    spec: [
+      { label: "Design", value: "Custom script — 'Open'" },
+      { label: "Size", value: "600mm x 300mm" },
+      { label: "Tube Color", value: "Warm White + Ice Blue" },
+      { label: "Backing", value: "Clear Acrylic, cut to shape" },
+      { label: "Power", value: "Dimmer + remote control" },
+    ],
+    quantities: ["1 pc"],
+    rows: [
+      { label: "Process Days", values: ["7"] },
+      { label: "Price (RM)", values: ["680.00"] },
+      { label: "Disc. (%)", values: ["0"] },
+      { label: "Disc. (RM)", values: ["0.00"] },
+      { label: "Total Price (RM)", values: ["680.00"] },
+    ],
+  },
+  {
+    ref: "Q65790",
+    date: "2026-06-20",
+    category: "Inkjet Printing",
+    product: "PVC Banner",
+    status: "Pending",
+    spec: [
+      { label: "Size", value: "3m x 1.2m" },
+      { label: "Material", value: "440gsm Frontlit PVC" },
+      { label: "Print", value: "Full colour, 1 side" },
+      { label: "Finishing", value: "Hemmed + eyelets every 50cm" },
+    ],
+    quantities: ["2", "5", "10"],
+    rows: [
+      { label: "Process Days", values: ["-", "-", "-"] },
+      { label: "Price (RM)", values: ["-", "-", "-"] },
+      { label: "Disc. (%)", values: ["-", "-", "-"] },
+      { label: "Disc. (RM)", values: ["-", "-", "-"] },
+      { label: "Total Price (RM)", values: ["-", "-", "-"] },
+    ],
+  },
+  {
+    // Quoted, but quote date is older than 15 days -> expired, must re-quote.
+    ref: "Q65771",
+    date: "2026-06-01",
+    category: "Inkjet Printing",
+    product: "Loose Sheet",
+    status: "Quoted",
+    spec: [
+      { label: "Size", value: "210mm x 297mm" },
+      { label: "Paper Material", value: "Gloss Art Card 250gsm (2 sides coated)" },
+      { label: "Print Colour", value: "4C + 4C" },
+      { label: "Finishing", value: "Matte Laminate (Both), Die Cutting" },
+    ],
+    quantities: ["300", "400", "500"],
+    rows: [
+      { label: "Process Days", values: ["5", "5", "6"] },
+      { label: "Price (RM)", values: ["455.00", "548.00", "636.00"] },
+      { label: "Disc. (%)", values: ["0", "0", "0"] },
+      { label: "Disc. (RM)", values: ["0.00", "0.00", "0.00"] },
+      { label: "Total Price (RM)", values: ["455.00", "548.00", "636.00"] },
+    ],
+  },
+];

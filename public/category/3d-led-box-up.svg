@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#241033"/><stop offset="1" stop-color="#0a0518"/></linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffd9a8"/></linearGradient>
+    <filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <g filter="url(#g)">
+    <!-- L -->
+    <path d="M70 90 h26 v70 h40 v26 H70 Z" fill="#7a5a2a"/>
+    <path d="M64 84 h26 v70 h40 v26 H64 Z" fill="url(#face)"/>
+    <!-- E -->
+    <path d="M156 90 h70 v22 h-44 v10 h38 v22 h-38 v10 h44 v22 h-70 Z" fill="#7a5a2a"/>
+    <path d="M150 84 h70 v22 h-44 v10 h38 v22 h-38 v10 h44 v22 h-70 Z" fill="url(#face)"/>
+    <!-- D -->
+    <path d="M250 90 h34 a48 48 0 0 1 0 96 h-34 Z" fill="#7a5a2a"/>
+    <path d="M244 84 h34 a48 48 0 0 1 0 96 h-34 Z" fill="url(#face)"/>
+    <circle cx="278" cy="132" r="20" fill="#0a0518"/>
+  </g>
+  <ellipse cx="200" cy="232" rx="150" ry="16" fill="#ffce8a" opacity="0.18"/>
+</svg>

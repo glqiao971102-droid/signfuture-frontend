@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a2238"/><stop offset="1" stop-color="#05101f"/></linearGradient>
+    <linearGradient id="rb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff3d6e"/><stop offset=".25" stop-color="#ffb347"/><stop offset=".5" stop-color="#35d8ff"/><stop offset=".75" stop-color="#7cf0c0"/><stop offset="1" stop-color="#b08bff"/></linearGradient>
+    <filter id="g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="118" y="150" width="164" height="96" rx="4" fill="#ffffff" opacity="0.96"/>
+  <rect x="118" y="150" width="164" height="96" rx="4" fill="url(#rb)" opacity="0.85" filter="url(#g)"/>
+  <rect x="86" y="86" width="228" height="72" rx="14" fill="#16324f"/>
+  <rect x="86" y="86" width="228" height="72" rx="14" fill="none" stroke="#35d8ff" stroke-opacity="0.45"/>
+  <rect x="108" y="150" width="184" height="16" rx="3" fill="#0c1f33"/>
+  <circle cx="124" cy="108" r="7" fill="#35d8ff" filter="url(#g)"/>
+  <rect x="150" y="103" width="130" height="9" rx="4" fill="#0c1f33"/>
+  <rect x="150" y="120" width="80" height="7" rx="3" fill="#0c1f33"/>
+  <rect x="106" y="166" width="12" height="74" fill="#16324f"/>
+  <rect x="282" y="166" width="12" height="74" fill="#16324f"/>
+</svg>

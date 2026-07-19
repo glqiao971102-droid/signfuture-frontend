@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a2238"/><stop offset="1" stop-color="#05101f"/></linearGradient>
+    <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#35d8ff"/><stop offset="1" stop-color="#1d6fff"/></linearGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cf0c0"/><stop offset="1" stop-color="#25a36a"/></linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- banner 1 -->
+  <rect x="96" y="60" width="92" height="170" rx="5" fill="#0c2138" stroke="#35d8ff" stroke-opacity="0.4"/>
+  <rect x="104" y="70" width="76" height="120" rx="3" fill="url(#b1)" opacity="0.85"/>
+  <rect x="118" y="200" width="48" height="8" rx="4" fill="#16324f"/>
+  <rect x="128" y="230" width="28" height="10" rx="4" fill="#16324f"/>
+  <!-- banner 2 -->
+  <rect x="214" y="74" width="84" height="156" rx="5" fill="#0c2138" stroke="#7cf0c0" stroke-opacity="0.4"/>
+  <rect x="221" y="84" width="70" height="108" rx="3" fill="url(#b2)" opacity="0.85"/>
+  <rect x="234" y="200" width="44" height="8" rx="4" fill="#16324f"/>
+  <rect x="243" y="230" width="26" height="10" rx="4" fill="#16324f"/>
+</svg>

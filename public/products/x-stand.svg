@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 460">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a2238"/><stop offset="1" stop-color="#05101f"/></linearGradient>
+    <linearGradient id="ban" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d6fff"/><stop offset=".55" stop-color="#35d8ff"/><stop offset="1" stop-color="#7cf0c0"/></linearGradient>
+    <filter id="g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <!-- X frame legs (behind) -->
+  <g stroke="#8da3ba" stroke-width="9" stroke-linecap="round" opacity="0.9">
+    <line x1="118" y1="66" x2="244" y2="416"/>
+    <line x1="242" y1="66" x2="116" y2="416"/>
+  </g>
+  <circle cx="180" cy="241" r="11" fill="#b9c8d8"/>
+  <circle cx="180" cy="241" r="4" fill="#0c1f33"/>
+  <!-- top + bottom support bar -->
+  <rect x="126" y="58" width="108" height="9" rx="4" fill="#9fb3c8"/>
+  <rect x="126" y="410" width="108" height="9" rx="4" fill="#9fb3c8"/>
+  <!-- banner -->
+  <rect x="124" y="60" width="112" height="356" rx="4" fill="url(#ban)"/>
+  <rect x="124" y="60" width="112" height="356" rx="4" fill="none" stroke="#ffffff" stroke-opacity="0.25"/>
+  <!-- sample artwork on banner -->
+  <circle cx="180" cy="150" r="30" fill="#ffffff" opacity="0.92" filter="url(#g)"/>
+  <path d="M168 150 l9 9 16 -18" stroke="#1d6fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="146" y="210" width="68" height="9" rx="4" fill="#ffffff" opacity="0.85"/>
+  <rect x="154" y="228" width="52" height="7" rx="3" fill="#ffffff" opacity="0.6"/>
+  <rect x="150" y="300" width="60" height="22" rx="6" fill="#03101f" opacity="0.85"/>
+  <rect x="158" y="307" width="44" height="8" rx="4" fill="#7cf0c0"/>
+  <!-- eyelets -->
+  <g fill="#0c1f33" stroke="#cdd9e6" stroke-width="2">
+    <circle cx="133" cy="69" r="3.4"/><circle cx="227" cy="69" r="3.4"/>
+    <circle cx="133" cy="407" r="3.4"/><circle cx="227" cy="407" r="3.4"/>
+  </g>
+</svg>

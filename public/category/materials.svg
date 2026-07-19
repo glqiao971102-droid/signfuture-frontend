@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2208"/><stop offset="1" stop-color="#0c0a04"/></linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <g>
+    <rect x="96" y="96" width="40" height="120" rx="6" fill="#35d8ff"/>
+    <ellipse cx="116" cy="96" rx="20" ry="8" fill="#7be8ff"/>
+    <ellipse cx="116" cy="96" rx="8" ry="3.4" fill="#0c1f33"/>
+
+    <rect x="150" y="104" width="40" height="112" rx="6" fill="#ff5f8f"/>
+    <ellipse cx="170" cy="104" rx="20" ry="8" fill="#ff90b3"/>
+    <ellipse cx="170" cy="104" rx="8" ry="3.4" fill="#3a0c1c"/>
+
+    <rect x="204" y="98" width="40" height="118" rx="6" fill="#ffc857"/>
+    <ellipse cx="224" cy="98" rx="20" ry="8" fill="#ffe09a"/>
+    <ellipse cx="224" cy="98" rx="8" ry="3.4" fill="#3a2c0c"/>
+
+    <rect x="258" y="108" width="40" height="108" rx="6" fill="#7cf0c0"/>
+    <ellipse cx="278" cy="108" rx="20" ry="8" fill="#aef7da"/>
+    <ellipse cx="278" cy="108" rx="8" ry="3.4" fill="#0c3325"/>
+  </g>
+</svg>

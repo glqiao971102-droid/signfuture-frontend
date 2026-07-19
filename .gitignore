@@ -1,0 +1,38 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next
+/out
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# debug / logs
+*.log
+.next-dev.log
+.next-dev.err.log
+.srv.out.log
+.srv.err.log
+
+# env — never commit local configuration
+.env
+.env.local
+.env*.local
+
+# bundled Windows toolchain (ffmpeg ~293MB, not referenced by any code and
+# over GitHub's 100MB per-file limit)
+/.tools
+
+# local editor / agent state
+/.claude
+/.agents
+
+# internal business documents — this is a public repo, and strategy decks
+# don't belong in a code repository
+*.pptx
+*.docx
+*.xlsx
+
+# misc
+.DS_Store
+*.pem
