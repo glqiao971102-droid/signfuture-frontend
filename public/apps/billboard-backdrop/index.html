@@ -1,0 +1,1968 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inkjet Printing Billboard / Backdrop Calculator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Segoe UI", Arial, sans-serif;
+      --bg: #030813;
+      --panel: rgba(7, 18, 35, 0.9);
+      --panel-strong: rgba(10, 27, 52, 0.95);
+      --line: rgba(57, 151, 255, 0.58);
+      --line-soft: rgba(57, 151, 255, 0.24);
+      --cyan: #35d8ff;
+      --blue: #5a8cff;
+      --green: #42ef7d;
+      --amber: #ffd166;
+      --pink: #ff5f8f;
+      --text: #f3f7ff;
+      --muted: #8fa7c5;
+      --shadow: 0 0 34px rgba(45, 111, 255, 0.24), inset 0 0 34px rgba(53, 216, 255, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(53, 216, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(53, 216, 255, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 18% 12%, rgba(38, 124, 255, 0.2), transparent 28%),
+        radial-gradient(circle at 84% 24%, rgba(31, 216, 255, 0.12), transparent 28%),
+        var(--bg);
+      background-size: 28px 28px, 28px 28px, auto, auto, auto;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0 28%, rgba(72, 150, 255, 0.08) 28.2%, transparent 28.7% 100%),
+        linear-gradient(155deg, transparent 0 62%, rgba(53, 216, 255, 0.07) 62.2%, transparent 62.6% 100%);
+      opacity: 0.8;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 30px 34px 42px;
+      position: relative;
+    }
+
+    .hero,
+    .panel,
+    .summary,
+    .agent-card,
+    .cart-drawer {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(5, 16, 32, 0.92), rgba(4, 11, 24, 0.84));
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before,
+    .panel::before,
+    .summary::before,
+    .cart-drawer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, transparent 0 46%, rgba(53, 216, 255, 0.11) 46.1% 46.3%, transparent 46.4%),
+        linear-gradient(0deg, transparent 0 72%, rgba(90, 140, 255, 0.12) 72.1% 72.3%, transparent 72.4%);
+      opacity: 0.65;
+    }
+
+    .hero {
+      min-height: 0;
+      padding: 0;
+      aspect-ratio: 3 / 1;
+      display: block;
+    }
+
+    .hero-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .topbar,
+    .content-grid,
+    .agent-grid,
+    .cart-row {
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 46px);
+      line-height: 1;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      text-shadow: 0 0 14px rgba(218, 235, 255, 0.55);
+    }
+
+    .subtitle {
+      margin: 9px 0 0;
+      color: #c8d8ef;
+      font-size: 17px;
+    }
+
+    .metric {
+      border: 1px solid rgba(63, 176, 255, 0.72);
+      border-radius: 12px;
+      padding: 13px 14px;
+      background: rgba(3, 11, 24, 0.9);
+      box-shadow: 0 0 18px rgba(53, 216, 255, 0.14), inset 0 0 22px rgba(30, 102, 255, 0.08);
+      min-width: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 22px;
+      color: #f7fbff;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 410px;
+      gap: 22px;
+      margin-top: 22px;
+      align-items: start;
+    }
+
+    .panel,
+    .summary {
+      padding: 22px;
+    }
+
+    /* ---- PREVIEW STYLE: icon badge beside each panel heading ---- */
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-head .section-title {
+      margin: 0;
+    }
+
+    .section-icon {
+      flex: 0 0 auto;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #1f6dff, #35a8ff);
+      color: #fff;
+      font-size: 22px;
+      box-shadow: 0 6px 18px rgba(31, 109, 255, 0.45);
+    }
+
+    /* ---- PREVIEW STYLE: leading icon inside every picker ---- */
+    .product-toggle::before,
+    .finishing-toggle::before {
+      content: attr(data-icon);
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: rgba(53, 216, 255, 0.13);
+      color: #35d8ff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .product-toggle > span,
+    .finishing-toggle > span {
+      margin-right: auto;
+    }
+
+    /* ---- PREVIEW STYLE: icon cell fused to the size inputs ---- */
+    .input-with-icon {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .input-icon {
+      flex: 0 0 auto;
+      width: 46px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(112, 164, 255, 0.38);
+      border-right: 0;
+      border-radius: 10px 0 0 10px;
+      background: rgba(53, 216, 255, 0.1);
+      color: #35d8ff;
+      font-size: 16px;
+    }
+
+    .input-with-icon input {
+      border-radius: 0 10px 10px 0;
+    }
+
+    .size-fields input[type="number"] {
+      min-height: 52px;
+    }
+
+    /* ---- PREVIEW STYLE: optional tag + live character counter ---- */
+    .optional-tag {
+      color: #7f9ec4;
+      font-weight: 700;
+      text-transform: none;
+    }
+
+    .textarea-wrap {
+      position: relative;
+    }
+
+    .char-count {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      color: #7f9ec4;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .textarea-wrap textarea {
+      padding-bottom: 28px;
+    }
+
+    /* ---- PREVIEW STYLE: icon chip on each summary row ---- */
+    .summary-line > span::before {
+      content: attr(data-icon);
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      margin-right: 9px;
+      border-radius: 8px;
+      background: rgba(53, 216, 255, 0.13);
+      color: #35d8ff;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .section-title {
+      margin: 0 0 18px;
+      color: #f7fbff;
+      font-size: 22px;
+      text-shadow: 0 0 12px rgba(210, 231, 255, 0.45);
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-title::before {
+      content: attr(data-kicker);
+      display: block;
+      margin-bottom: 10px;
+      color: var(--cyan);
+      font-size: 12px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(53, 216, 255, 0.75);
+    }
+
+    form {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 17px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+    }
+
+    .product-picker-stack {
+      display: grid;
+      gap: 15px;
+    }
+
+    .native-select-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    label,
+    .field-label {
+      display: grid;
+      /* This label is a sibling of its control, not a wrapper, so `gap` never
+         applies — the margin is what actually separates it from the box, and
+         8px matches the gap the wrapping <label> fields (Remark, etc.) get
+         for free. */
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #dbe8ff;
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid rgba(112, 164, 255, 0.38);
+      border-radius: 10px;
+      background: rgba(4, 12, 26, 0.94);
+      color: var(--text);
+      padding: 13px 14px;
+      font: inherit;
+      outline: none;
+      box-shadow: inset 0 0 20px rgba(20, 90, 180, 0.08);
+    }
+
+    /* Native <select> fields are dressed to match the custom pickers
+       (Printing / Material / Finishing): same frame, same weight, same cyan
+       chevron. A <select> is a replaced element so it can't take the ::after
+       chevron those toggles use — hence the inline SVG background, drawn to
+       the same 2px / 45deg proportions. */
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      min-height: 52px;
+      padding: 0 40px 0 14px;
+      border-color: rgba(63, 176, 255, 0.58);
+      background-color: rgba(3, 11, 24, 0.92);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Cpath d='M1 1l7 7 7-7' fill='none' stroke='%2335d8ff' stroke-width='2'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      /* 12px, not 14px: the toggles' chevron is a rotated 10px box whose
+         visual centre lands 19px from the edge — this matches it. */
+      background-position: right 12px center;
+      background-size: 14px 8px;
+      color: #f7fbff;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    select option {
+      background: #071427;
+      color: #f7fbff;
+      font-size: 15px;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(53, 216, 255, 0.78);
+      box-shadow: 0 0 16px rgba(53, 216, 255, 0.22), inset 0 0 20px rgba(20, 90, 180, 0.08);
+    }
+
+    input[type=file] {
+      color: #dce8fb;
+      padding: 10px;
+    }
+
+    input[type=file]::file-selector-button {
+      margin-right: 14px;
+      border: 1px solid rgba(53, 216, 255, 0.5);
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: rgba(14, 42, 78, 0.94);
+      color: #e9f4ff;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.12);
+    }
+
+    .inline-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+      align-items: end;
+    }
+
+    .size-fields {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 104px;
+    }
+
+    .size-multiply {
+      align-self: end;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      color: #35d8ff;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(53, 216, 255, 0.8);
+    }
+
+    .addon-grid,
+    .collect-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      border: 1px solid rgba(63, 176, 255, 0.58);
+      border-radius: 10px;
+      background: #020712;
+      padding: 7px;
+      box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.08);
+    }
+
+    .product-picker,
+    .finishing-picker {
+      position: relative;
+    }
+
+    .product-toggle,
+    .finishing-toggle {
+      width: 100%;
+      min-height: 52px;
+      border: 1px solid rgba(63, 176, 255, 0.58);
+      border-radius: 10px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: rgba(3, 11, 24, 0.92);
+      color: #f7fbff;
+      font-weight: 900;
+      text-align: left;
+      box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.08);
+      cursor: pointer;
+    }
+
+    .product-toggle::after,
+    .finishing-toggle::after {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid #35d8ff;
+      border-bottom: 2px solid #35d8ff;
+      transform: rotate(45deg);
+      transition: transform 160ms ease;
+      flex: 0 0 auto;
+    }
+
+    .product-picker.is-open .product-toggle,
+    .finishing-picker.is-open .finishing-toggle {
+      border-color: #35d8ff;
+      box-shadow: 0 0 14px rgba(53, 216, 255, 0.52), inset 0 0 18px rgba(53, 216, 255, 0.12);
+    }
+
+    .product-picker.is-open .product-toggle::after,
+    .finishing-picker.is-open .finishing-toggle::after {
+      transform: rotate(225deg);
+    }
+
+    .product-picker .addon-grid,
+    .finishing-picker .addon-grid {
+      display: none;
+      margin-top: 8px;
+    }
+
+    .product-picker.is-open .addon-grid,
+    .finishing-picker.is-open .addon-grid {
+      display: grid;
+    }
+
+    .choice {
+      position: relative;
+      border: 1px solid rgba(63, 176, 255, 0.58);
+      border-radius: 8px;
+      padding: 0;
+      background: rgba(3, 15, 31, 0.95);
+      cursor: pointer;
+      display: grid;
+      grid-template-rows: 172px auto;
+      min-height: 224px;
+      overflow: hidden;
+      transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .choice input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .choice.is-selected {
+      border-color: #35d8ff;
+      background: rgba(53, 216, 255, 0.08);
+      box-shadow: 0 0 16px rgba(53, 216, 255, 0.65), inset 0 0 12px rgba(53, 216, 255, 0.16);
+    }
+
+    .option-image {
+      position: relative;
+      min-height: 0;
+      border-bottom: 1px solid rgba(63, 176, 255, 0.34);
+      display: grid;
+      place-items: center;
+      background: #f7f7f7;
+      box-shadow: inset 0 0 28px rgba(53, 216, 255, 0.08);
+    }
+
+    .option-image img {
+      display: block;
+      width: 100%;
+      height: 172px;
+      object-fit: contain;
+      object-position: center;
+      pointer-events: none;
+    }
+
+    .collect-image {
+      display: grid;
+      place-items: center;
+      padding: 10px;
+      background:
+        linear-gradient(90deg, rgba(53, 216, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(53, 216, 255, 0.04) 1px, transparent 1px),
+        radial-gradient(circle at 18% 14%, rgba(53, 216, 255, 0.24), transparent 34%),
+        rgba(3, 11, 24, 0.92);
+      background-size: 14px 14px, 14px 14px, auto, auto;
+    }
+
+    .date-ticket {
+      width: 100%;
+      min-height: 82px;
+      border: 1px solid rgba(53, 216, 255, 0.52);
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, rgba(7, 46, 87, 0.95), rgba(3, 14, 29, 0.95));
+      box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.12);
+      color: #e9f7ff;
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(53, 216, 255, 0.65);
+    }
+
+    .date-ticket span {
+      display: block;
+      margin-top: 5px;
+      color: #9fc8f4;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .image-zoom-button {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(53, 216, 255, 0.8);
+      border-radius: 999px;
+      padding: 0;
+      background: rgba(2, 7, 18, 0.76);
+      box-shadow: 0 0 10px rgba(53, 216, 255, 0.45);
+      z-index: 2;
+      pointer-events: auto;
+      cursor: zoom-in;
+    }
+
+    .image-zoom-button::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 5px;
+      width: 8px;
+      height: 8px;
+      border: 2px solid #e9f7ff;
+      border-radius: 999px;
+    }
+
+    .image-zoom-button::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 7px;
+      height: 2px;
+      border-radius: 999px;
+      background: #e9f7ff;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+
+    .image-viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: none;
+      /* No dimming / blur: the preview is an anchored popover, not a modal,
+         so the page behind it stays fully visible. */
+      background: transparent;
+    }
+
+    .image-viewer.is-open {
+      display: block;
+    }
+
+    /* Hover preview: the overlay must not swallow the pointer, otherwise it
+       covers the zoom button the moment it opens, the button loses :hover and
+       the preview flickers open/closed. Click-to-open keeps normal behaviour. */
+    .image-viewer.is-hover {
+      pointer-events: none;
+    }
+
+    .image-viewer.is-hover .image-viewer-close {
+      display: none;
+    }
+
+    .image-viewer-card {
+      /* JS anchors this to the hovered thumbnail via top/left. */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: min(739px, 92vw);
+      max-height: 79vh;
+      border: 1px solid rgba(53, 216, 255, 0.7);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 22px rgba(53, 216, 255, 0.3);
+    }
+
+    /* Little pointer tucked under (or over) the card, aimed at the thumbnail.
+       --arrow-x is set by JS so it tracks the anchor even when the card is
+       nudged sideways to stay on screen. */
+    .image-viewer-card::after {
+      content: "";
+      position: absolute;
+      left: var(--arrow-x, 50%);
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+    }
+
+    .image-viewer-card[data-placement="above"]::after {
+      top: 100%;
+      border-top: 11px solid #fff;
+    }
+
+    .image-viewer-card[data-placement="below"]::after {
+      bottom: 100%;
+      border-bottom: 11px solid #fff;
+    }
+
+    .image-viewer img {
+      display: block;
+      width: 100%;
+      max-height: 68vh;
+      object-fit: contain;
+      border-radius: 7px;
+      background: #f7f7f7;
+    }
+
+    .image-viewer-close {
+      position: absolute;
+      /* Tucked against the card corner rather than floating well outside it. */
+      top: -9px;
+      right: -9px;
+      width: 28px;
+      height: 28px;
+      /* Grid centring (plus padding:0) optically centres the glyph — relying on
+         line-height alone left it sitting off-centre in the circle. */
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid rgba(53, 216, 255, 0.88);
+      border-radius: 999px;
+      background: linear-gradient(135deg, #1f6dff, #35d8ff);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(53, 216, 255, 0.5);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .image-viewer-close:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 16px rgba(53, 216, 255, 0.75);
+    }
+
+    .choice-text {
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      align-content: center;
+      min-height: 50px;
+      background: rgba(3, 11, 24, 0.96);
+    }
+
+    .choice strong {
+      color: #f7fbff;
+      font-size: 13px;
+      line-height: 1.15;
+    }
+
+    .choice span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .term-row {
+      display: flex;
+      gap: 11px;
+      align-items: flex-start;
+      border: 1px solid rgba(63, 176, 255, 0.45);
+      border-radius: 10px;
+      padding: 13px 14px;
+      background: rgba(3, 11, 24, 0.72);
+      color: #dce8fb;
+      font-weight: 700;
+      text-transform: none;
+    }
+
+    .term-row input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: var(--cyan);
+    }
+
+    button {
+      border: 1px solid rgba(91, 220, 255, 0.62);
+      border-radius: 10px;
+      padding: 14px 22px;
+      color: #f8fbff;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      background: linear-gradient(100deg, #244bff, #08d3e7);
+      box-shadow: 0 0 22px rgba(34, 120, 255, 0.65), inset 0 0 16px rgba(255, 255, 255, 0.18);
+    }
+
+    button.secondary {
+      background: rgba(13, 32, 57, 0.9);
+      color: #b9c9df;
+      border-color: rgba(112, 164, 255, 0.34);
+      box-shadow: none;
+    }
+
+    button:disabled {
+      opacity: 0.54;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .summary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      position: sticky;
+      top: 18px;
+      align-self: start;
+    }
+
+    .summary-list {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .summary-line {
+      display: grid;
+      gap: 7px;
+      border: 1px solid rgba(63, 176, 255, 0.72);
+      border-radius: 12px;
+      padding: 10px;
+      background:
+        linear-gradient(90deg, rgba(53, 216, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(53, 216, 255, 0.04) 1px, transparent 1px),
+        rgba(3, 11, 24, 0.9);
+      background-size: 16px 16px;
+      box-shadow: 0 0 18px rgba(53, 216, 255, 0.14), inset 0 0 22px rgba(30, 102, 255, 0.08);
+      color: #c9d8ec;
+    }
+
+    .summary-line.is-wide {
+      grid-column: 1 / -1;
+    }
+
+    .summary-line strong {
+      color: #f7fbff;
+      text-align: left;
+      font-size: 15px;
+    }
+
+    .order-box {
+      position: relative;
+      z-index: 1;
+      margin-top: 14px;
+      border: 1px solid rgba(63, 176, 255, 0.42);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(5, 18, 36, 0.78);
+      box-shadow: inset 0 0 26px rgba(53, 216, 255, 0.06);
+    }
+
+    .collect-date-panel {
+      position: relative;
+      z-index: 1;
+      margin-top: 14px;
+      border: 1px solid rgba(63, 176, 255, 0.42);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(5, 18, 36, 0.78);
+      box-shadow: inset 0 0 26px rgba(53, 216, 255, 0.06);
+    }
+
+    .collect-date-title {
+      margin: 0 0 9px;
+      color: #dce8fb;
+      font-size: 14px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .collect-date-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      border: 1px solid rgba(63, 176, 255, 0.58);
+      border-radius: 10px;
+      background: #020712;
+      padding: 7px;
+      box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.08);
+    }
+
+    .collect-date-option {
+      position: relative;
+      min-width: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: rgba(3, 15, 31, 0.95);
+      cursor: pointer;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .collect-date-option input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .collect-date-option.is-selected {
+      border-color: #35d8ff;
+      box-shadow: 0 0 16px rgba(53, 216, 255, 0.78), inset 0 0 12px rgba(53, 216, 255, 0.14);
+      background: rgba(53, 216, 255, 0.08);
+    }
+
+    .collect-date-option img {
+      display: block;
+      width: 100%;
+      height: 92px;
+      object-fit: contain;
+      object-position: center;
+      min-height: 0;
+      background: #020712;
+      padding: 5px 8px 0;
+    }
+
+    .collect-date-option strong {
+      display: block;
+      padding: 5px 5px 7px;
+      color: #f7fbff;
+      font-size: 15px;
+      line-height: 1;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(218, 235, 255, 0.42);
+      background: rgba(2, 7, 18, 0.76);
+    }
+
+    .collect-date-option .image-zoom-button {
+      top: 7px;
+      right: 7px;
+      width: 24px;
+      height: 24px;
+      border-width: 1px;
+      background: rgba(2, 7, 18, 0.9);
+      box-shadow: 0 0 10px rgba(53, 216, 255, 0.7), inset 0 0 8px rgba(53, 216, 255, 0.12);
+    }
+
+    .collect-date-option .image-zoom-button::before {
+      left: 5px;
+      top: 4px;
+      width: 8px;
+      height: 8px;
+      border-width: 2px;
+    }
+
+    .collect-date-option .image-zoom-button::after {
+      left: 13px;
+      top: 13px;
+      width: 7px;
+      height: 2px;
+    }
+
+    .artwork-panel {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+      border: 1px solid rgba(63, 176, 255, 0.42);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(5, 18, 36, 0.78);
+      box-shadow: inset 0 0 26px rgba(53, 216, 255, 0.06);
+      color: #dbe8ff;
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    /* Rows inside the artwork panel: label above its control. */
+    .artwork-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .artwork-field[hidden] {
+      display: none;
+    }
+
+    .order-title {
+      margin: 0 0 10px;
+      color: #dce8fb;
+      font-size: 14px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 7px;
+    }
+
+    .agent-card {
+      padding: 10px 10px;
+      border-color: rgba(63, 176, 255, 0.42);
+      border-radius: 8px;
+      background: rgba(3, 13, 30, 0.72);
+      box-shadow: inset 0 0 16px rgba(30, 102, 255, 0.05);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 12px;
+      align-items: center;
+    }
+
+    .agent-card:first-child {
+      border-color: rgba(53, 216, 255, 0.95);
+      background: linear-gradient(90deg, rgba(8, 70, 116, 0.92), rgba(4, 35, 67, 0.92));
+      box-shadow: 0 0 14px rgba(53, 216, 255, 0.22), inset 0 0 14px rgba(53, 216, 255, 0.08);
+    }
+
+    .agent-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .agent-card:first-child span,
+    .agent-card:first-child strong {
+      color: #62efff;
+    }
+
+    .agent-card strong {
+      display: block;
+      margin-top: 0;
+      font-size: 15px;
+      color: #f7fbff;
+    }
+
+    .agent-card em {
+      display: none;
+    }
+
+    .quantity-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      margin-top: 12px;
+    }
+
+    .quantity-panel span {
+      color: #77c9ff;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .quantity-stepper {
+      display: grid;
+      grid-template-columns: 36px 58px 36px;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .quantity-stepper button {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 8px;
+      font-size: 20px;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #228cff, #22d4ff);
+      box-shadow: 0 0 18px rgba(34, 188, 255, 0.75), inset 0 0 12px rgba(255, 255, 255, 0.16);
+    }
+
+    .quantity-stepper input {
+      height: 36px;
+      padding: 0 8px;
+      text-align: center;
+      font-weight: 900;
+      border-color: rgba(53, 216, 255, 0.62);
+      background: rgba(3, 11, 24, 0.94);
+    }
+
+    .order-box .term-row {
+      margin-top: 12px;
+      border: 0;
+      padding: 0 4px;
+      background: transparent;
+      color: #dce8fb;
+    }
+
+    .order-box .term-row a {
+      color: #f3f7ff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .actions button {
+      width: 100%;
+      background: rgba(5, 18, 36, 0.88);
+      border-color: rgba(63, 176, 255, 0.42);
+      box-shadow: inset 0 0 16px rgba(30, 102, 255, 0.06);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .actions button:not(:disabled) {
+      background: linear-gradient(100deg, #244bff, #08d3e7);
+      box-shadow: 0 0 22px rgba(34, 120, 255, 0.65), inset 0 0 16px rgba(255, 255, 255, 0.18);
+    }
+
+    .cart-drawer {
+      display: none;
+      margin-top: 22px;
+      padding: 18px;
+    }
+
+    .cart-drawer.is-visible {
+      display: block;
+    }
+
+    .cart-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .cart-row h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .cart-row p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      transform: translateY(120px);
+      opacity: 0;
+      border: 1px solid rgba(66, 239, 125, 0.58);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: rgba(5, 29, 23, 0.94);
+      color: #f7fff9;
+      font-weight: 900;
+      box-shadow: 0 0 22px rgba(66, 239, 125, 0.24);
+      transition: opacity 180ms ease, transform 180ms ease;
+      z-index: 5;
+    }
+
+    .toast.is-visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    @media (max-width: 1050px) {
+      main { padding: 22px 18px 34px; }
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+      .summary {
+        position: static;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar,
+      .cart-row {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+      .field-grid,
+      .inline-fields,
+      .addon-grid,
+      .collect-grid,
+      .actions,
+      .summary-list {
+        grid-template-columns: 1fr;
+      }
+      .hero,
+      .panel,
+      .summary {
+        padding: 18px;
+      }
+    }
+    /* =====================================================================
+       PREVIEW STYLE: corner radii dialled back — just a hint of rounding
+       instead of the softer, pill-like look. Kept together at the end of the
+       sheet so the whole scale can be tuned from one place.
+       ===================================================================== */
+    .hero,
+    .panel,
+    .summary,
+    .cart-drawer {
+      border-radius: 10px;
+    }
+
+    .metric,
+    .summary-line,
+    .order-box,
+    .collect-date-panel,
+    .collect-date-grid,
+    .artwork-panel,
+    .addon-grid,
+    .collect-grid,
+    .term-row,
+    .image-viewer-card {
+      border-radius: 7px;
+    }
+
+    input,
+    select,
+    textarea,
+    button,
+    .product-toggle,
+    .finishing-toggle,
+    .choice,
+    .collect-date-option,
+    .agent-card,
+    .date-ticket,
+    .quantity-stepper button,
+    input[type="file"]::file-selector-button,
+    .image-viewer img,
+    .product-toggle::before,
+    .finishing-toggle::before,
+    .summary-line > span::before {
+      border-radius: 5px;
+    }
+
+    .section-icon {
+      border-radius: 9px;
+    }
+
+    .input-icon {
+      border-radius: 5px 0 0 5px;
+    }
+
+    .input-with-icon input {
+      border-radius: 0 5px 5px 0;
+    }
+
+    /* PREVIEW STYLE: X separator sits dead centre on the input band. Matches
+       the 52px boxes and cancels the 8px of slack the grid track carries below
+       the labels — `align-items: end` would otherwise drop it. Must come after
+       the original .size-multiply rule to win. */
+    .size-multiply {
+      height: 52px;
+      margin-bottom: 8px;
+    }
+
+    /* The zoom badge and viewer close button stay circular by design. */
+    .image-zoom-button,
+    .image-zoom-button::before,
+    .image-zoom-button::after,
+    .image-viewer-close {
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <img class="hero-image" src="assets/inkjet-billboard-hero.png" alt="Custom billboard and backdrop premium quality">
+    </section>
+
+    <div class="content-grid">
+      <section class="panel">
+        <div class="section-head"><span class="section-icon" aria-hidden="true">▤</span><h2 class="section-title" data-kicker="Options">Billboard / Backdrop Order</h2></div>
+        <form id="billboardForm">
+          <div class="product-picker-stack">
+            <div>
+              <label class="native-select-hidden" for="printing">
+                Printing
+                <select id="printing" required>
+                  <option value="uv">UV Ink 1220dpi</option>
+                  <option value="solvent">Eco Solvent 1440dpi</option>
+                </select>
+              </label>
+              <div class="field-label">Printing</div>
+              <div class="product-picker" id="printingPicker" data-picker>
+                <button type="button" class="product-toggle" id="printingToggle" data-icon="◈" aria-expanded="false" aria-controls="printingChoices">
+                  <span id="selectedPrintingLabel">UV Ink 1220dpi</span>
+                </button>
+                <div class="addon-grid" id="printingChoices">
+                  <label class="choice is-selected">
+                    <input type="radio" name="printingChoice" value="uv" checked>
+                    <div class="option-image"><img src="assets/inkjet-billboard-hero.png" alt="UV Ink 1220dpi"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>UV Ink 1220dpi</strong>
+                    </div>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="printingChoice" value="solvent">
+                    <div class="option-image"><img src="assets/inkjet-billboard-hero.png" alt="Eco Solvent 1440dpi"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Eco Solvent 1440dpi</strong>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="native-select-hidden" for="material">
+                Choose Material
+                <select id="material" required>
+                  <option value="380">Tarpaulin 380gsm</option>
+                  <option value="440">Tarpaulin 440gsm</option>
+                  <option value="510">Tarpaulin 510gsm</option>
+                  <option value="blackback440">Black Back Tarpaulin 440gsm</option>
+                </select>
+              </label>
+              <div class="field-label">Choose Material</div>
+              <div class="product-picker" id="materialPicker" data-picker>
+                <button type="button" class="product-toggle" id="materialToggle" data-icon="▤" aria-expanded="false" aria-controls="materialChoices">
+                  <span id="selectedMaterialLabel">Tarpaulin 380gsm</span>
+                </button>
+                <div class="addon-grid" id="materialChoices">
+                  <label class="choice is-selected">
+                    <input type="radio" name="materialChoice" value="380" checked>
+                    <div class="option-image"><img src="assets/finishing-rope-eyelets.png" alt="Tarpaulin 380gsm"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Tarpaulin 380gsm</strong>
+                    </div>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="materialChoice" value="440">
+                    <div class="option-image"><img src="assets/finishing-welded-edge.png" alt="Tarpaulin 440gsm"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Tarpaulin 440gsm</strong>
+                    </div>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="materialChoice" value="510">
+                    <div class="option-image"><img src="assets/finishing-edge-eyelets.png" alt="Tarpaulin 510gsm"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Tarpaulin 510gsm</strong>
+                    </div>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="materialChoice" value="blackback440">
+                    <div class="option-image"><img src="assets/finishing-cut-to-size.png" alt="Black Back Tarpaulin 440gsm"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Black Back Tarpaulin 440gsm</strong>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="inline-fields size-fields">
+            <label>
+              Height
+              <div class="input-with-icon"><span class="input-icon" aria-hidden="true">↕</span><input id="height" type="number" min="0" step="0.1" value="48" required></div>
+            </label>
+            <div class="size-multiply" aria-hidden="true">X</div>
+            <label>
+              Width
+              <div class="input-with-icon"><span class="input-icon" aria-hidden="true">↔</span><input id="width" type="number" min="0" step="0.1" value="72" required></div>
+            </label>
+            <label>
+              Unit
+              <select id="sizeUnit">
+                <option value="in" selected>Inch</option>
+                <option value="cm">cm</option>
+                <option value="mm">mm</option>
+                <option value="m">Meter</option>
+                <option value="ft">Feet</option>
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <div class="field-label">Choose Finishing</div>
+            <div class="finishing-picker" id="finishingPicker" data-picker>
+              <button type="button" class="finishing-toggle" id="finishingToggle" data-icon="✎" aria-expanded="false" aria-controls="finishingChoices">
+                <span id="selectedFinishingLabel">All-round 3inch White Space</span>
+              </button>
+              <div class="addon-grid" id="finishingChoices">
+                <label class="choice is-selected">
+                  <input type="radio" name="finishing" value="ws3" checked>
+                  <div class="option-image cut"><img src="assets/finishing-cut-to-size.png" alt="All-round 3inch White Space"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 3inch White Space</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="ws4">
+                  <div class="option-image cut"><img src="assets/finishing-cut-to-size.png" alt="All-round 4inch White Space"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 4inch White Space</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="ws5">
+                  <div class="option-image cut"><img src="assets/finishing-cut-to-size.png" alt="All-round 5inch White Space"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 5inch White Space</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="ws6">
+                  <div class="option-image cut"><img src="assets/finishing-cut-to-size.png" alt="All-round 6inch White Space"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 6inch White Space</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="pk3">
+                  <div class="option-image welded"><img src="assets/finishing-welded-edge.png" alt="All-round 3inch Pocket (Top &amp; Bottom)"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 3inch Pocket (Top &amp; Bottom)</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="pk4">
+                  <div class="option-image welded"><img src="assets/finishing-welded-edge.png" alt="All-round 4inch Pocket (Top &amp; Bottom)"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 4inch Pocket (Top &amp; Bottom)</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="pk5">
+                  <div class="option-image welded"><img src="assets/finishing-welded-edge.png" alt="All-round 5inch Pocket (Top &amp; Bottom)"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 5inch Pocket (Top &amp; Bottom)</strong>
+                  </div>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="finishing" value="pk6">
+                  <div class="option-image welded"><img src="assets/finishing-welded-edge.png" alt="All-round 6inch Pocket (Top &amp; Bottom)"><span class="image-zoom-button"></span></div>
+                  <div class="choice-text">
+                    <strong>All-round 6inch Pocket (Top &amp; Bottom)</strong>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <label>
+            Remark <span class="optional-tag">(Optional)</span>
+            <div class="textarea-wrap"><textarea id="remark" maxlength="200" placeholder="Installation notes, eyelet spacing, preferred orientation..."></textarea><span class="char-count" id="remarkCount">0 / 200</span></div>
+          </label>
+
+          <div class="artwork-panel">
+            <label class="artwork-field">
+              <span>Artwork Quantity</span>
+              <select id="artworkQty" required></select>
+            </label>
+            <!-- Revealed by update() once a quantity has been chosen. -->
+            <label class="artwork-field" id="artworkUpload" hidden>
+              <span>Upload your Artwork</span>
+              <input id="artwork" type="file" accept=".ai,.pdf,.jpg,.jpeg,.png,.zip">
+            </label>
+          </div>
+
+          <div class="collect-date-panel">
+            <h3 class="collect-date-title">Collect Date</h3>
+            <div class="collect-date-grid" id="collectChoices">
+              <label class="collect-date-option is-selected">
+                <input type="radio" name="collect" value="normal" checked>
+                <img src="assets/collect-4-working-days.png" alt="4 Working Days">
+                <span class="image-zoom-button"></span>
+                <strong>4 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="quick3">
+                <img src="assets/collect-3-working-days.png" alt="3 Working Days">
+                <span class="image-zoom-button"></span>
+                <strong>3 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="rush2">
+                <img src="assets/collect-2-working-days.png" alt="2 Working Days">
+                <span class="image-zoom-button"></span>
+                <strong>2 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="next">
+                <img src="assets/collect-next-working-days.png" alt="Next Working Days">
+                <span class="image-zoom-button"></span>
+                <strong>Next Working Days</strong>
+              </label>
+            </div>
+          </div>
+
+        </form>
+      </section>
+
+      <div class="summary-col">
+      <aside class="summary">
+        <div class="section-head"><span class="section-icon" aria-hidden="true">◈</span><h2 class="section-title" data-kicker="Live Quote">Product Detail</h2></div>
+        <div class="summary-list">
+          <div class="summary-line"><span data-icon="◈">Printing</span><strong id="sumPrinting">UV Ink 1220dpi</strong></div>
+          <div class="summary-line"><span data-icon="▤">Material</span><strong id="sumMaterial">Tarpaulin 380gsm</strong></div>
+          <div class="summary-line"><span data-icon="⤢">Size</span><strong id="sumSize">48 x 72 in</strong></div>
+          <div class="summary-line"><span data-icon="▦">Total Area</span><strong id="sumArea">24.00 sq.ft.</strong></div>
+          <div class="summary-line"><span data-icon="◫">Artwork</span><strong id="sumArtwork">Not selected</strong></div>
+          <div class="summary-line is-wide"><span data-icon="✎">Finishing</span><strong id="sumFinishing">All-round 3inch White Space</strong></div>
+          <div class="summary-line is-wide"><span data-icon="▣">Collect</span><strong id="sumCollect">4 Working Days</strong></div>
+        </div>
+      </aside>
+
+      <aside class="summary">
+        <div class="order-box" style="border:0;background:transparent;box-shadow:none;margin:0;padding:0;">
+          <h3 class="order-title">Order Summary</h3>
+          <div class="agent-grid">
+            <div class="agent-card">
+              <span>Normal Agent Price</span>
+              <strong id="agentA">RM 72.00</strong>
+              <em>RM 3 / sq.ft.</em>
+            </div>
+            <div class="agent-card">
+              <span>Gold Agent Price</span>
+              <strong id="agentB">RM 61.20</strong>
+              <em>15% margin</em>
+            </div>
+            <div class="agent-card">
+              <span>Platinum Agent Price</span>
+              <strong id="agentC">RM 57.60</strong>
+              <em>20% margin</em>
+            </div>
+          </div>
+
+          <div class="quantity-panel">
+            <span>Quantity</span>
+            <div class="quantity-stepper" aria-label="Quantity">
+              <button type="button" id="qtyMinus" aria-label="Decrease quantity">-</button>
+              <input id="quantity" type="number" min="1" step="1" value="1" aria-label="Quantity">
+              <button type="button" id="qtyPlus" aria-label="Increase quantity">+</button>
+            </div>
+          </div>
+
+          <label class="term-row">
+            <input id="terms" type="checkbox">
+            <span>I agree to the <a href="#" onclick="return false;">Terms and Conditions</a></span>
+          </label>
+
+          <div class="actions">
+            <button type="button" id="addToCart" disabled>Add to Cart</button>
+          </div>
+        </div>
+      </aside>
+      </div>
+    </div>
+
+    <section class="cart-drawer" id="cartDrawer">
+      <div class="cart-row">
+        <div>
+          <h3>Inkjet Printing - Billboard / Backdrop added to cart</h3>
+          <p id="cartDetails">Quotation ready.</p>
+        </div>
+        <strong id="cartPrice">RM 0.00</strong>
+        <button type="button" class="secondary" id="editOrder">Edit</button>
+      </div>
+    </section>
+  </main>
+  <div class="image-viewer" id="imageViewer" aria-hidden="true">
+    <div class="image-viewer-card" role="dialog" aria-modal="true" aria-label="Image preview">
+      <button type="button" class="image-viewer-close" id="imageViewerClose" aria-label="Close image preview">&times;</button>
+      <img id="imageViewerImg" src="" alt="">
+    </div>
+  </div>
+  <div class="toast" id="toast">Added to cart</div>
+
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    const printingOptions = {
+      uv: { label: "UV Ink 1220dpi", multiplier: 1.1 },
+      solvent: { label: "Eco Solvent 1440dpi", multiplier: 1 }
+    };
+
+    const materialOptions = {
+      "380": { label: "Tarpaulin 380gsm", rate: 1.12 },
+      "440": { label: "Tarpaulin 440gsm", rate: 1.24 },
+      "510": { label: "Tarpaulin 510gsm", rate: 1.36 },
+      blackback440: { label: "Black Back Tarpaulin 440gsm", rate: 1.48 }
+    };
+
+    const finishingOptions = {
+      ws3: { label: "All-round 3inch White Space", rate: 0 },
+      ws4: { label: "All-round 4inch White Space", rate: 0 },
+      ws5: { label: "All-round 5inch White Space", rate: 0 },
+      ws6: { label: "All-round 6inch White Space", rate: 0 },
+      pk3: { label: "All-round 3inch Pocket (Top & Bottom)", rate: 0 },
+      pk4: { label: "All-round 4inch Pocket (Top & Bottom)", rate: 0 },
+      pk5: { label: "All-round 5inch Pocket (Top & Bottom)", rate: 0 },
+      pk6: { label: "All-round 6inch Pocket (Top & Bottom)", rate: 0 }
+    };
+
+    const collectOptions = {
+      normal: { label: "4 Working Days", days: 4, multiplier: 1 },
+      quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
+      rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
+      next: { label: "Next Working Days", days: 1, multiplier: 1.5 }
+    };
+
+    const money = (value) => `RM ${value.toFixed(2)}`;
+
+    const formatDate = (date) => date.toLocaleDateString("en-MY", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+
+    const startDate = () => {
+      const now = new Date();
+      const day = now.getDay();
+      const afterCutoff = now.getHours() > 12 || (now.getHours() === 12 && now.getMinutes() >= 30);
+      const fridayLate = day === 5 && now.getHours() >= 18;
+      const sunday = day === 0;
+      const start = new Date(now);
+      if (afterCutoff || fridayLate || sunday) start.setDate(start.getDate() + 1);
+      while (start.getDay() === 0) start.setDate(start.getDate() + 1);
+      return start;
+    };
+
+    const addWorkingDays = (days) => {
+      const date = startDate();
+      let added = 0;
+      while (added < days) {
+        date.setDate(date.getDate() + 1);
+        if (date.getDay() !== 0) added += 1;
+      }
+      return date;
+    };
+
+    const selectedValue = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+
+    const setChoiceState = () => {
+      $$(".choice").forEach((choice) => {
+        const input = choice.querySelector("input");
+        if (input) choice.classList.toggle("is-selected", input.checked);
+      });
+      $$(".collect-date-option").forEach((choice) => {
+        const input = choice.querySelector("input");
+        if (input) choice.classList.toggle("is-selected", input.checked);
+      });
+    };
+
+    const updateDates = () => {
+      return {
+        normal: formatDate(addWorkingDays(4)),
+        quick3: formatDate(addWorkingDays(3)),
+        rush2: formatDate(addWorkingDays(2)),
+        next: formatDate(addWorkingDays(1))
+      };
+    };
+
+    // length units -> inches (pricing is per sq.ft. based on inches)
+    const unitToInch = { in: 1, cm: 1 / 2.54, mm: 1 / 25.4, m: 39.3700787, ft: 12 };
+    const unitLabels = { in: "in", cm: "cm", mm: "mm", m: "m", ft: "ft" };
+
+    // How many separate artwork files the customer is supplying (1-100).
+    const ARTWORK_QTY_MAX = 100;
+
+    const populateArtworkQty = () => {
+      const select = $("#artworkQty");
+      if (!select) return;
+      const options = ['<option value="" selected>Please select artwork quantity</option>'];
+      for (let n = 1; n <= ARTWORK_QTY_MAX; n += 1) {
+        options.push(`<option value="${n}">${n} Artwork</option>`);
+      }
+      select.innerHTML = options.join("");
+    };
+
+    const quote = () => {
+      const height = Math.max(0, Number($("#height").value) || 0);
+      const width = Math.max(0, Number($("#width").value) || 0);
+      const unit = ($("#sizeUnit") && $("#sizeUnit").value) || "in";
+      const factor = unitToInch[unit] || 1;
+      const heightIn = height * factor;
+      const widthIn = width * factor;
+      const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
+      const area = heightIn * widthIn / 144;
+      const printing = printingOptions[$("#printing").value];
+      const material = materialOptions[$("#material").value];
+      const finishing = finishingOptions[selectedValue("finishing")];
+      const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
+      const subtotal = area * 3 * quantity;
+      const total = Math.max(0, subtotal);
+
+      const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
+
+      return { height, width, unit, quantity, area, printing, material, finishing, collect, artworkQty, total };
+    };
+
+    const validate = () => {
+      const hasTerms = $("#terms").checked;
+      const hasArtworkQty = !!($("#artworkQty") && $("#artworkQty").value);
+      const height = Number($("#height").value);
+      const width = Number($("#width").value);
+      $("#addToCart").disabled =
+        !hasTerms || !hasArtworkQty || height <= 0 || width <= 0;
+    };
+
+    const setPickerOpen = (pickerId, isOpen) => {
+      const picker = $(`#${pickerId}`);
+      const toggle = picker.querySelector("[aria-controls]");
+      picker.classList.toggle("is-open", isOpen);
+      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    };
+
+    const closePickers = (exceptId = "") => {
+      $$("[data-picker]").forEach((picker) => {
+        if (picker.id !== exceptId) setPickerOpen(picker.id, false);
+      });
+    };
+
+    const setFinishingPickerOpen = (isOpen) => {
+      setPickerOpen("finishingPicker", isOpen);
+    };
+
+    const update = () => {
+      updateDates();
+      setChoiceState();
+      const q = quote();
+      const sizeText = `${q.height} x ${q.width} ${unitLabels[q.unit] || "in"}`;
+      const areaText = `${q.area.toFixed(2)} sq.ft.`;
+      const collectDate = formatDate(addWorkingDays(q.collect.days));
+      const price = money(q.total);
+
+      $("#sumPrinting").textContent = q.printing.label;
+      $("#sumMaterial").textContent = q.material.label;
+      $("#sumSize").textContent = sizeText;
+      $("#sumArea").textContent = areaText;
+      $("#sumArtwork").textContent = q.artworkQty
+        ? `${q.artworkQty} Artwork`
+        : "Not selected";
+      // Only ask for the files once we know how many there are.
+      const upload = $("#artworkUpload");
+      if (upload) upload.hidden = !q.artworkQty;
+      $("#sumFinishing").textContent = q.finishing.label;
+      const remarkEl = $("#remark");
+      $("#remarkCount").textContent = `${remarkEl.value.length} / ${remarkEl.maxLength}`;
+      $("#selectedPrintingLabel").textContent = q.printing.label;
+      $("#selectedMaterialLabel").textContent = q.material.label;
+      $("#selectedFinishingLabel").textContent = q.finishing.label;
+      $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
+      $("#agentA").textContent = money(q.total);
+      $("#agentB").textContent = money(q.total * 0.85);
+      $("#agentC").textContent = money(q.total * 0.8);
+
+      validate();
+    };
+
+    const addToCart = () => {
+      const q = quote();
+      const collectDate = formatDate(addWorkingDays(q.collect.days));
+      const details = `${q.printing.label}, ${q.material.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${collectDate}`;
+      $("#cartPrice").textContent = money(q.total);
+      $("#cartDetails").textContent = details;
+      $("#cartDrawer").classList.add("is-visible");
+      $("#toast").classList.add("is-visible");
+      window.setTimeout(() => $("#toast").classList.remove("is-visible"), 1800);
+      $("#cartDrawer").scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+      // Bridge to the storefront cart (parent React app). Same-origin only.
+      try {
+        window.parent.postMessage(
+          {
+            type: "sign-cart-add",
+            item: {
+              label: "Inkjet Printing - Billboard / Backdrop",
+              href: "/billboard-backdrop",
+              price: q.total,
+              meta: details,
+              image: "/apps/billboard-backdrop/assets/inkjet-billboard-hero.png",
+            },
+          },
+          window.location.origin
+        );
+      } catch (e) {
+        /* ignore */
+      }
+    };
+
+    const reset = () => {
+      $("#billboardForm").reset();
+      $("#quantity").value = 1;
+      $("#terms").checked = false;
+      $("#cartDrawer").classList.remove("is-visible");
+      update();
+    };
+
+    const stepQuantity = (delta) => {
+      const next = Math.max(1, Math.floor(Number($("#quantity").value) || 1) + delta);
+      $("#quantity").value = next;
+      update();
+    };
+
+    // Sweeping the cursor across the form shouldn't flash previews open, so the
+    // pointer has to settle on a magnifier for this long before one appears.
+    const HOVER_OPEN_DELAY = 200;
+    let hoverTimer = null;
+
+    // Place the popover next to its thumbnail: above by default, flipped below
+    // when there isn't room, and nudged sideways to stay fully on screen.
+    const positionImageViewer = (anchor) => {
+      if (!anchor) return;
+      const card = $(".image-viewer-card");
+      const a = anchor.getBoundingClientRect();
+      const cw = card.offsetWidth;
+      const ch = card.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const gap = 14;
+      const edge = 8;
+
+      let placement = "above";
+      let top = a.top - ch - gap;
+      if (top < edge) {
+        placement = "below";
+        top = a.bottom + gap;
+      }
+      top = Math.max(edge, Math.min(top, vh - ch - edge));
+
+      let left = a.left + a.width / 2 - cw / 2;
+      left = Math.max(edge, Math.min(left, vw - cw - edge));
+
+      card.dataset.placement = placement;
+      card.style.top = `${top}px`;
+      card.style.left = `${left}px`;
+      // Keep the arrow pointing at the thumbnail's centre.
+      const arrowX = a.left + a.width / 2 - left;
+      card.style.setProperty("--arrow-x", `${Math.max(18, Math.min(arrowX, cw - 18))}px`);
+    };
+
+    // hoverMode = true  -> transient preview, follows the mouse on/off
+    // hoverMode = false -> pinned by a click, closed via X / backdrop / Esc
+    const openImageViewer = (img, hoverMode = false, anchor = null) => {
+      // A click beats a pending hover: drop the timer so it can't fire later
+      // and downgrade this pinned preview back to hover mode.
+      if (!hoverMode) window.clearTimeout(hoverTimer);
+      const target = $("#imageViewerImg");
+      target.src = img.src;
+      target.alt = img.alt || "Image preview";
+      $("#imageViewer").classList.add("is-open");
+      $("#imageViewer").classList.toggle("is-hover", hoverMode);
+      $("#imageViewer").setAttribute("aria-hidden", "false");
+
+      const anchorEl = anchor || img.closest(".option-image, .collect-date-option");
+      positionImageViewer(anchorEl);
+      // The card's height isn't final until the image has decoded, so place it
+      // again once it has (cached images fire this immediately).
+      if (!target.complete) {
+        target.addEventListener("load", () => positionImageViewer(anchorEl), { once: true });
+      }
+    };
+
+    const closeImageViewer = () => {
+      window.clearTimeout(hoverTimer);
+      $("#imageViewer").classList.remove("is-open", "is-hover");
+      $("#imageViewer").setAttribute("aria-hidden", "true");
+      $("#imageViewerImg").src = "";
+    };
+
+    const zoomAnchor = (node) => node.closest(".option-image, .collect-date-option");
+
+    // Resting on the magnifier shows the preview — no click needed. Moving from
+    // one magnifier to another re-arms the delay, so a sweep across the row
+    // opens nothing until the pointer actually stops.
+    document.addEventListener("mouseover", (event) => {
+      const zoomButton = event.target.closest(".image-zoom-button");
+      if (!zoomButton) return;
+      const anchor = zoomAnchor(zoomButton);
+      const img = anchor && anchor.querySelector("img");
+      if (!img) return;
+      window.clearTimeout(hoverTimer);
+      hoverTimer = window.setTimeout(
+        () => openImageViewer(img, true, anchor),
+        HOVER_OPEN_DELAY
+      );
+    });
+
+    document.addEventListener("mouseout", (event) => {
+      const zoomButton = event.target.closest(".image-zoom-button");
+      if (!zoomButton) return;
+      // Ignore moves within the button itself.
+      if (event.relatedTarget && zoomButton.contains(event.relatedTarget)) return;
+      // Drop any preview that hasn't opened yet.
+      window.clearTimeout(hoverTimer);
+      // Only dismiss previews opened by hover; a clicked one stays pinned.
+      if ($("#imageViewer").classList.contains("is-hover")) closeImageViewer();
+    });
+
+    document.addEventListener("input", update);
+    document.addEventListener("change", (event) => {
+      if (event.target.name === "printingChoice") {
+        $("#printing").value = event.target.value;
+        setPickerOpen("printingPicker", false);
+      }
+      if (event.target.name === "materialChoice") {
+        $("#material").value = event.target.value;
+        setPickerOpen("materialPicker", false);
+      }
+      if (event.target.name === "finishing") setFinishingPickerOpen(false);
+      update();
+    });
+    document.addEventListener("click", (event) => {
+      const zoomButton = event.target.closest(".image-zoom-button");
+      if (!zoomButton) {
+        if (!event.target.closest("[data-picker]")) closePickers();
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const card = zoomButton.closest(".option-image, .collect-date-option");
+      const img = card?.querySelector("img");
+      if (img) openImageViewer(img, false, card);
+    });
+    $("#imageViewer").addEventListener("click", (event) => {
+      if (event.target === $("#imageViewer")) closeImageViewer();
+    });
+    $("#imageViewerClose").addEventListener("click", closeImageViewer);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeImageViewer();
+      if (event.key === "Escape") closePickers();
+    });
+    $("#printingToggle").addEventListener("click", () => {
+      const isOpen = $("#printingPicker").classList.contains("is-open");
+      closePickers("printingPicker");
+      setPickerOpen("printingPicker", !isOpen);
+    });
+    $("#materialToggle").addEventListener("click", () => {
+      const isOpen = $("#materialPicker").classList.contains("is-open");
+      closePickers("materialPicker");
+      setPickerOpen("materialPicker", !isOpen);
+    });
+    $("#finishingToggle").addEventListener("click", () => {
+      const isOpen = $("#finishingPicker").classList.contains("is-open");
+      closePickers("finishingPicker");
+      setFinishingPickerOpen(!isOpen);
+    });
+    $("#addToCart").addEventListener("click", addToCart);
+    $("#qtyMinus").addEventListener("click", () => stepQuantity(-1));
+    $("#qtyPlus").addEventListener("click", () => stepQuantity(1));
+    $("#editOrder").addEventListener("click", () => $(".panel").scrollIntoView({ behavior: "smooth" }));
+
+    populateArtworkQty();
+    update();
+  </script>
+  <script src="/apps/_shared/single-option.js" defer></script>
+</body>
+</html>

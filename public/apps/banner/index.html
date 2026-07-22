@@ -167,6 +167,121 @@
       padding: 22px;
     }
 
+    /* ---- PREVIEW STYLE: icon badge beside each panel heading ---- */
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-head .section-title {
+      margin: 0;
+    }
+
+    .section-icon {
+      flex: 0 0 auto;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #1f6dff, #35a8ff);
+      color: #fff;
+      font-size: 22px;
+      box-shadow: 0 6px 18px rgba(31, 109, 255, 0.45);
+    }
+
+    /* ---- PREVIEW STYLE: leading icon inside every picker ---- */
+    .product-toggle::before,
+    .finishing-toggle::before {
+      content: attr(data-icon);
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: rgba(53, 216, 255, 0.13);
+      color: #35d8ff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .product-toggle > span,
+    .finishing-toggle > span {
+      margin-right: auto;
+    }
+
+    /* ---- PREVIEW STYLE: icon cell fused to the size inputs ---- */
+    .input-with-icon {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .input-icon {
+      flex: 0 0 auto;
+      width: 46px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(112, 164, 255, 0.38);
+      border-right: 0;
+      border-radius: 10px 0 0 10px;
+      background: rgba(53, 216, 255, 0.1);
+      color: #35d8ff;
+      font-size: 16px;
+    }
+
+    .input-with-icon input {
+      border-radius: 0 10px 10px 0;
+    }
+
+    .size-fields input[type="number"] {
+      min-height: 52px;
+    }
+
+    /* ---- PREVIEW STYLE: optional tag + live character counter ---- */
+    .optional-tag {
+      color: #7f9ec4;
+      font-weight: 700;
+      text-transform: none;
+    }
+
+    .textarea-wrap {
+      position: relative;
+    }
+
+    .char-count {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      color: #7f9ec4;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .textarea-wrap textarea {
+      padding-bottom: 28px;
+    }
+
+    /* ---- PREVIEW STYLE: icon chip on each summary row ---- */
+    .summary-line > span::before {
+      content: attr(data-icon);
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      margin-right: 9px;
+      border-radius: 8px;
+      background: rgba(53, 216, 255, 0.13);
+      color: #35d8ff;
+      font-size: 13px;
+      vertical-align: middle;
+    }
     .section-title {
       margin: 0 0 18px;
       color: #f7fbff;
@@ -216,7 +331,12 @@
     label,
     .field-label {
       display: grid;
+      /* This label is a sibling of its control, not a wrapper, so `gap` never
+         applies — the margin is what actually separates it from the box, and
+         8px matches the gap the wrapping <label> fields (Remark, etc.) get
+         for free. */
       gap: 8px;
+      margin-bottom: 8px;
       color: #dbe8ff;
       font-size: 13px;
       font-weight: 900;
@@ -236,6 +356,36 @@
       font: inherit;
       outline: none;
       box-shadow: inset 0 0 20px rgba(20, 90, 180, 0.08);
+    }
+
+    /* Native <select> fields are dressed to match the custom pickers
+       (Printing / Material / Finishing): same frame, same weight, same cyan
+       chevron. A <select> is a replaced element so it can't take the ::after
+       chevron those toggles use — hence the inline SVG background, drawn to
+       the same 2px / 45deg proportions. */
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      min-height: 52px;
+      padding: 0 40px 0 14px;
+      border-color: rgba(63, 176, 255, 0.58);
+      background-color: rgba(3, 11, 24, 0.92);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Cpath d='M1 1l7 7 7-7' fill='none' stroke='%2335d8ff' stroke-width='2'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      /* 12px, not 14px: the toggles' chevron is a rotated 10px box whose
+         visual centre lands 19px from the edge — this matches it. */
+      background-position: right 12px center;
+      background-size: 14px 8px;
+      color: #f7fbff;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    select option {
+      background: #071427;
+      color: #f7fbff;
+      font-size: 15px;
     }
 
     textarea {
@@ -487,31 +637,68 @@
       inset: 0;
       z-index: 60;
       display: none;
-      place-items: center;
-      padding: 26px;
-      background: rgba(1, 5, 12, 0.82);
-      backdrop-filter: blur(8px);
+      /* No dimming / blur: the preview is an anchored popover, not a modal,
+         so the page behind it stays fully visible. */
+      background: transparent;
     }
 
     .image-viewer.is-open {
-      display: grid;
+      display: block;
+    }
+
+    /* Hover preview: the overlay must not swallow the pointer, otherwise it
+       covers the zoom button the moment it opens, the button loses :hover and
+       the preview flickers open/closed. Click-to-open keeps normal behaviour. */
+    .image-viewer.is-hover {
+      pointer-events: none;
+    }
+
+    .image-viewer.is-hover .image-viewer-close {
+      display: none;
     }
 
     .image-viewer-card {
-      position: relative;
-      width: min(1120px, 94vw);
-      max-height: 90vh;
+      /* JS anchors this to the hovered thumbnail via top/left. */
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: min(739px, 92vw);
+      max-height: 79vh;
       border: 1px solid rgba(53, 216, 255, 0.7);
       border-radius: 12px;
-      padding: 16px;
-      background: rgba(3, 11, 24, 0.96);
-      box-shadow: 0 0 34px rgba(53, 216, 255, 0.42);
+      padding: 10px;
+      background: #fff;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 22px rgba(53, 216, 255, 0.3);
+    }
+
+    /* Little pointer tucked under (or over) the card, aimed at the thumbnail.
+       --arrow-x is set by JS so it tracks the anchor even when the card is
+       nudged sideways to stay on screen. */
+    .image-viewer-card::after {
+      content: "";
+      position: absolute;
+      left: var(--arrow-x, 50%);
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+    }
+
+    .image-viewer-card[data-placement="above"]::after {
+      top: 100%;
+      border-top: 11px solid #fff;
+    }
+
+    .image-viewer-card[data-placement="below"]::after {
+      bottom: 100%;
+      border-bottom: 11px solid #fff;
     }
 
     .image-viewer img {
       display: block;
       width: 100%;
-      max-height: 82vh;
+      max-height: 68vh;
       object-fit: contain;
       border-radius: 7px;
       background: #f7f7f7;
@@ -519,19 +706,31 @@
 
     .image-viewer-close {
       position: absolute;
-      top: -13px;
-      right: -13px;
-      width: 34px;
-      height: 34px;
+      /* Tucked against the card corner rather than floating well outside it. */
+      top: -9px;
+      right: -9px;
+      width: 28px;
+      height: 28px;
+      /* Grid centring (plus padding:0) optically centres the glyph — relying on
+         line-height alone left it sitting off-centre in the circle. */
+      display: grid;
+      place-items: center;
+      padding: 0;
       border: 1px solid rgba(53, 216, 255, 0.88);
       border-radius: 999px;
       background: linear-gradient(135deg, #1f6dff, #35d8ff);
       color: #fff;
-      font-size: 22px;
-      font-weight: 900;
+      font-size: 17px;
+      font-weight: 700;
       line-height: 1;
       cursor: pointer;
-      box-shadow: 0 0 16px rgba(53, 216, 255, 0.72);
+      box-shadow: 0 0 10px rgba(53, 216, 255, 0.5);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .image-viewer-close:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 16px rgba(53, 216, 255, 0.75);
     }
 
     .choice-text {
@@ -775,6 +974,16 @@
       text-transform: uppercase;
     }
 
+    /* Rows inside the artwork panel: label above its control. */
+    .artwork-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .artwork-field[hidden] {
+      display: none;
+    }
+
     .order-title {
       margin: 0 0 10px;
       color: #dce8fb;
@@ -992,6 +1201,78 @@
         padding: 18px;
       }
     }
+    /* =====================================================================
+       PREVIEW STYLE: corner radii dialled back — just a hint of rounding
+       instead of the softer, pill-like look. Kept together at the end of the
+       sheet so the whole scale can be tuned from one place.
+       ===================================================================== */
+    .hero,
+    .panel,
+    .summary,
+    .cart-drawer {
+      border-radius: 10px;
+    }
+
+    .metric,
+    .summary-line,
+    .order-box,
+    .collect-date-panel,
+    .collect-date-grid,
+    .artwork-panel,
+    .addon-grid,
+    .collect-grid,
+    .term-row,
+    .image-viewer-card {
+      border-radius: 7px;
+    }
+
+    input,
+    select,
+    textarea,
+    button,
+    .product-toggle,
+    .finishing-toggle,
+    .choice,
+    .collect-date-option,
+    .agent-card,
+    .date-ticket,
+    .quantity-stepper button,
+    input[type="file"]::file-selector-button,
+    .image-viewer img,
+    .product-toggle::before,
+    .finishing-toggle::before,
+    .summary-line > span::before {
+      border-radius: 5px;
+    }
+
+    .section-icon {
+      border-radius: 9px;
+    }
+
+    .input-icon {
+      border-radius: 5px 0 0 5px;
+    }
+
+    .input-with-icon input {
+      border-radius: 0 5px 5px 0;
+    }
+
+    /* PREVIEW STYLE: X separator sits dead centre on the input band. Matches
+       the 52px boxes and cancels the 8px of slack the grid track carries below
+       the labels — `align-items: end` would otherwise drop it. Must come after
+       the original .size-multiply rule to win. */
+    .size-multiply {
+      height: 52px;
+      margin-bottom: 8px;
+    }
+
+    /* The zoom badge and viewer close button stay circular by design. */
+    .image-zoom-button,
+    .image-zoom-button::before,
+    .image-zoom-button::after,
+    .image-viewer-close {
+      border-radius: 999px;
+    }
   </style>
 </head>
 <body>
@@ -1002,7 +1283,7 @@
 
     <div class="content-grid">
       <section class="panel">
-        <h2 class="section-title" data-kicker="Options">Banner Order</h2>
+        <div class="section-head"><span class="section-icon" aria-hidden="true">▤</span><h2 class="section-title" data-kicker="Options">Banner Order</h2></div>
         <form id="bannerForm">
           <div class="product-picker-stack">
             <div>
@@ -1015,7 +1296,7 @@
               </label>
               <div class="field-label">Printing</div>
               <div class="product-picker" id="printingPicker" data-picker>
-                <button type="button" class="product-toggle" id="printingToggle" aria-expanded="false" aria-controls="printingChoices">
+                <button type="button" class="product-toggle" id="printingToggle" data-icon="◈" aria-expanded="false" aria-controls="printingChoices">
                   <span id="selectedPrintingLabel">UV Ink 1220dpi</span>
                 </button>
                 <div class="addon-grid" id="printingChoices">
@@ -1050,7 +1331,7 @@
               </label>
               <div class="field-label">Choose Material</div>
               <div class="product-picker" id="materialPicker" data-picker>
-                <button type="button" class="product-toggle" id="materialToggle" aria-expanded="false" aria-controls="materialChoices">
+                <button type="button" class="product-toggle" id="materialToggle" data-icon="▤" aria-expanded="false" aria-controls="materialChoices">
                   <span id="selectedMaterialLabel">Tarpaulin 380gsm</span>
                 </button>
                 <div class="addon-grid" id="materialChoices">
@@ -1097,12 +1378,12 @@
           <div class="inline-fields size-fields">
             <label>
               Height
-              <input id="height" type="number" min="0" step="0.1" value="48" required>
+              <div class="input-with-icon"><span class="input-icon" aria-hidden="true">↕</span><input id="height" type="number" min="0" step="0.1" value="48" required></div>
             </label>
             <div class="size-multiply" aria-hidden="true">X</div>
             <label>
               Width
-              <input id="width" type="number" min="0" step="0.1" value="72" required>
+              <div class="input-with-icon"><span class="input-icon" aria-hidden="true">↔</span><input id="width" type="number" min="0" step="0.1" value="72" required></div>
             </label>
             <label>
               Unit
@@ -1119,7 +1400,7 @@
           <div>
             <div class="field-label">Choose Finishing</div>
             <div class="finishing-picker" id="finishingPicker" data-picker>
-              <button type="button" class="finishing-toggle" id="finishingToggle" aria-expanded="false" aria-controls="finishingChoices">
+              <button type="button" class="finishing-toggle" id="finishingToggle" data-icon="✎" aria-expanded="false" aria-controls="finishingChoices">
                 <span id="selectedFinishingLabel">Welded rope with eyelets</span>
               </button>
               <div class="addon-grid" id="finishingChoices">
@@ -1156,9 +1437,21 @@
           </div>
 
           <label>
-            Remark
-            <textarea id="remark" placeholder="Installation notes, eyelet spacing, preferred orientation..."></textarea>
+            Remark <span class="optional-tag">(Optional)</span>
+            <div class="textarea-wrap"><textarea id="remark" maxlength="200" placeholder="Installation notes, eyelet spacing, preferred orientation..."></textarea><span class="char-count" id="remarkCount">0 / 200</span></div>
           </label>
+
+          <div class="artwork-panel">
+            <label class="artwork-field">
+              <span>Artwork Quantity</span>
+              <select id="artworkQty" required></select>
+            </label>
+            <!-- Revealed by update() once a quantity has been chosen. -->
+            <label class="artwork-field" id="artworkUpload" hidden>
+              <span>Upload your Artwork</span>
+              <input id="artwork" type="file" accept=".ai,.pdf,.jpg,.jpeg,.png,.zip">
+            </label>
+          </div>
 
           <div class="collect-date-panel">
             <h3 class="collect-date-title">Collect Date</h3>
@@ -1190,30 +1483,26 @@
             </div>
           </div>
 
-          <label class="artwork-panel">
-            <span>Upload your Artwork</span>
-            <input id="artwork" type="file" accept=".ai,.pdf,.jpg,.jpeg,.png,.zip">
-          </label>
-
         </form>
       </section>
 
       <div class="summary-col">
       <aside class="summary">
-        <h2 class="section-title" data-kicker="Live Quote">Product Detail</h2>
+        <div class="section-head"><span class="section-icon" aria-hidden="true">◈</span><h2 class="section-title" data-kicker="Live Quote">Product Detail</h2></div>
         <div class="summary-list">
-          <div class="summary-line"><span>Printing</span><strong id="sumPrinting">UV Ink 1220dpi</strong></div>
-          <div class="summary-line"><span>Material</span><strong id="sumMaterial">Tarpaulin 380gsm</strong></div>
-          <div class="summary-line"><span>Size</span><strong id="sumSize">48 x 72 in</strong></div>
-          <div class="summary-line"><span>Total Area</span><strong id="sumArea">24.00 sq.ft.</strong></div>
-          <div class="summary-line is-wide"><span>Finishing</span><strong id="sumFinishing">Welded rope with eyelets</strong></div>
-          <div class="summary-line is-wide"><span>Collect</span><strong id="sumCollect">4 Working Days</strong></div>
+          <div class="summary-line"><span data-icon="◈">Printing</span><strong id="sumPrinting">UV Ink 1220dpi</strong></div>
+          <div class="summary-line"><span data-icon="▤">Material</span><strong id="sumMaterial">Tarpaulin 380gsm</strong></div>
+          <div class="summary-line"><span data-icon="⤢">Size</span><strong id="sumSize">48 x 72 in</strong></div>
+          <div class="summary-line"><span data-icon="▦">Total Area</span><strong id="sumArea">24.00 sq.ft.</strong></div>
+          <div class="summary-line"><span data-icon="◫">Artwork</span><strong id="sumArtwork">Not selected</strong></div>
+          <div class="summary-line is-wide"><span data-icon="✎">Finishing</span><strong id="sumFinishing">Welded rope with eyelets</strong></div>
+          <div class="summary-line is-wide"><span data-icon="▣">Collect</span><strong id="sumCollect">4 Working Days</strong></div>
         </div>
       </aside>
 
       <aside class="summary">
         <div class="order-box" style="border:0;background:transparent;box-shadow:none;margin:0;padding:0;">
-          <h3 class="order-title">Order</h3>
+          <h3 class="order-title">Order Summary</h3>
           <div class="agent-grid">
             <div class="agent-card">
               <span>Normal Agent Price</span>
@@ -1361,6 +1650,19 @@
     const unitToInch = { in: 1, cm: 1 / 2.54, mm: 1 / 25.4, m: 39.3700787, ft: 12 };
     const unitLabels = { in: "in", cm: "cm", mm: "mm", m: "m", ft: "ft" };
 
+    // How many separate artwork files the customer is supplying (1-100).
+    const ARTWORK_QTY_MAX = 100;
+
+    const populateArtworkQty = () => {
+      const select = $("#artworkQty");
+      if (!select) return;
+      const options = ['<option value="" selected>Please select artwork quantity</option>'];
+      for (let n = 1; n <= ARTWORK_QTY_MAX; n += 1) {
+        options.push(`<option value="${n}">${n} Artwork</option>`);
+      }
+      select.innerHTML = options.join("");
+    };
+
     const quote = () => {
       const height = Math.max(0, Number($("#height").value) || 0);
       const width = Math.max(0, Number($("#width").value) || 0);
@@ -1377,14 +1679,18 @@
       const subtotal = area * 3 * quantity;
       const total = Math.max(0, subtotal);
 
-      return { height, width, unit, quantity, area, printing, material, finishing, collect, total };
+      const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
+
+      return { height, width, unit, quantity, area, printing, material, finishing, collect, artworkQty, total };
     };
 
     const validate = () => {
       const hasTerms = $("#terms").checked;
+      const hasArtworkQty = !!($("#artworkQty") && $("#artworkQty").value);
       const height = Number($("#height").value);
       const width = Number($("#width").value);
-      $("#addToCart").disabled = !hasTerms || height <= 0 || width <= 0;
+      $("#addToCart").disabled =
+        !hasTerms || !hasArtworkQty || height <= 0 || width <= 0;
     };
 
     const setPickerOpen = (pickerId, isOpen) => {
@@ -1417,7 +1723,15 @@
       $("#sumMaterial").textContent = q.material.label;
       $("#sumSize").textContent = sizeText;
       $("#sumArea").textContent = areaText;
+      $("#sumArtwork").textContent = q.artworkQty
+        ? `${q.artworkQty} Artwork`
+        : "Not selected";
+      // Only ask for the files once we know how many there are.
+      const upload = $("#artworkUpload");
+      if (upload) upload.hidden = !q.artworkQty;
       $("#sumFinishing").textContent = q.finishing.label;
+      const remarkEl = $("#remark");
+      $("#remarkCount").textContent = `${remarkEl.value.length} / ${remarkEl.maxLength}`;
       $("#selectedPrintingLabel").textContent = q.printing.label;
       $("#selectedMaterialLabel").textContent = q.material.label;
       $("#selectedFinishingLabel").textContent = q.finishing.label;
@@ -1432,7 +1746,7 @@
     const addToCart = () => {
       const q = quote();
       const collectDate = formatDate(addWorkingDays(q.collect.days));
-      const details = `${q.printing.label}, ${q.material.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, collect ${collectDate}`;
+      const details = `${q.printing.label}, ${q.material.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${collectDate}`;
       $("#cartPrice").textContent = money(q.total);
       $("#cartDetails").textContent = details;
       $("#cartDrawer").classList.add("is-visible");
@@ -1474,18 +1788,100 @@
       update();
     };
 
-    const openImageViewer = (img) => {
-      $("#imageViewerImg").src = img.src;
-      $("#imageViewerImg").alt = img.alt || "Image preview";
+    // Sweeping the cursor across the form shouldn't flash previews open, so the
+    // pointer has to settle on a magnifier for this long before one appears.
+    const HOVER_OPEN_DELAY = 200;
+    let hoverTimer = null;
+
+    // Place the popover next to its thumbnail: above by default, flipped below
+    // when there isn't room, and nudged sideways to stay fully on screen.
+    const positionImageViewer = (anchor) => {
+      if (!anchor) return;
+      const card = $(".image-viewer-card");
+      const a = anchor.getBoundingClientRect();
+      const cw = card.offsetWidth;
+      const ch = card.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const gap = 14;
+      const edge = 8;
+
+      let placement = "above";
+      let top = a.top - ch - gap;
+      if (top < edge) {
+        placement = "below";
+        top = a.bottom + gap;
+      }
+      top = Math.max(edge, Math.min(top, vh - ch - edge));
+
+      let left = a.left + a.width / 2 - cw / 2;
+      left = Math.max(edge, Math.min(left, vw - cw - edge));
+
+      card.dataset.placement = placement;
+      card.style.top = `${top}px`;
+      card.style.left = `${left}px`;
+      // Keep the arrow pointing at the thumbnail's centre.
+      const arrowX = a.left + a.width / 2 - left;
+      card.style.setProperty("--arrow-x", `${Math.max(18, Math.min(arrowX, cw - 18))}px`);
+    };
+
+    // hoverMode = true  -> transient preview, follows the mouse on/off
+    // hoverMode = false -> pinned by a click, closed via X / backdrop / Esc
+    const openImageViewer = (img, hoverMode = false, anchor = null) => {
+      // A click beats a pending hover: drop the timer so it can't fire later
+      // and downgrade this pinned preview back to hover mode.
+      if (!hoverMode) window.clearTimeout(hoverTimer);
+      const target = $("#imageViewerImg");
+      target.src = img.src;
+      target.alt = img.alt || "Image preview";
       $("#imageViewer").classList.add("is-open");
+      $("#imageViewer").classList.toggle("is-hover", hoverMode);
       $("#imageViewer").setAttribute("aria-hidden", "false");
+
+      const anchorEl = anchor || img.closest(".option-image, .collect-date-option");
+      positionImageViewer(anchorEl);
+      // The card's height isn't final until the image has decoded, so place it
+      // again once it has (cached images fire this immediately).
+      if (!target.complete) {
+        target.addEventListener("load", () => positionImageViewer(anchorEl), { once: true });
+      }
     };
 
     const closeImageViewer = () => {
-      $("#imageViewer").classList.remove("is-open");
+      window.clearTimeout(hoverTimer);
+      $("#imageViewer").classList.remove("is-open", "is-hover");
       $("#imageViewer").setAttribute("aria-hidden", "true");
       $("#imageViewerImg").src = "";
     };
+
+    const zoomAnchor = (node) => node.closest(".option-image, .collect-date-option");
+
+    // Resting on the magnifier shows the preview — no click needed. Moving from
+    // one magnifier to another re-arms the delay, so a sweep across the row
+    // opens nothing until the pointer actually stops.
+    document.addEventListener("mouseover", (event) => {
+      const zoomButton = event.target.closest(".image-zoom-button");
+      if (!zoomButton) return;
+      const anchor = zoomAnchor(zoomButton);
+      const img = anchor && anchor.querySelector("img");
+      if (!img) return;
+      window.clearTimeout(hoverTimer);
+      hoverTimer = window.setTimeout(
+        () => openImageViewer(img, true, anchor),
+        HOVER_OPEN_DELAY
+      );
+    });
+
+    document.addEventListener("mouseout", (event) => {
+      const zoomButton = event.target.closest(".image-zoom-button");
+      if (!zoomButton) return;
+      // Ignore moves within the button itself.
+      if (event.relatedTarget && zoomButton.contains(event.relatedTarget)) return;
+      // Drop any preview that hasn't opened yet.
+      window.clearTimeout(hoverTimer);
+      // Only dismiss previews opened by hover; a clicked one stays pinned.
+      if ($("#imageViewer").classList.contains("is-hover")) closeImageViewer();
+    });
 
     document.addEventListener("input", update);
     document.addEventListener("change", (event) => {
@@ -1511,7 +1907,7 @@
       event.stopPropagation();
       const card = zoomButton.closest(".option-image, .collect-date-option");
       const img = card?.querySelector("img");
-      if (img) openImageViewer(img);
+      if (img) openImageViewer(img, false, card);
     });
     $("#imageViewer").addEventListener("click", (event) => {
       if (event.target === $("#imageViewer")) closeImageViewer();
@@ -1541,7 +1937,9 @@
     $("#qtyPlus").addEventListener("click", () => stepQuantity(1));
     $("#editOrder").addEventListener("click", () => $(".panel").scrollIntoView({ behavior: "smooth" }));
 
+    populateArtworkQty();
     update();
   </script>
+  <script src="/apps/_shared/single-option.js" defer></script>
 </body>
 </html>

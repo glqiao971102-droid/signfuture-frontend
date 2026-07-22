@@ -127,37 +127,47 @@ export default function PvcFoamboardProduct() {
       <div className="xprod-grid">
         {/* LEFT: options */}
         <section className="xprod-panel">
-          <h2 className="xprod-stitle" data-kicker="Options">PVC Foamboard Order</h2>
+          <div className="xprod-head"><span className="xprod-head-icon" aria-hidden="true">▤</span><h2 className="xprod-stitle" data-kicker="Options">PVC Foamboard Order</h2></div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="▤">
             <label>Choose Material</label>
             <div className="xprod-fixedfield">PVC Foamboard</div>
           </div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="✎">
             <label>Surface Finishing</label>
-            <select value={finishing} onChange={(e) => setFinishing(e.target.value)}>
+            <select value={finishing} onChange={(e) => setFinishing(e.target.value)} disabled={FINISHING.length === 1}>
               {FINISHING.map((o) => <option key={o}>{o}</option>)}
             </select>
           </div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="▦">
             <label>PVC Thickness</label>
-            <select value={thickness} onChange={(e) => setThickness(e.target.value)}>
+            <select value={thickness} onChange={(e) => setThickness(e.target.value)} disabled={THICKNESS.length === 1}>
               {THICKNESS.map((o) => <option key={o}>{o}</option>)}
             </select>
           </div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="⤢">
             <label>Size (inch)</label>
-            <select value={sizeLabel} onChange={(e) => setSizeLabel(e.target.value)}>
+            <select value={sizeLabel} onChange={(e) => setSizeLabel(e.target.value)} disabled={SIZE_OPTIONS.length === 1}>
               {SIZE_OPTIONS.map((o) => (
                 <option key={o.label} value={o.label}>{o.label}</option>
               ))}
             </select>
           </div>
 
-          {/* Collect Date — 4 zoomable images (unchanged) */}
+          <label className="xprod-artwork">
+            <span>Upload your Artwork</span>
+            <input
+              type="file"
+              accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
+              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+            />
+            {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
+          </label>
+
+          {/* Collect Date sits last in the form, matching the Inkjet pages. */}
           <div className="xprod-collectp">
             <h3>Collect Date</h3>
             <div className="xprod-collect-grid">
@@ -191,29 +201,20 @@ export default function PvcFoamboardProduct() {
           </div>
 
           {/* Upload artwork (unchanged) */}
-          <label className="xprod-artwork">
-            <span>Upload your Artwork</span>
-            <input
-              type="file"
-              accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
-            />
-            {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
-          </label>
         </section>
 
         {/* RIGHT: two separate frames — Product Detail + Order */}
         <div className="xprod-summary-col">
           <aside className="xprod-summary">
-            <h2 className="xprod-stitle" data-kicker="Live Quote">Product Detail</h2>
+            <div className="xprod-head"><span className="xprod-head-icon" aria-hidden="true">◈</span><h2 className="xprod-stitle" data-kicker="Live Quote">Product Detail</h2></div>
             <div className="xprod-summary-list">
-              <div className="xprod-sline"><span>Material</span><strong>PVC Foamboard</strong></div>
-              <div className="xprod-sline"><span>Thickness</span><strong>{thickness}</strong></div>
-              <div className="xprod-sline"><span>Size</span><strong>{sizeOpt.h} x {sizeOpt.w} in</strong></div>
-              <div className="xprod-sline"><span>Total Area</span><strong>{areaSqft.toFixed(2)} sq.ft.</strong></div>
-              <div className="xprod-sline is-wide"><span>Finishing</span><strong>{finishing}</strong></div>
+              <div className="xprod-sline"><span data-icon="▤">Material</span><strong>PVC Foamboard</strong></div>
+              <div className="xprod-sline"><span data-icon="▦">Thickness</span><strong>{thickness}</strong></div>
+              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>{sizeOpt.h} x {sizeOpt.w} in</strong></div>
+              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>{areaSqft.toFixed(2)} sq.ft.</strong></div>
+              <div className="xprod-sline is-wide"><span data-icon="✎">Finishing</span><strong>{finishing}</strong></div>
               <div className="xprod-sline is-wide">
-                <span>Collect</span>
+                <span data-icon="▣">Collect</span>
                 <strong>
                   {collectOpt.label}
                   {collectDates[collect] ? ` / ${collectDates[collect]}` : ""}
@@ -224,7 +225,7 @@ export default function PvcFoamboardProduct() {
 
           <aside className="xprod-summary">
             <div className="xprod-order" style={{ border: 0, background: "transparent", boxShadow: "none", margin: 0, padding: 0 }}>
-              <h3>Order</h3>
+              <h3>Order Summary</h3>
               <div className="xprod-agents">
                 {agents.map((a) => (
                   <div key={a.name} className="xprod-agent">

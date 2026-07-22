@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150">
+  <defs>
+    <linearGradient id="mtl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8e6f5" stop-opacity="0.55"/><stop offset="0.5" stop-color="#9ab4cc" stop-opacity="0.4"/><stop offset="1" stop-color="#eaf4ff" stop-opacity="0.6"/></linearGradient>
+  </defs>
+  <rect width="200" height="150" fill="#0a1422"/>
+  <!-- printed cut-out panel -->
+  <path d="M78 22 h44 a8 8 0 0 1 8 8 v88 h-60 V30 a8 8 0 0 1 8 -8 Z" fill="#12314f"/>
+  <path d="M78 22 h44 a8 8 0 0 1 8 8 v88 h-60 V30 a8 8 0 0 1 8 -8 Z" fill="none" stroke="#35a8ff" stroke-opacity="0.7"/>
+  <!-- metal easel leg hinged at the back -->
+  <path d="M130 60 L166 122" stroke="url(#mtl)" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M130 60 L166 122" stroke="#dff3ff" stroke-opacity="0.35" stroke-width="1.5" fill="none"/>
+  <circle cx="130" cy="60" r="4" fill="#cfe0f2"/>
+  <!-- floor line -->
+  <path d="M52 122 h124" stroke="#35a8ff" stroke-opacity="0.35" stroke-width="2"/>
+  <text x="100" y="140" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#9fc7e8" text-anchor="middle">METAL</text>
+</svg>

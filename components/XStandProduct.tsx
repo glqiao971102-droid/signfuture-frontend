@@ -90,7 +90,8 @@ export default function XStandProduct() {
   const lamAdd = lam.includes("Matt") ? 5 : lam.includes("Gloss") ? 6 : 0;
   let unit = BASE[finishing];
   if (!standOnly) unit = unit * printMult + lamAdd;
-  unit = unit * collectOpt.mult;
+  // No collect-date step for a bare stand, so no rush multiplier applies.
+  if (!standOnly) unit = unit * collectOpt.mult;
   const total = unit * qty;
   const agents = [
     { name: "Normal Agent Price", price: total },
@@ -120,46 +121,80 @@ export default function XStandProduct() {
       <div className="xprod-grid">
         {/* LEFT: options */}
         <section className="xprod-panel">
-          <h2 className="xprod-stitle" data-kicker="Options">X Stand Order</h2>
+          <div className="xprod-head">
+            <span className="xprod-head-icon" aria-hidden="true">▤</span>
+            <h2 className="xprod-stitle" data-kicker="Options">X Stand Order</h2>
+          </div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="✎">
             <label>Finishing</label>
-            <select value={finishing} onChange={(e) => setFinishing(e.target.value)}>
+            <select value={finishing} onChange={(e) => setFinishing(e.target.value)} disabled={FINISHING.length === 1}>
               {FINISHING.map((o) => <option key={o}>{o}</option>)}
             </select>
           </div>
 
           {!standOnly && (
             <>
-              <div className="xprod-field">
+              <div className="xprod-field" data-icon="▤">
                 <label>Choose Material</label>
                 <select disabled value="Synthetic Paper 180 Micron">
                   <option>Synthetic Paper 180 Micron</option>
                 </select>
               </div>
-              <div className="xprod-field">
+              <div className="xprod-field" data-icon="◈">
                 <label>Printing</label>
-                <select value={tech} onChange={(e) => setTech(e.target.value)}>
+                <select
+                  value={tech}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setTech(next);
+                    // Lamination is Eco Solvent only - drop a stale choice so
+                    // it cannot linger hidden when switching back to UV.
+                    if (!next.includes("Eco Solvent")) setLam(LAMINATION[0]);
+                  }}
+                  disabled={PRINT_TECH.length === 1}
+                >
                   {PRINT_TECH.map((o) => <option key={o}>{o}</option>)}
                 </select>
               </div>
-              <div className="xprod-field">
-                <label>Lamination</label>
-                <select value={lam} onChange={(e) => setLam(e.target.value)}>
-                  {LAMINATION.map((o) => <option key={o}>{o}</option>)}
-                </select>
-              </div>
+              {/* Lamination is only offered on Eco Solvent prints. */}
+              {tech.includes("Eco Solvent") && (
+                <div className="xprod-field" data-icon="◐">
+                  <label>Lamination</label>
+                  <select value={lam} onChange={(e) => setLam(e.target.value)} disabled={LAMINATION.length === 1}>
+                    {LAMINATION.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              )}
             </>
           )}
 
-          <div className="xprod-field">
-            <label>Size</label>
-            <select value={size} onChange={(e) => setSize(e.target.value)}>
-              {SIZE.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
+          {/* Stand-only orders skip the printed panel entirely, so size and
+              artwork upload drop out with the print options. */}
+          {!standOnly && (
+            <>
+              <div className="xprod-field" data-icon="⤢">
+                <label>Size</label>
+                <select value={size} onChange={(e) => setSize(e.target.value)} disabled={SIZE.length === 1}>
+                  {SIZE.map((o) => <option key={o}>{o}</option>)}
+                </select>
+              </div>
 
-          {/* Collect Date — 4 zoomable images (in left panel, like banner) */}
+              <label className="xprod-artwork">
+                <span>Upload your Artwork</span>
+                <input
+                  type="file"
+                  accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
+                  onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+                />
+                {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
+              </label>
+            </>
+          )}
+
+          {/* Collect Date sits last in the form, matching the Inkjet pages.
+              A bare stand ships from stock, so it skips this step. */}
+          {!standOnly && (
           <div className="xprod-collectp">
             <h3>Collect Date</h3>
             <div className="xprod-collect-grid">
@@ -191,42 +226,37 @@ export default function XStandProduct() {
               ))}
             </div>
           </div>
-
-          {/* Upload artwork (below collect date, like banner) */}
-          <label className="xprod-artwork">
-            <span>Upload your Artwork</span>
-            <input
-              type="file"
-              accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
-            />
-            {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
-          </label>
+          )}
         </section>
 
         {/* RIGHT: two separate frames — Product Detail + Order */}
         <div className="xprod-summary-col">
           <aside className="xprod-summary">
-            <h2 className="xprod-stitle" data-kicker="Live Quote">Product Detail</h2>
+            <div className="xprod-head">
+              <span className="xprod-head-icon" aria-hidden="true">◈</span>
+              <h2 className="xprod-stitle" data-kicker="Live Quote">Product Detail</h2>
+            </div>
             <div className="xprod-summary-list">
-              <div className="xprod-sline"><span>Printing</span><strong>{standOnly ? "—" : tech}</strong></div>
-              <div className="xprod-sline"><span>Material</span><strong>{standOnly ? "Stand only" : "Synthetic Paper 180 Micron"}</strong></div>
-              <div className="xprod-sline"><span>Size</span><strong>24 x 72 in</strong></div>
-              <div className="xprod-sline"><span>Total Area</span><strong>12.00 sq.ft.</strong></div>
-              <div className="xprod-sline is-wide"><span>Finishing</span><strong>{finishing}</strong></div>
+              <div className="xprod-sline"><span data-icon="◈">Printing</span><strong>{standOnly ? "—" : tech}</strong></div>
+              <div className="xprod-sline"><span data-icon="▤">Material</span><strong>{standOnly ? "Stand only" : "Synthetic Paper 180 Micron"}</strong></div>
+              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>24 x 72 in</strong></div>
+              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>12.00 sq.ft.</strong></div>
+              <div className="xprod-sline is-wide"><span data-icon="✎">Finishing</span><strong>{finishing}</strong></div>
+              {!standOnly && (
               <div className="xprod-sline is-wide">
-                <span>Collect</span>
+                <span data-icon="▣">Collect</span>
                 <strong>
                   {collectOpt.label}
                   {collectDates[collect] ? ` / ${collectDates[collect]}` : ""}
                 </strong>
               </div>
+              )}
             </div>
           </aside>
 
           <aside className="xprod-summary">
             <div className="xprod-order" style={{ border: 0, background: "transparent", boxShadow: "none", margin: 0, padding: 0 }}>
-              <h3>Order</h3>
+              <h3>Order Summary</h3>
               <div className="xprod-agents">
                 {agents.map((a) => (
                   <div key={a.name} className="xprod-agent">
