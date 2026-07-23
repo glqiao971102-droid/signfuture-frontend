@@ -21,6 +21,8 @@ export type MemberProfile = {
   lastName: string | null;
   /** null for accounts with no membership role — a plain WordPress customer. */
   tier: MemberTier | null;
+  /** True when the account holds the WordPress `administrator` role. */
+  isAdmin: boolean;
   memberNo: string;
   registeredAt: string | null;
   roles: string[];
@@ -101,6 +103,28 @@ export type OrderDetail = OrderSummary & {
   billing: Record<string, string | null>;
   shipping: Record<string, string | null>;
   paidAt: string | null;
+};
+
+export type PaymentProvider = "ipay88" | "stripe";
+
+/**
+ * How to hand the browser over to the gateway.
+ *
+ * iPay88 needs a real form POST to its entry page; Stripe hosts the checkout
+ * and just needs a redirect. `submitToGateway` handles both.
+ */
+export type PaymentInitiation =
+  | { provider: "ipay88"; refNo: string; action: string; fields: Record<string, string> }
+  | { provider: "stripe"; refNo: string; redirectUrl: string };
+
+export type PaymentStatus = {
+  refNo: string;
+  status: "pending" | "paid" | "failed";
+  amount: number;
+  currency: string;
+  purpose: "topup" | "order";
+  errDesc: string | null;
+  settledAt: string | null;
 };
 
 export type InvoiceRow = {
@@ -257,4 +281,110 @@ export const api = {
     const qs = new URLSearchParams({ page: String(page), perPage: String(perPage) });
     return request<{ data: InvoiceRow[]; meta: PagedMeta }>(`/api/v1/invoices?${qs}`);
   },
+
+  /** Creates a pending top-up and returns how to reach the chosen gateway. */
+  startTopup(amount: number, provider: PaymentProvider = "ipay88") {
+    return request<PaymentInitiation>("/api/v1/payments/topup", {
+      method: "POST",
+      body: JSON.stringify({ amount, provider }),
+    });
+  },
+
+  paymentStatus(refNo: string) {
+    return request<PaymentStatus>(`/api/v1/payments/${encodeURIComponent(refNo)}`);
+  },
+
+  // ----- Admin (requires the administrator role; 403 otherwise) -----
+
+  adminUsers(opts: { page?: number; perPage?: number; search?: string; role?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (opts.page) qs.set("page", String(opts.page));
+    if (opts.perPage) qs.set("perPage", String(opts.perPage));
+    if (opts.search) qs.set("search", opts.search);
+    if (opts.role) qs.set("role", opts.role);
+    return request<{ data: AdminUserRow[]; meta: PagedMeta }>(`/api/v1/admin/users?${qs}`);
+  },
+
+  adminUser(id: number) {
+    return request<MemberProfile>(`/api/v1/admin/users/${id}`);
+  },
+
+  adminProducts() {
+    return request<{ data: AdminProductRow[] }>("/api/v1/admin/products");
+  },
+
+  adminProduct(slug: string) {
+    return request<AdminProductDetail>(`/api/v1/admin/products/${slug}`);
+  },
+
+  adminSaveProduct(slug: string, body: { name?: string; active?: boolean; config: unknown }) {
+    return request<{ success: boolean; slug: string; previewPrice: number | null }>(
+      `/api/v1/admin/products/${slug}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    );
+  },
 };
+
+export type AdminProductRow = {
+  id: number;
+  slug: string;
+  name: string;
+  category: string;
+  active: boolean;
+  inputCount: number;
+  optionCount: number;
+  updatedAt: string | null;
+};
+
+export type AdminProductDetail = {
+  id: number;
+  slug: string;
+  name: string;
+  category: string;
+  active: boolean;
+  config: import("@/lib/formula").ProductConfig;
+  previewPrice: number | null;
+};
+
+/** A row in the admin users table. */
+export type AdminUserRow = {
+  id: number;
+  login: string;
+  email: string;
+  registeredAt: string | null;
+  tier: MemberTier | null;
+  isAdmin: boolean;
+  roles: string[];
+  memberNo: string;
+  walletBalance: number;
+};
+
+/**
+ * Hands the browser over to whichever gateway was chosen.
+ *
+ * Stripe hosts its own checkout page, so a plain redirect is enough. iPay88
+ * requires a real browser form POST from the registered Request URL — a
+ * fetch/XHR will not do, since the gateway then renders its own payment page.
+ */
+export function submitToGateway(initiation: PaymentInitiation) {
+  if (initiation.provider === "stripe") {
+    window.location.href = initiation.redirectUrl;
+    return;
+  }
+
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = initiation.action;
+  form.style.display = "none";
+
+  for (const [name, value] of Object.entries(initiation.fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value ?? "";
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
