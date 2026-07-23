@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type AdminUserRow } from "@/lib/api";
 
 const PER_PAGE = 25;
@@ -139,7 +140,11 @@ export default function AdminUsers() {
               {rows.map((u) => (
                 <tr key={u.id}>
                   <td className="adm-mono">{u.id}</td>
-                  <td className="adm-login">{u.login}</td>
+                  <td className="adm-login">
+                    <Link href={`/admin/users/${u.id}`} className="adm-edit-link">
+                      {u.login}
+                    </Link>
+                  </td>
                   <td className="adm-email">{u.email}</td>
                   <td>
                     <span className={tierClass(u)}>

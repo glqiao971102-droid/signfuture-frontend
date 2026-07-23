@@ -14,7 +14,13 @@ import { useAuth } from "@/components/AuthProvider";
  */
 
 const NAV = [
-  { href: "/admin/users", label: "Users", icon: "☺" },
+  { href: "/admin/dashboard", label: "Dashboard", icon: "◆" },
+  { href: "/admin/orders", label: "Orders", icon: "▤" },
+  { href: "/admin/users", label: "Customers", icon: "☺" },
+  { href: "/admin/wallet", label: "Wallet", icon: "◈" },
+  { href: "/admin/invoices", label: "Invoices", icon: "▧" },
+  { href: "/admin/coupons", label: "Coupons", icon: "✁" },
+  { href: "/admin/tiers", label: "Membership", icon: "★" },
   { href: "/admin/products", label: "Products", icon: "▦" },
 ];
 

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export default function AdminIndex() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/admin/users");
+    router.replace("/admin/dashboard");
   }, [router]);
   return <div className="adm-page-head">Loading…</div>;
 }
