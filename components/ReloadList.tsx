@@ -28,8 +28,49 @@ function formatDate(value: string): string {
  * only exists once money actually landed, so every entry here is a successful
  * top-up.
  */
+/**
+ * Banner shown when the member returns from iPay88. The gateway redirects to
+ * /reload-status?payment=success|failed|error, and the wallet has already been
+ * settled server-side by then.
+ */
+function PaymentOutcome({ onSettled }: { onSettled: () => void }) {
+  const [state, setState] = useState<{ kind: string; ref: string | null } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kind = params.get("payment");
+    if (!kind) return;
+
+    setState({ kind, ref: params.get("ref") });
+
+    // Refresh the balance/history now that the payment has landed, then drop
+    // the query string so a reload doesn't show the banner again.
+    if (kind === "success") onSettled();
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [onSettled]);
+
+  if (!state) return null;
+
+  if (state.kind === "success") {
+    return (
+      <p className="login-notice" role="status">
+        ✓ Top up successful{state.ref ? ` — reference ${state.ref}` : ""}. Your wallet balance
+        has been updated.
+      </p>
+    );
+  }
+
+  return (
+    <p className="login-error" role="alert">
+      {state.kind === "failed"
+        ? "Your payment was not completed. No money has been taken."
+        : "We could not verify that payment. If you were charged, please contact support."}
+    </p>
+  );
+}
+
 export default function ReloadList() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [rows, setRows] = useState<WalletTransaction[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -87,8 +128,16 @@ export default function ReloadList() {
     downloadBlob(buildReloadSlipPdf(data), `Reload-${tx.id}.pdf`);
   }
 
+  const onSettled = useCallback(() => {
+    void refresh();
+    void load(1);
+    setPage(1);
+  }, [refresh, load]);
+
   return (
     <>
+      <PaymentOutcome onSettled={onSettled} />
+
       {error && <div className="quote-empty">{error}</div>}
       {loading && !error && <div className="quote-empty">Loading top-ups…</div>}
       {!loading && !error && rows.length === 0 && (
