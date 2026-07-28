@@ -9,10 +9,10 @@ const TIERS = [
   {
     name: "Silver",
     glyph: "◆",
-    topup: "RM 1,000",
+    topup: "RM 2,000",
     save: "50%",
     cls: "tier-silver",
-    perks: ["Lower unit prices", "Free vouchers", "Wallet credit for online orders"],
+    perks: ["RM 20 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Lower unit prices", "Wallet credit for online orders"],
   },
   {
     name: "Gold",
@@ -21,7 +21,7 @@ const TIERS = [
     save: "60%",
     cls: "tier-gold",
     featured: true,
-    perks: ["Bigger savings on every order", "Free vouchers", "Priority quotation"],
+    perks: ["RM 50 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Bigger savings on every order", "Priority quotation"],
   },
   {
     name: "Diamond",
@@ -29,7 +29,7 @@ const TIERS = [
     topup: "RM 10,000",
     save: "80%",
     cls: "tier-diamond",
-    perks: ["Maximum savings", "Free vouchers", "Best value for bulk orders"],
+    perks: ["RM 100 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Maximum savings", "Best value for bulk orders"],
   },
 ];
 
