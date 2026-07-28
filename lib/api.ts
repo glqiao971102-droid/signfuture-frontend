@@ -257,4 +257,143 @@ export const api = {
     const qs = new URLSearchParams({ page: String(page), perPage: String(perPage) });
     return request<{ data: InvoiceRow[]; meta: PagedMeta }>(`/api/v1/invoices?${qs}`);
   },
+
+  /** The signed-in member's vouchers (owned + site-wide). */
+  vouchers() {
+    return request<{ data: Voucher[]; serverTime: string }>("/api/v1/vouchers");
+  },
+
+  /** The signed-in member's reward-point balance (members only). */
+  points() {
+    return request<PointsInfo>("/api/v1/points");
+  },
+
+  // ---- Admin: calculator products ----------------------------------------
+
+  adminProducts() {
+    return request<{ data: AdminProductRow[] }>("/api/v1/admin/products");
+  },
+
+  adminProduct(slug: string) {
+    return request<AdminProductDetail>(`/api/v1/admin/products/${slug}`);
+  },
+
+  adminUpdateProduct(
+    slug: string,
+    body: { name?: string; active?: boolean; config: ProductConfig }
+  ) {
+    return request<{ success: boolean; slug: string; previewPrice: number | null }>(
+      `/api/v1/admin/products/${slug}`,
+      { method: "PUT", body: JSON.stringify(body) }
+    );
+  },
+
+  /** Prices a config without saving — powers the editor's live preview. */
+  adminPreviewProduct(
+    slug: string,
+    body: {
+      config?: ProductConfig;
+      inputs?: Record<string, number>;
+      selections?: Record<string, string>;
+    }
+  ) {
+    return request<{ ok: true; price: number } | { ok: false; error: string }>(
+      `/api/v1/admin/products/${slug}/preview`,
+      { method: "POST", body: JSON.stringify(body) }
+    );
+  },
+};
+
+// ---- Voucher (member-facing) ----------------------------------------------
+
+export type Voucher = {
+  code: string;
+  title: string;
+  description: string | null;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  /** Ready-to-show label, e.g. "20% off" or "RM 30.00 off". */
+  discountLabel: string;
+  /** What it applies to, e.g. "All Products" or "Inkjet Printing". */
+  appliesTo: string;
+  minSpend: number | null;
+  /** True for a top-up member perk (member-only or tier-specific). */
+  membersOnly?: boolean;
+  /** Set when the voucher is a specific tier's top-up reward. */
+  requiredTier?: MemberTier | null;
+  /** ISO date (YYYY-MM-DD) or null for no expiry. */
+  expiresAt: string | null;
+  status: "active" | "upcoming" | "expired" | "inactive";
+};
+
+// ---- Reward points (member-facing) ----------------------------------------
+
+export type PointsInfo = {
+  /** True when the member's tier earns points; false for a plain customer. */
+  earning: boolean;
+  tier: MemberTier | null;
+  /** Points earned per RM 1 of spend. */
+  rate: number;
+  /** Current point balance. */
+  balance: number;
+  /** Spend the balance was derived from. */
+  qualifyingSpend: number;
+};
+
+// ---- Admin product config types (mirror the backend CalcProduct) ----------
+
+export type ProductInput = {
+  key: string;
+  label: string;
+  type: "number" | "integer";
+  min?: number;
+  max?: number;
+  default: number;
+  unit?: string;
+};
+export type ProductChoice = { key: string; label: string; value: number };
+export type ProductOption = { key: string; label: string; choices: ProductChoice[] };
+export type ProductVariable = { key: string; expr: string };
+/**
+ * A 2-D price grid keyed by two option selections (e.g. Material × Printing).
+ * The looked-up cell `values[rowKey][colKey]` is fed to the formula as `key`.
+ */
+export type ProductMatrix = {
+  key: string;
+  label: string;
+  rowOption: string;
+  colOption: string;
+  values: Record<string, Record<string, number>>;
+};
+export type ProductConfig = {
+  inputs: ProductInput[];
+  options: ProductOption[];
+  constants: Record<string, number>;
+  variables: ProductVariable[];
+  matrices?: ProductMatrix[];
+  formula: string;
+  currency?: string;
+};
+
+export type AdminProductRow = {
+  id: number;
+  slug: string;
+  name: string;
+  category: string;
+  active: boolean;
+  imageUrl: string | null;
+  inputCount: number;
+  optionCount: number;
+  updatedAt: string | null;
+};
+
+export type AdminProductDetail = {
+  id: number;
+  slug: string;
+  name: string;
+  category: string;
+  active: boolean;
+  imageUrl: string | null;
+  config: ProductConfig;
+  previewPrice: number | null;
 };

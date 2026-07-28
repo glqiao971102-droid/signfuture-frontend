@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
 import QuotationBrowser from "@/components/QuotationBrowser";
@@ -9,11 +9,14 @@ import InvoiceList from "@/components/InvoiceList";
 import ReloadList from "@/components/ReloadList";
 import CustomTopUp from "@/components/CustomTopUp";
 import WalletTransactions from "@/components/WalletTransactions";
+import VoucherList from "@/components/VoucherList";
+import { api, type PointsInfo } from "@/lib/api";
 import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 type SectionKey =
   | "consultant"
   | "quotation"
+  | "vouchers"
   | "wallet"
   | "orders"
   | "invoice"
@@ -24,6 +27,7 @@ type SectionKey =
 const SIDE: { key: SectionKey; label: string; glyph: string }[] = [
   { key: "consultant", label: "My Consultant", glyph: "☎" },
   { key: "quotation", label: "My Quotation", glyph: "❝" },
+  { key: "vouchers", label: "My Vouchers", glyph: "▧" },
   { key: "wallet", label: "My Wallet", glyph: "◈" },
   { key: "orders", label: "Order Status", glyph: "⛟" },
   { key: "invoice", label: "Download Invoice", glyph: "⤓" },
@@ -88,9 +92,9 @@ const PENDING = [
 
 // Top-up packages (mirrors the /package promo) — shown in the My Wallet tab.
 const TOPUP_TIERS = [
-  { name: "Silver", glyph: "◆", topup: "RM 1,000", save: "50%", cls: "tier-silver", featured: false, perks: ["Lower unit prices", "Free vouchers", "Wallet credit for online orders"] },
-  { name: "Gold", glyph: "◆◆", topup: "RM 5,000", save: "60%", cls: "tier-gold", featured: true, perks: ["Bigger savings on every order", "Free vouchers", "Priority quotation"] },
-  { name: "Diamond", glyph: "◆◆◆", topup: "RM 10,000", save: "80%", cls: "tier-diamond", featured: false, perks: ["Maximum savings", "Free vouchers", "Best value for bulk orders"] },
+  { name: "Silver", glyph: "◆", topup: "RM 2,000", save: "50%", cls: "tier-silver", featured: false, perks: ["RM 20 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Lower unit prices", "Wallet credit for online orders"] },
+  { name: "Gold", glyph: "◆◆", topup: "RM 5,000", save: "60%", cls: "tier-gold", featured: true, perks: ["RM 50 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Bigger savings on every order", "Priority quotation"] },
+  { name: "Diamond", glyph: "◆◆◆", topup: "RM 10,000", save: "80%", cls: "tier-diamond", featured: false, perks: ["RM 100 voucher (1% of top-up)", "Earn 1 point per RM 1 spent", "Maximum savings", "Best value for bulk orders"] },
 ];
 
 const TIER_RATE: Record<MemberTier, number> = {
@@ -107,6 +111,24 @@ const rm = (n: number) =>
 export default function AccountDashboard() {
   const { user } = useAuth();
   const [active, setActive] = useState<SectionKey>("consultant");
+  const [points, setPoints] = useState<PointsInfo | null>(null);
+
+  // Point balance for the member summary. Members earn 1 point per RM 1;
+  // plain customers stay at 0.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .points()
+      .then((res) => {
+        if (!cancelled) setPoints(res);
+      })
+      .catch(() => {
+        /* leave points null — the summary just omits the badge */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!user) {
     return (
@@ -341,6 +363,17 @@ export default function AccountDashboard() {
           </section>
         );
 
+      case "vouchers":
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>My Vouchers</h2>
+              <span>Your discounts — what they apply to, the amount off, and when they expire.</span>
+            </div>
+            <VoucherList />
+          </section>
+        );
+
       case "wallet":
         return (
           <>
@@ -501,6 +534,15 @@ export default function AccountDashboard() {
             <span className={`acct-tier-chip tier-${tierClass}`}>{tierLabel}</span>
             <strong>{user.name}</strong>
             <span className="acct-no">Member No. {user.memberNo}</span>
+          </div>
+          <div className="acct-summary-points">
+            <span>My Points</span>
+            <strong>{(points?.balance ?? 0).toLocaleString("en-MY")}</strong>
+            <span className="acct-points-hint">
+              {points && !points.earning
+                ? "Top up to earn 1 pt / RM 1"
+                : "Earning 1 pt / RM 1"}
+            </span>
           </div>
           <div className="acct-summary-wallet">
             <span>Wallet Balance</span>

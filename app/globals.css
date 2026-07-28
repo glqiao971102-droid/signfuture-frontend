@@ -1679,7 +1679,16 @@ a { color: inherit; text-decoration: none; }
 .acct-avatar.tier-diamond { color: #9fe6ff; border-color: rgba(95, 200, 239, 0.6); box-shadow: inset 0 0 16px rgba(95, 200, 239, 0.22); }
 .acct-summary-meta strong { font-size: 20px; }
 .acct-no { color: var(--muted); font-size: 13px; }
-.acct-summary-wallet { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.acct-summary-points {
+  margin-left: auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  padding-right: 22px; margin-right: 22px;
+  border-right: 1px solid var(--line);
+}
+.acct-summary-points > span { color: var(--muted); font-size: 12.5px; }
+.acct-summary-points > strong { font-size: 22px; color: #ffd76b; }
+.acct-points-hint { font-size: 11px; color: var(--muted); }
+.acct-summary-wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .acct-summary-wallet > span { color: var(--muted); font-size: 12.5px; }
 .acct-summary-wallet > strong { font-size: 22px; color: var(--cyan); }
 .acct-topup { margin-top: 6px; padding: 7px 18px; font-size: 12.5px; }
@@ -1834,6 +1843,66 @@ a { color: inherit; text-decoration: none; }
 .acct-card-head h2 { margin: 0 0 3px; font-size: 19px; }
 .acct-card-head span { color: var(--muted); font-size: 12.5px; }
 
+/* ---- My Vouchers -------------------------------------------------------- */
+.voucher-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
+.voucher-empty.is-error { color: #ff8098; }
+.voucher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.voucher-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid rgba(53, 216, 255, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(6, 20, 40, 0.92), rgba(4, 12, 26, 0.86));
+  overflow: hidden;
+}
+.voucher-card.is-dead { opacity: 0.55; border-color: var(--line); filter: grayscale(0.4); }
+/* left stub with the discount, separated by a dashed "tear" line */
+.voucher-amount {
+  flex: 0 0 96px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  text-align: center;
+  background: linear-gradient(160deg, rgba(53, 216, 255, 0.16), rgba(31, 109, 255, 0.12));
+  border-right: 2px dashed rgba(53, 216, 255, 0.4);
+}
+.voucher-amount strong { font-size: 16px; font-weight: 900; color: #8fe6ff; line-height: 1.2; }
+.voucher-body { flex: 1; min-width: 0; padding: 12px 14px; }
+.voucher-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.voucher-top h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.voucher-members {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #042033; background: linear-gradient(90deg, #d9c07a, #f3e3a6);
+  padding: 2px 7px; border-radius: 999px;
+}
+.voucher-status {
+  flex: 0 0 auto;
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 3px 8px; border-radius: 999px;
+}
+.voucher-status.status-active { color: #062; background: rgba(56, 214, 130, 0.18); color: #56d682; }
+.voucher-status.status-upcoming { color: #8fe6ff; background: rgba(53, 216, 255, 0.15); }
+.voucher-status.status-expired,
+.voucher-status.status-inactive { color: #ff8098; background: rgba(255, 88, 120, 0.14); }
+.voucher-desc { margin: 6px 0 10px; font-size: 12.5px; color: var(--muted); }
+.voucher-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0 0 10px; }
+.voucher-meta dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--muted); }
+.voucher-meta dd { margin: 1px 0 0; font-size: 13px; font-weight: 700; }
+.voucher-code {
+  display: flex; align-items: center; gap: 8px;
+  border-top: 1px solid var(--line); padding-top: 9px;
+}
+.voucher-code span { font-size: 10.5px; text-transform: uppercase; color: var(--muted); }
+.voucher-code code {
+  font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #8fe6ff;
+  background: rgba(53, 216, 255, 0.1); border: 1px dashed rgba(53, 216, 255, 0.4);
+  padding: 2px 10px; border-radius: 6px;
+}
+
 /* monthly bar chart */
 .acct-chart {
   display: flex;
@@ -1906,6 +1975,11 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 920px) {
   .acct-grid { grid-template-columns: 1fr; }
   .acct-summary { flex-wrap: wrap; }
+  .acct-summary-points {
+    margin-left: 0; width: 100%; align-items: flex-start;
+    padding-right: 0; margin-right: 0; border-right: 0;
+    border-top: 1px solid var(--line); padding-top: 12px;
+  }
   .acct-summary-wallet { margin-left: 0; width: 100%; align-items: flex-start; }
 }
 
@@ -3658,4 +3732,101 @@ a { color: inherit; text-decoration: none; }
   font-weight: 500;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* ============================ admin product editor ============================ */
+.admin-wrap {
+  max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px;
+  color: var(--text);
+}
+.admin-muted { color: var(--muted); font-size: 14px; }
+.admin-error { color: #ff9a9a; font-size: 13px; }
+.admin-ok { color: #6ee7b7; font-size: 13px; }
+.admin-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.admin-head h1 { font-size: 26px; font-weight: 800; }
+.admin-search {
+  background: var(--panel); border: 1px solid var(--line-soft); color: var(--text);
+  padding: 9px 14px; border-radius: 10px; min-width: 220px; font-size: 14px;
+}
+.admin-cat { margin-bottom: 26px; }
+.admin-cat h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan); margin-bottom: 12px; }
+.admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.admin-card {
+  display: flex; flex-direction: column; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line-soft); border-radius: 12px;
+  padding: 14px 16px; text-decoration: none; color: var(--text);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.admin-card:hover { border-color: var(--cyan); transform: translateY(-1px); }
+.admin-card-name { font-weight: 700; font-size: 14.5px; }
+.admin-card-meta { color: var(--muted); font-size: 12.5px; }
+.admin-off { color: #ffb27a; font-style: normal; }
+
+/* editor */
+.admin-crumb { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.admin-crumb a { color: var(--cyan); text-decoration: none; font-size: 14px; }
+.admin-title-edit { display: flex; flex-direction: column; gap: 8px; }
+.admin-name {
+  background: transparent; border: none; border-bottom: 1px solid var(--line-soft);
+  color: var(--text); font-size: 22px; font-weight: 800; padding: 4px 2px; min-width: 320px;
+}
+.admin-name:focus { outline: none; border-bottom-color: var(--cyan); }
+.admin-active { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.admin-save-col { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.admin-btn {
+  border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  padding: 9px 20px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.admin-btn.primary { background: var(--cyan); color: #042033; border-color: var(--cyan); }
+.admin-btn:disabled { opacity: 0.6; cursor: default; }
+
+.admin-editor-cols { display: grid; grid-template-columns: 1fr 300px; gap: 22px; align-items: start; }
+.admin-section-title { font-size: 16px; font-weight: 800; margin-bottom: 14px; }
+.admin-block { background: var(--panel); border: 1px solid var(--line-soft); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; }
+.admin-block-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.admin-block-head h3 { font-size: 15px; font-weight: 700; }
+
+/* price grid */
+.admin-matrix-scroll { overflow-x: auto; }
+.admin-matrix { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.admin-matrix th, .admin-matrix td { border: 1px solid var(--line-soft); padding: 8px 10px; text-align: left; }
+.admin-matrix thead th { background: rgba(53, 216, 255, 0.08); color: var(--cyan); font-weight: 700; white-space: nowrap; }
+.admin-matrix-corner { background: transparent !important; color: var(--muted) !important; }
+.admin-matrix tbody th { font-weight: 600; color: var(--text); white-space: nowrap; }
+.admin-cell { display: flex; align-items: center; gap: 5px; }
+.admin-cell span { color: var(--muted); font-size: 12px; }
+.admin-cell input {
+  width: 84px; background: var(--bg); border: 1px solid var(--line-soft); color: var(--text);
+  padding: 6px 8px; border-radius: 8px; font-size: 13.5px;
+}
+.admin-cell input:focus { outline: none; border-color: var(--cyan); }
+
+/* plain option choices */
+.admin-choices { display: flex; flex-direction: column; gap: 8px; }
+.admin-choice { display: flex; align-items: center; gap: 10px; }
+.admin-choice-label {
+  flex: 1; background: var(--bg); border: 1px solid var(--line-soft); color: var(--text);
+  padding: 7px 10px; border-radius: 8px; font-size: 13.5px;
+}
+.admin-choice-label:focus { outline: none; border-color: var(--cyan); }
+
+/* preview */
+.admin-preview { position: sticky; top: 20px; background: var(--panel-strong); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.admin-preview h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+.admin-preview-price { display: flex; align-items: baseline; gap: 6px; margin-bottom: 16px; }
+.admin-preview-price span { color: var(--muted); font-size: 15px; }
+.admin-preview-price strong { font-size: 30px; font-weight: 800; color: var(--cyan); }
+.admin-preview-fields { display: flex; flex-direction: column; gap: 10px; }
+.admin-preview-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.admin-preview-field input, .admin-preview-field select {
+  background: var(--bg); border: 1px solid var(--line-soft); color: var(--text);
+  padding: 7px 9px; border-radius: 8px; font-size: 13.5px;
+}
+.admin-preview-field em { font-style: normal; color: var(--muted); font-size: 11px; }
+.admin-foot-note { margin-top: 20px; color: var(--muted); font-size: 12.5px; }
+.admin-foot-note code { background: rgba(53,216,255,0.1); padding: 1px 6px; border-radius: 5px; color: #9fe8ff; }
+
+@media (max-width: 860px) {
+  .admin-editor-cols { grid-template-columns: 1fr; }
+  .admin-preview { position: static; }
 }

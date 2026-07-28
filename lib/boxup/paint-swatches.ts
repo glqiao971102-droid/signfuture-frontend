@@ -1,12 +1,12 @@
 /**
- * Box Up paint picker: colour swatches shown inline, multi-select.
+ * Box Up paint picker: colour swatches shown inline, single-select.
  *
- * The hidden <select class="mounting-select box-up-paint-select"> is the value
- * carrier. Keeping it means the calculator's existing change handler (which
- * matches ".mounting-select") still rebuilds the 3D preview, so no new wiring
- * is needed on the engine side. Its value is a comma-separated hex list in pick
- * order; the preview paints the whole letter in the first colour only, so extra
- * picks are recorded for the order without splitting the model into two tones.
+ * Clicking a colour selects only that one (radio-style) - the previous pick
+ * clears. The hidden <select class="mounting-select box-up-paint-select"> is the
+ * value carrier. Keeping it means the calculator's existing change handler
+ * (which matches ".mounting-select") still rebuilds the 3D preview, so no new
+ * wiring is needed on the engine side. Its value is the chosen hex, which is
+ * exactly the colour the preview paints the letter.
  */
 
 export const PAINT_COLOURS: { name: string; hex: string }[] = [
@@ -53,33 +53,21 @@ const style = `<style>
   border:1px solid rgba(255,255,255,.35);box-shadow:inset 0 0 6px rgba(0,0,0,.45)}
 .box-up-paint .paint-name{font-size:10px;font-weight:800;letter-spacing:.2px;color:#dbe8ff;text-align:center}
 .box-up-paint .paint-swatch.is-selected .paint-name{color:#8fe6ff}
-.box-up-paint .paint-order{position:absolute;top:3px;right:4px;font-size:9px;font-weight:900;color:#04121f;
-  background:#35d8ff;border-radius:50%;width:13px;height:13px;display:none;place-items:center}
-.box-up-paint .paint-swatch.is-selected .paint-order{display:grid}
 .box-up-paint.is-hidden{display:none}
 </style>`;
 
-// Selection order matters (first = face), so clicks append/remove rather than
-// rebuild, and each chip shows its position.
+// Single-select: clicking a colour selects only that one and clears the rest.
 const script = `<script>
 (function(){
   if (window.__paintSwatchInit) return;
   window.__paintSwatchInit = true;
   var sync = function(field){
-    var chosen = [].slice.call(field.querySelectorAll('.paint-swatch'))
-      .filter(function(s){ return s.classList.contains('is-selected'); })
-      .sort(function(a,b){ return (+a.dataset.order||0) - (+b.dataset.order||0); });
-    chosen.forEach(function(s,i){
-      s.dataset.order = String(i+1);
-      var badge = s.querySelector('.paint-order');
-      if (!badge) { badge = document.createElement('span'); badge.className='paint-order'; s.appendChild(badge); }
-      badge.textContent = String(i+1);
-    });
-    var hexes = chosen.map(function(s){ return s.querySelector('input').value; });
+    var selected = field.querySelector('.paint-swatch.is-selected');
+    var hex = selected ? selected.querySelector('input').value : '';
     var sel = field.querySelector('.box-up-paint-select');
     if (sel) {
-      sel.innerHTML = '<option value="' + hexes.join(',') + '" selected></option>';
-      sel.value = hexes.join(',');
+      sel.innerHTML = '<option value="' + hex + '" selected></option>';
+      sel.value = hex;
       // Reuses the calculator's own ".mounting-select" handler to refresh 3D.
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -88,17 +76,17 @@ const script = `<script>
     var swatch = ev.target.closest && ev.target.closest('.box-up-paint .paint-swatch');
     if (!swatch) return;
     ev.preventDefault();
+    if (swatch.classList.contains('is-selected')) return;  // already the pick
     var field = swatch.closest('.box-up-paint');
+    // Clear every other swatch, then select just this one (radio behaviour).
+    field.querySelectorAll('.paint-swatch').forEach(function(s){
+      s.classList.remove('is-selected');
+      var i = s.querySelector('input');
+      if (i) i.checked = false;
+    });
+    swatch.classList.add('is-selected');
     var input = swatch.querySelector('input');
-    var selectedNow = swatch.classList.contains('is-selected');
-    // Clicking a selected colour deselects it, including the last one.
-    swatch.classList.toggle('is-selected', !selectedNow);
-    input.checked = !selectedNow;
-    if (!selectedNow) {
-      swatch.dataset.order = String(Date.now());  // newest goes last
-    } else {
-      delete swatch.dataset.order;
-    }
+    if (input) input.checked = true;
     sync(field);
   });
   // Paint only applies to the sprayed finish; the plain material uses the
