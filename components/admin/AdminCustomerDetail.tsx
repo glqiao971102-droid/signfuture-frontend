@@ -186,9 +186,25 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
         {/* Referral / admin */}
         <div className="adm-tier-control">
           {profile.isAdmin ? (
+            !profile.referralCode ? (
+              <>
+                <span className="adm-key-label">Referral code</span>
+                <em className="adm-card-sub">This admin has no referral code yet.</em>
+                <button
+                  type="button"
+                  className="hero-btn ghost"
+                  disabled={makingAdmin}
+                  onClick={promoteToAdmin}
+                >
+                  {makingAdmin ? "Generating…" : "Generate referral code"}
+                </button>
+                {adminMsg && <em className="adm-card-sub">{adminMsg}</em>}
+              </>
+            ) : (
             <>
               <span className="adm-key-label">Referral code</span>
               <code className="adm-referral-code">{profile.referralCode ?? "—"}</code>
+              <em className="adm-card-sub">🔒 Permanent — a referral code cannot be changed once generated.</em>
               {profile.referralCode && (
                 <div className="adm-qr-block">
                   <div className="adm-qr-frame">
@@ -222,6 +238,7 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
                 </div>
               )}
             </>
+            )
           ) : (
             <>
               <span className="adm-key-label">Admin access</span>

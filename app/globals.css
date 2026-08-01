@@ -942,11 +942,27 @@ a { color: inherit; text-decoration: none; }
 .login-modal {
   position: relative;
   width: min(420px, 100%);
+  /* Cap to the viewport and scroll inside, so long forms (register) are
+     reachable on small screens. 100dvh accounts for mobile browser chrome. */
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(8, 20, 40, 0.98), rgba(5, 13, 28, 0.98));
   box-shadow: 0 30px 80px rgba(2, 8, 20, 0.7), 0 0 40px rgba(53, 216, 255, 0.15);
   padding: 34px 30px 28px;
+}
+/* The close button stays put while the body scrolls. */
+.login-modal .login-close { position: sticky; top: 0; float: right; }
+
+@media (max-width: 640px) {
+  .login-overlay { padding: 12px; align-items: start; }
+  .login-modal { max-height: calc(100dvh - 24px); padding: 24px 18px 20px; border-radius: 14px; }
+  .login-modal h2 { font-size: 20px; }
+  .login-modal label { margin-bottom: 11px; }
+  .reg-professions { margin-bottom: 12px; }
+  .reg-chip { padding: 6px 11px; font-size: 12px; }
 }
 .login-modal h2 { margin: 0 0 6px; font-size: 24px; }
 .login-sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
