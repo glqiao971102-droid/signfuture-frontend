@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { QRCodeCanvas } from "qrcode.react";
 import {
   api,
   type MemberProfile,
@@ -38,6 +39,20 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
   const [downlineTotal, setDownlineTotal] = useState(0);
   const [makingAdmin, setMakingAdmin] = useState(false);
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
+  const qrRef = useRef<HTMLCanvasElement>(null);
+
+  // Public site base for the referral link encoded in the QR.
+  const SITE = "https://www.signfuturegroup.com";
+  const referralUrl = profile?.referralCode ? `${SITE}/?ref=${profile.referralCode}` : "";
+
+  function downloadQr() {
+    const canvas = qrRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `signfuture-referral-${profile?.referralCode ?? "qr"}.png`;
+    a.click();
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,6 +151,16 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
               <div><span className="adm-key-label">Lifetime spend</span>RM {money(profile.stats.totalSpent)}</div>
             </>
           )}
+          {profile.professions && profile.professions.length > 0 && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span className="adm-key-label">Profession</span>
+              <div className="adm-prof-tags">
+                {profile.professions.map((p) => (
+                  <span key={p} className="adm-chip adm-chip-member">{p}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {!profile.isAdmin && (
@@ -164,9 +189,38 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             <>
               <span className="adm-key-label">Referral code</span>
               <code className="adm-referral-code">{profile.referralCode ?? "—"}</code>
-              <em className="adm-card-sub">
-                People who register with this code become this admin&apos;s downline.
-              </em>
+              {profile.referralCode && (
+                <div className="adm-qr-block">
+                  <div className="adm-qr-frame">
+                    <QRCodeCanvas
+                      ref={qrRef}
+                      value={referralUrl}
+                      size={160}
+                      level="M"
+                      includeMargin
+                    />
+                  </div>
+                  <div className="adm-qr-actions">
+                    <em className="adm-card-sub">
+                      Scanning this QR opens sign-up with this code pre-filled — the new
+                      member joins under this admin.
+                    </em>
+                    <code className="adm-qr-link">{referralUrl}</code>
+                    <div className="adm-radio-row">
+                      <button type="button" className="adm-filter" onClick={downloadQr}>
+                        ↓ Download QR
+                      </button>
+                      <button
+                        type="button"
+                        className="adm-filter"
+                        onClick={() => navigator.clipboard?.writeText(referralUrl)}
+                      >
+                        Copy link
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>

@@ -36,7 +36,23 @@ export type MemberProfile = {
   referralCode: string | null;
   /** The admin user id that referred this member, else null. */
   referredBy: number | null;
+  /** Trades the member selected at sign-up (may be empty). */
+  professions: string[];
 };
+
+/** Trades offered at registration (mirrors the backend PROFESSIONS list). */
+export const PROFESSIONS = [
+  "Offset Printing",
+  "Digital Printing",
+  "Inkjet Printing",
+  "Signage Advertising",
+  "Signboard Installation",
+  "Graphic Design",
+  "Packaging Printing",
+  "Material Supplier",
+  "Advertising Agency",
+  "Exhibition",
+] as const;
 
 export type WalletTransaction = {
   id: number;
@@ -267,6 +283,7 @@ export const api = {
     referralCode: string;
     otp: string;
     phone?: string;
+    professions?: string[];
   }) {
     const res = await request<SessionResponse>("/api/v1/auth/register", {
       method: "POST",

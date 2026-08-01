@@ -13,6 +13,7 @@ import {
   getToken,
   setToken,
   PASSWORD_RESET_REQUIRED,
+  PROFESSIONS,
   type MemberProfile,
   type MemberTier,
 } from "@/lib/api";
@@ -49,6 +50,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
+  // Referral code pulled from a ?ref=CODE link (e.g. a sales admin's QR code).
+  const [pendingReferral, setPendingReferral] = useState<string | null>(null);
+
+  // A ?ref=CODE in the URL (from a QR code / referral link) opens the register
+  // modal with the code pre-filled.
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref) {
+        setPendingReferral(ref.trim().toUpperCase());
+        setOpen(true);
+      }
+    } catch {
+      /* no-op */
+    }
+  }, []);
 
   // Restore the session from a stored token on first mount. Starting signed-out
   // keeps SSR and first paint consistent; the token check then fills the user in.
@@ -124,7 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{ user, loading, openLogin, closeLogin, login, logout, refresh, adjustWallet }}
     >
       {children}
-      {open && <LoginModal onClose={closeLogin} onAuthenticated={onAuthenticated} />}
+      {open && (
+        <LoginModal
+          onClose={closeLogin}
+          onAuthenticated={onAuthenticated}
+          initialReferral={pendingReferral}
+        />
+      )}
     </AuthContext.Provider>
   );
 }
@@ -141,14 +164,18 @@ const MIN_PASSWORD = 8;
 function LoginModal({
   onClose,
   onAuthenticated,
+  initialReferral,
 }: {
   onClose: () => void;
   onAuthenticated: (user: Member) => void;
+  initialReferral?: string | null;
 }) {
   // "signin" -> normal login. "reset" -> the member has never set a password on
   // the new site and must choose one before they can get in. "register" ->
-  // brand-new customer creating an account.
-  const [step, setStep] = useState<"signin" | "reset" | "register">("signin");
+  // brand-new customer creating an account. A referral link lands on register.
+  const [step, setStep] = useState<"signin" | "reset" | "register">(
+    initialReferral ? "register" : "signin",
+  );
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -161,8 +188,14 @@ function LoginModal({
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [regReferral, setRegReferral] = useState("");
+  const [regReferral, setRegReferral] = useState(initialReferral ?? "");
+  const [regProfessions, setRegProfessions] = useState<string[]>([]);
   const [regOtp, setRegOtp] = useState("");
+
+  const toggleProfession = (p: string) =>
+    setRegProfessions((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
+    );
   // Register is two sub-steps: fill the form, then verify the emailed code.
   const [otpSent, setOtpSent] = useState(false);
 
@@ -215,6 +248,7 @@ function LoginModal({
           referralCode: regReferral.trim(),
           otp: regOtp.trim(),
           phone: regPhone.trim() || undefined,
+          professions: regProfessions.length ? regProfessions : undefined,
         }),
       );
     } catch (err) {
@@ -417,6 +451,24 @@ function LoginModal({
                   required
                 />
               </label>
+
+              <div className="reg-professions">
+                <span className="reg-professions-label">
+                  What do you do? <span className="login-optional">(select all that apply)</span>
+                </span>
+                <div className="reg-chips">
+                  {PROFESSIONS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`reg-chip${regProfessions.includes(p) ? " is-active" : ""}`}
+                      onClick={() => toggleProfession(p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {error && (
                 <p className="login-error" role="alert">

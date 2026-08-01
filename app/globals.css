@@ -3599,6 +3599,28 @@ a { color: inherit; text-decoration: none; }
 .login-link:hover { text-decoration: underline; }
 .login-optional { color: var(--muted); font-weight: 400; font-size: 12px; }
 
+/* Registration profession multi-select chips. */
+.reg-professions { margin-bottom: 16px; }
+.reg-professions-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.reg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.reg-chip {
+  border: 1px solid var(--line-soft);
+  background: rgba(3, 10, 22, 0.8);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.reg-chip:hover { border-color: var(--cyan); }
+.reg-chip.is-active {
+  background: rgba(53, 216, 255, 0.14);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 600;
+}
+
 /* Admin: referral code display chip. */
 .adm-referral-code {
   display: inline-block;
@@ -3612,6 +3634,13 @@ a { color: inherit; text-decoration: none; }
   border-radius: 8px;
   padding: 6px 14px;
 }
+
+/* Admin referral QR + link. */
+.adm-qr-block { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; align-items: flex-start; }
+.adm-qr-frame { background: #fff; padding: 10px; border-radius: 10px; line-height: 0; }
+.adm-qr-actions { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
+.adm-qr-link { font-size: 12px; color: var(--muted); word-break: break-all; }
+.adm-prof-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 
 /* ---------- Order line items (expanded order details) ---------- */
 .order-lines {
