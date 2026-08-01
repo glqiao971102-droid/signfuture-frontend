@@ -244,6 +244,16 @@ export const api = {
     return res.user;
   },
 
+  /** Creates a brand-new customer account and signs them straight in. */
+  async register(input: { name: string; email: string; password: string; phone?: string }) {
+    const res = await request<SessionResponse>("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    setToken(res.token.value);
+    return res.user;
+  },
+
   /** Sets the password on a first-time login and signs the member straight in. */
   async firstTimeReset(identifier: string, password: string) {
     const res = await request<SessionResponse>("/api/v1/auth/first-time-reset", {

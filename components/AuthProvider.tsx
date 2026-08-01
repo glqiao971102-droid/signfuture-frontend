@@ -146,8 +146,9 @@ function LoginModal({
   onAuthenticated: (user: Member) => void;
 }) {
   // "signin" -> normal login. "reset" -> the member has never set a password on
-  // the new site and must choose one before they can get in.
-  const [step, setStep] = useState<"signin" | "reset">("signin");
+  // the new site and must choose one before they can get in. "register" ->
+  // brand-new customer creating an account.
+  const [step, setStep] = useState<"signin" | "reset" | "register">("signin");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -155,6 +156,44 @@ function LoginModal({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Register-only fields.
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+
+  async function submitRegister(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError(null);
+
+    if (password.length < MIN_PASSWORD) {
+      setError(`Password must be at least ${MIN_PASSWORD} characters.`);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("The two passwords do not match.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      onAuthenticated(
+        await api.register({
+          name: regName.trim(),
+          email: regEmail.trim(),
+          password,
+          phone: regPhone.trim() || undefined,
+        }),
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submitSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -213,7 +252,7 @@ function LoginModal({
           ×
         </button>
 
-        {step === "signin" ? (
+        {step === "signin" && (
           <>
             <h2>Welcome back</h2>
             <p className="login-sub">Sign in to your Sign Future account</p>
@@ -261,10 +300,109 @@ function LoginModal({
               </button>
             </form>
             <p className="login-foot">
-              Use the same email as your existing Sign Future account.
+              New to Sign Future?{" "}
+              <button
+                type="button"
+                className="login-link"
+                onClick={() => {
+                  setStep("register");
+                  setError(null);
+                  setNotice(null);
+                }}
+              >
+                Create an account
+              </button>
             </p>
           </>
-        ) : (
+        )}
+
+        {step === "register" && (
+          <>
+            <h2>Create your account</h2>
+            <p className="login-sub">Join Sign Future to order and manage signage</p>
+            <form onSubmit={submitRegister}>
+              <label>
+                Full name
+                <input
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Your name"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Phone <span className="login-optional">(optional)</span>
+                <input
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="01x-xxx xxxx"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={`At least ${MIN_PASSWORD} characters`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Confirm password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </label>
+
+              {error && (
+                <p className="login-error" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <button type="submit" className="login-submit" disabled={busy}>
+                {busy ? "Creating account…" : "Create account"}
+              </button>
+            </form>
+            <button
+              type="button"
+              className="login-back"
+              onClick={() => {
+                setStep("signin");
+                setError(null);
+                setPassword("");
+                setConfirmPassword("");
+              }}
+            >
+              ← Back to sign in
+            </button>
+          </>
+        )}
+
+        {step === "reset" && (
           <>
             <h2>Set your new password</h2>
             <p className="login-sub">

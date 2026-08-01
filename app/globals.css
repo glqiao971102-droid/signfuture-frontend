@@ -3586,6 +3586,19 @@ a { color: inherit; text-decoration: none; }
 }
 .login-back:hover { color: var(--cyan); }
 
+/* Inline "Create an account" link in the sign-in footer. */
+.login-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--cyan);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-link:hover { text-decoration: underline; }
+.login-optional { color: var(--muted); font-weight: 400; font-size: 12px; }
+
 /* ---------- Order line items (expanded order details) ---------- */
 .order-lines {
   margin-top: 12px;
