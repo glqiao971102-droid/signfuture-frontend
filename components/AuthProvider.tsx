@@ -161,19 +161,48 @@ function LoginModal({
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regReferral, setRegReferral] = useState("");
+  const [regOtp, setRegOtp] = useState("");
+  // Register is two sub-steps: fill the form, then verify the emailed code.
+  const [otpSent, setOtpSent] = useState(false);
 
+  /** Step 1: validate the form, then email a verification code. */
+  async function sendRegisterCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError(null);
+
+    if (!regName.trim()) return setError("Please enter your name.");
+    if (!regReferral.trim()) return setError("A referral code is required.");
+    if (password.length < MIN_PASSWORD) {
+      return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
+    }
+    if (password !== confirmPassword) {
+      return setError("The two passwords do not match.");
+    }
+
+    setBusy(true);
+    try {
+      await api.sendRegisterOtp(regEmail.trim());
+      setOtpSent(true);
+      setNotice(`We've sent a 6-digit code to ${regEmail.trim()}.`);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Could not send the verification code.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Step 2: submit the code + form to create the account and sign in. */
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     setError(null);
 
-    if (password.length < MIN_PASSWORD) {
-      setError(`Password must be at least ${MIN_PASSWORD} characters.`);
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("The two passwords do not match.");
-      return;
+    if (regOtp.trim().length !== 6) {
+      return setError("Enter the 6-digit code from your email.");
     }
 
     setBusy(true);
@@ -183,6 +212,8 @@ function LoginModal({
           name: regName.trim(),
           email: regEmail.trim(),
           password,
+          referralCode: regReferral.trim(),
+          otp: regOtp.trim(),
           phone: regPhone.trim() || undefined,
         }),
       );
@@ -316,11 +347,11 @@ function LoginModal({
           </>
         )}
 
-        {step === "register" && (
+        {step === "register" && !otpSent && (
           <>
             <h2>Create your account</h2>
             <p className="login-sub">Join Sign Future to order and manage signage</p>
-            <form onSubmit={submitRegister}>
+            <form onSubmit={sendRegisterCode}>
               <label>
                 Full name
                 <input
@@ -376,6 +407,16 @@ function LoginModal({
                   required
                 />
               </label>
+              <label>
+                Referral code
+                <input
+                  type="text"
+                  placeholder="Enter your referral code"
+                  value={regReferral}
+                  onChange={(e) => setRegReferral(e.target.value.toUpperCase())}
+                  required
+                />
+              </label>
 
               {error && (
                 <p className="login-error" role="alert">
@@ -384,7 +425,7 @@ function LoginModal({
               )}
 
               <button type="submit" className="login-submit" disabled={busy}>
-                {busy ? "Creating account…" : "Create account"}
+                {busy ? "Sending code…" : "Send verification code"}
               </button>
             </form>
             <button
@@ -393,11 +434,64 @@ function LoginModal({
               onClick={() => {
                 setStep("signin");
                 setError(null);
+                setNotice(null);
                 setPassword("");
                 setConfirmPassword("");
               }}
             >
               ← Back to sign in
+            </button>
+          </>
+        )}
+
+        {step === "register" && otpSent && (
+          <>
+            <h2>Verify your email</h2>
+            <p className="login-sub">Enter the 6-digit code we sent you</p>
+
+            {notice && (
+              <p className="login-notice" role="status">
+                {notice}
+              </p>
+            )}
+
+            <form onSubmit={submitRegister}>
+              <label>
+                Verification code
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={regOtp}
+                  onChange={(e) => setRegOtp(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                />
+              </label>
+
+              {error && (
+                <p className="login-error" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <button type="submit" className="login-submit" disabled={busy}>
+                {busy ? "Creating account…" : "Verify & create account"}
+              </button>
+            </form>
+            <button
+              type="button"
+              className="login-back"
+              onClick={() => {
+                setOtpSent(false);
+                setRegOtp("");
+                setError(null);
+                setNotice(null);
+              }}
+            >
+              ← Change details
             </button>
           </>
         )}

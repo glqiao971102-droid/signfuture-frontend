@@ -32,6 +32,10 @@ export type MemberProfile = {
   shipping: Record<string, string | null>;
   /** Lifetime order count and spend; null for members who never ordered. */
   stats: { orderCount: number; totalSpent: number } | null;
+  /** This account's own referral code (admins only), else null. */
+  referralCode: string | null;
+  /** The admin user id that referred this member, else null. */
+  referredBy: number | null;
 };
 
 export type WalletTransaction = {
@@ -244,8 +248,26 @@ export const api = {
     return res.user;
   },
 
-  /** Creates a brand-new customer account and signs them straight in. */
-  async register(input: { name: string; email: string; password: string; phone?: string }) {
+  /** Sends a 6-digit email verification code for registration. */
+  sendRegisterOtp(email: string) {
+    return request<{ success: boolean; message: string }>(
+      "/api/v1/auth/register/send-otp",
+      { method: "POST", body: JSON.stringify({ email }) },
+    );
+  },
+
+  /**
+   * Creates a brand-new customer account and signs them straight in.
+   * Requires a verified email (otp) and a valid admin referral code.
+   */
+  async register(input: {
+    name: string;
+    email: string;
+    password: string;
+    referralCode: string;
+    otp: string;
+    phone?: string;
+  }) {
     const res = await request<SessionResponse>("/api/v1/auth/register", {
       method: "POST",
       body: JSON.stringify(input),
@@ -437,6 +459,23 @@ export const api = {
       `/api/v1/admin/users/${id}/tier`,
       { method: "PATCH", body: JSON.stringify({ tier }) },
     );
+  },
+
+  /** Promotes a member to administrator and returns their new referral code. */
+  adminMakeAdmin(id: number) {
+    return request<{ success: boolean; isAdmin: boolean; referralCode: string }>(
+      `/api/v1/admin/users/${id}/make-admin`,
+      { method: "POST" },
+    );
+  },
+
+  /** Members referred by this admin (their downline). */
+  adminDownline(id: number, page = 1) {
+    return request<{
+      data: { id: number; login: string; email: string; name: string; registeredAt: string | null }[];
+      meta: PagedMeta;
+      referralCode: string | null;
+    }>(`/api/v1/admin/users/${id}/downline?page=${page}`);
   },
 
   // ----- Admin: wallet audit -----

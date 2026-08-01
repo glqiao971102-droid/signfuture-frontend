@@ -3599,6 +3599,20 @@ a { color: inherit; text-decoration: none; }
 .login-link:hover { text-decoration: underline; }
 .login-optional { color: var(--muted); font-weight: 400; font-size: 12px; }
 
+/* Admin: referral code display chip. */
+.adm-referral-code {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  background: rgba(53, 216, 255, 0.1);
+  border: 1px solid rgba(53, 216, 255, 0.25);
+  border-radius: 8px;
+  padding: 6px 14px;
+}
+
 /* ---------- Order line items (expanded order details) ---------- */
 .order-lines {
   margin-top: 12px;

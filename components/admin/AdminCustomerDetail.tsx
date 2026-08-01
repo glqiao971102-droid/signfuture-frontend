@@ -31,6 +31,14 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
   const [savingTier, setSavingTier] = useState(false);
   const [tierMsg, setTierMsg] = useState<string | null>(null);
 
+  // Referral / admin
+  const [downline, setDownline] = useState<
+    { id: number; email: string; name: string; registeredAt: string | null }[]
+  >([]);
+  const [downlineTotal, setDownlineTotal] = useState(0);
+  const [makingAdmin, setMakingAdmin] = useState(false);
+  const [adminMsg, setAdminMsg] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -43,6 +51,16 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
       setProfile(p);
       setOrders(o.data);
       setWallet(w.data);
+      // Admins have a downline; load it.
+      if (p.isAdmin) {
+        try {
+          const dl = await api.adminDownline(id);
+          setDownline(dl.data);
+          setDownlineTotal(dl.meta.total);
+        } catch {
+          setDownline([]);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load customer");
     } finally {
@@ -53,6 +71,21 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function promoteToAdmin() {
+    if (!confirm("Promote this member to administrator? They'll get a referral code and admin access.")) return;
+    setMakingAdmin(true);
+    setAdminMsg(null);
+    try {
+      const r = await api.adminMakeAdmin(id);
+      setAdminMsg(`Now an admin. Referral code: ${r.referralCode}`);
+      await load();
+    } catch (err) {
+      setAdminMsg(err instanceof Error ? err.message : "Could not promote user");
+    } finally {
+      setMakingAdmin(false);
+    }
+  }
 
   async function changeTier(tier: (typeof SETTABLE)[number]) {
     setSavingTier(true);
@@ -124,7 +157,70 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             {tierMsg && <em className="adm-card-sub">{tierMsg}</em>}
           </div>
         )}
+
+        {/* Referral / admin */}
+        <div className="adm-tier-control">
+          {profile.isAdmin ? (
+            <>
+              <span className="adm-key-label">Referral code</span>
+              <code className="adm-referral-code">{profile.referralCode ?? "—"}</code>
+              <em className="adm-card-sub">
+                People who register with this code become this admin&apos;s downline.
+              </em>
+            </>
+          ) : (
+            <>
+              <span className="adm-key-label">Admin access</span>
+              <button
+                type="button"
+                className="hero-btn ghost"
+                disabled={makingAdmin}
+                onClick={promoteToAdmin}
+              >
+                {makingAdmin ? "Promoting…" : "Make admin"}
+              </button>
+            </>
+          )}
+          {adminMsg && <em className="adm-card-sub">{adminMsg}</em>}
+          {profile.referredBy && (
+            <em className="adm-card-sub">
+              Referred by admin #{profile.referredBy}
+            </em>
+          )}
+        </div>
       </div>
+
+      {profile.isAdmin && (
+        <div className="adm-card">
+          <div className="adm-card-head-row">
+            <h2>Downline</h2>
+            <span className="adm-card-sub">{downlineTotal} member{downlineTotal === 1 ? "" : "s"}</span>
+          </div>
+          <div className="adm-table-scroll">
+            <table className="adm-table">
+              <thead>
+                <tr><th>Member</th><th>Email</th><th>Joined</th></tr>
+              </thead>
+              <tbody>
+                {downline.length === 0 && (
+                  <tr><td colSpan={3} className="adm-empty">No one has registered with this code yet.</td></tr>
+                )}
+                {downline.map((m) => (
+                  <tr key={m.id}>
+                    <td>
+                      <Link href={`/admin/users/${m.id}`} className="adm-edit-link">
+                        {m.name || m.email}
+                      </Link>
+                    </td>
+                    <td className="adm-email">{m.email}</td>
+                    <td className="adm-date">{formatDate(m.registeredAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="adm-two-col">
         <div className="adm-card">
