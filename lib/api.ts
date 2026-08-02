@@ -342,6 +342,52 @@ export const api = {
     return request<{ data: InvoiceRow[]; meta: PagedMeta }>(`/api/v1/invoices?${qs}`);
   },
 
+  /** Places a native order. Returns the created order (with ref + status). */
+  createOrder(input: {
+    items: {
+      productSlug?: string;
+      productName: string;
+      qty: number;
+      unitPrice: number;
+      options?: { label: string; value: string }[];
+      artworkUrl?: string;
+    }[];
+    billing?: Record<string, string>;
+    shipping?: Record<string, string>;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    deliveryMethod?: string;
+    collectDate?: string;
+    notes?: string;
+    paymentMethod: "wallet" | "pending";
+  }) {
+    return request<{ id: number; ref: string; status: string; statusLabel: string; total: number }>(
+      "/api/v1/orders",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+
+  /** Uploads an artwork file for an order, returns its stored URL. */
+  async uploadArtwork(file: File) {
+    const form = new FormData();
+    form.append("artwork", file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/orders/artwork`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : {},
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed", body?.error ?? null);
+    return body as { success: boolean; url: string };
+  },
+
+  /** The member's own native orders. */
+  myNativeOrders() {
+    return request<{ data: NativeOrderRow[] }>("/api/v1/orders/native");
+  },
+
   /** Creates a pending top-up and returns how to reach the chosen gateway. */
   startTopup(amount: number, provider: PaymentProvider = "ipay88") {
     return request<PaymentInitiation>("/api/v1/payments/topup", {
@@ -446,14 +492,32 @@ export const api = {
     );
   },
 
+  adminNativeStatuses() {
+    return request<{ data: { value: string; label: string }[] }>(
+      "/api/v1/admin/orders/native/statuses",
+    );
+  },
+
   adminOrder(id: number) {
     return request<OrderDetail>(`/api/v1/admin/orders/${id}`);
+  },
+
+  adminNativeOrder(id: number) {
+    return request<NativeOrderDetail>(`/api/v1/admin/orders/native/${id}`);
   },
 
   adminUpdateOrderStatus(id: number, status: string) {
     return request<{ success: boolean; status: string }>(
       `/api/v1/admin/orders/${id}/status`,
       { method: "PATCH", body: JSON.stringify({ status }) },
+    );
+  },
+
+  /** Changes a native order's status (writes history + emails the customer). */
+  adminUpdateNativeStatus(id: number, status: string, note?: string) {
+    return request<{ success: boolean; status: string; statusLabel: string }>(
+      `/api/v1/admin/orders/native/${id}/status`,
+      { method: "PATCH", body: JSON.stringify({ status, note }) },
     );
   },
 
@@ -558,10 +622,47 @@ export const api = {
   },
 };
 
-/** A row in the admin all-orders table. */
+/** A row in the admin all-orders table (native orders carry source + ref). */
 export type AdminOrderRow = OrderSummary & {
   customer: string;
   customerId: number | null;
+  source?: "native" | "legacy";
+  ref?: string;
+};
+
+export type NativeOrderRow = {
+  id: number;
+  ref: string;
+  status: string;
+  statusLabel: string;
+  total: number;
+  currency: string;
+  date: string | null;
+  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null }[];
+};
+
+export type NativeOrderDetail = {
+  id: number;
+  ref: string;
+  source: "native";
+  status: string;
+  statusLabel: string;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  currency: string;
+  paymentMethod: string;
+  paidAt: string | null;
+  customer: string | null;
+  customerId: number;
+  billing: Record<string, string> | null;
+  shipping_address: Record<string, string> | null;
+  deliveryMethod: string | null;
+  collectDate: string | null;
+  notes: string | null;
+  date: string | null;
+  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null }[];
+  history: { from: string | null; to: string; note: string | null; date: string | null }[];
 };
 
 export type AdminWalletSummary = {

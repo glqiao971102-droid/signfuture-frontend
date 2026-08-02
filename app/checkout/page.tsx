@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
+import { api, ApiError } from "@/lib/api";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
+
+const COLLECT_OPTIONS = [
+  "Normal (4 Working Days)",
+  "Express (2 Working Days)",
+  "Urgent (Next Working Day)",
+];
 
 type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string };
 type Address = {
@@ -24,12 +31,23 @@ type Order = {
 };
 
 export default function CheckoutPage() {
-  const { user, openLogin, adjustWallet } = useAuth();
+  const { user, openLogin, refresh } = useAuth();
   const { clear } = useCart();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [placed, setPlaced] = useState<{ ref: string; paid: number } | null>(null);
+  const [placed, setPlaced] = useState<{ ref: string; label: string; paid: number; pending: boolean } | null>(null);
+
+  // Extra order details (mirrors the old system).
+  const [collectDate, setCollectDate] = useState(COLLECT_OPTIONS[0]);
+  const [notes, setNotes] = useState("");
+  const [agree, setAgree] = useState(false);
+  const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
+  const [artworkName, setArtworkName] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -45,18 +63,71 @@ export default function CheckoutPage() {
   const total = order?.total ?? 0;
   const enough = wallet >= total;
 
-  const placeOrder = () => {
-    if (!order || !user || !enough) return;
-    const ref = "SF" + Date.now().toString(36).toUpperCase().slice(-7);
-    adjustWallet(-total);
-    clear();
+  async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
     try {
-      localStorage.removeItem(CHECKOUT_KEY);
-    } catch {
-      /* ignore */
+      const res = await api.uploadArtwork(file);
+      setArtworkUrl(res.url);
+      setArtworkName(file.name);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Artwork upload failed.");
+    } finally {
+      setUploading(false);
     }
-    setPlaced({ ref, paid: total });
-  };
+  }
+
+  async function submit(paymentMethod: "wallet" | "pending") {
+    if (!order || !user) return;
+    if (!agree) {
+      setError("Please agree to the Terms & Conditions.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const items = order.items.map((it, i) => ({
+        productName: it.label,
+        qty: it.qty,
+        unitPrice: it.price,
+        options: it.meta ? [{ label: "Specification", value: it.meta }] : [],
+        // Attach the uploaded artwork to the first line item.
+        artworkUrl: i === 0 && artworkUrl ? artworkUrl : undefined,
+      }));
+      const a = order.address;
+      const res = await api.createOrder({
+        items,
+        billing: a
+          ? {
+              name: a.receiver || a.profile || "",
+              phone: a.mobile || a.tel || "",
+              address_1: a.address1 || "",
+              address_2: a.address2 || "",
+              city: a.city || "",
+              state: a.state || "",
+              postcode: a.postcode || "",
+            }
+          : undefined,
+        customerName: a?.receiver || a?.profile || user.name,
+        customerPhone: a?.mobile || a?.tel || user.phone || undefined,
+        deliveryMethod: order.shipping.label || "Self Pickup",
+        collectDate,
+        notes: notes.trim() || undefined,
+        paymentMethod,
+      });
+      // Real balance changed on the server when paid by wallet.
+      if (paymentMethod === "wallet") void refresh();
+      clear();
+      try { localStorage.removeItem(CHECKOUT_KEY); } catch { /* ignore */ }
+      setPlaced({ ref: res.ref, label: res.statusLabel, paid: paymentMethod === "wallet" ? total : 0, pending: paymentMethod === "pending" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not place the order. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -74,9 +145,12 @@ export default function CheckoutPage() {
           <section className="checkout-done">
             <span className="checkout-done-icon">✓</span>
             <h2>Order placed!</h2>
-            <p>Your order <strong>{placed.ref}</strong> has been confirmed and paid from your wallet.</p>
-            <div className="checkout-done-row"><span>Paid</span><strong>{formatRM(placed.paid)}</strong></div>
-            <div className="checkout-done-row"><span>Wallet balance</span><strong>{formatRM(user?.wallet.balance ?? 0)}</strong></div>
+            <p>Your order <strong>{placed.ref}</strong> has been received — status <strong>{placed.label}</strong>.</p>
+            {placed.pending ? (
+              <p className="checkout-wallet-note">Payment pending — we&apos;ll confirm your order shortly.</p>
+            ) : (
+              <div className="checkout-done-row"><span>Paid from wallet</span><strong>{formatRM(placed.paid)}</strong></div>
+            )}
             <div className="checkout-done-actions">
               <Link href="/order-status" className="hero-btn primary">Track order</Link>
               <Link href="/#categories" className="cart-dd-btn ghost">Continue shopping</Link>
@@ -132,6 +206,27 @@ export default function CheckoutPage() {
                   <p className="checkout-pickup-note">Pick up at our outlet — no delivery address needed.</p>
                 )}
               </div>
+
+              {/* Collection + artwork + notes */}
+              <div className="checkout-block">
+                <h3 className="checkout-block-title">Order details</h3>
+                <label className="checkout-field">
+                  <span>Collection timeline</span>
+                  <select value={collectDate} onChange={(e) => setCollectDate(e.target.value)}>
+                    {COLLECT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </label>
+                <label className="checkout-field">
+                  <span>Upload artwork <em>(optional — JPG/PNG/PDF/AI/EPS/ZIP)</em></span>
+                  <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip" onChange={handleArtwork} />
+                  {uploading && <em className="checkout-hint">Uploading…</em>}
+                  {artworkName && !uploading && <em className="checkout-hint ok">✓ {artworkName}</em>}
+                </label>
+                <label className="checkout-field">
+                  <span>Order notes <em>(optional)</em></span>
+                  <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any special instructions…" />
+                </label>
+              </div>
             </div>
 
             {/* Payment */}
@@ -149,26 +244,41 @@ export default function CheckoutPage() {
 
               <div className="checkout-wallet">
                 <div className="checkout-wallet-head">
-                  <span>Pay with Wallet</span>
+                  <span>Wallet balance</span>
                   <strong className={enough ? "" : "low"}>{formatRM(wallet)}</strong>
                 </div>
                 {!user ? (
-                  <p className="checkout-wallet-note">Please sign in to pay with your wallet.</p>
+                  <p className="checkout-wallet-note">Please sign in to place your order.</p>
                 ) : enough ? (
-                  <p className="checkout-wallet-note ok">Balance after payment: {formatRM(wallet - total)}</p>
+                  <p className="checkout-wallet-note ok">Balance after wallet payment: {formatRM(wallet - total)}</p>
                 ) : (
-                  <p className="checkout-wallet-note low">Insufficient balance — top up {formatRM(total - wallet)} more.</p>
+                  <p className="checkout-wallet-note low">Not enough to pay by wallet — submit and pay later, or top up.</p>
                 )}
               </div>
 
+              <label className="checkout-tnc">
+                <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                <span>I agree to the Terms &amp; Conditions</span>
+              </label>
+
+              {error && <p className="login-error" role="alert">{error}</p>}
+
               {!user ? (
                 <button type="button" className="hero-btn primary cart-checkout" onClick={openLogin}>Sign in to continue</button>
-              ) : enough ? (
-                <button type="button" className="hero-btn primary cart-checkout" onClick={placeOrder}>Place order</button>
               ) : (
-                <Link href="/package" className="hero-btn primary cart-checkout checkout-topup">Top up wallet</Link>
+                <>
+                  {enough && (
+                    <button type="button" className="hero-btn primary cart-checkout" disabled={submitting || uploading} onClick={() => submit("wallet")}>
+                      {submitting ? "Placing…" : "Place order & pay by wallet"}
+                    </button>
+                  )}
+                  <button type="button" className={`hero-btn cart-checkout ${enough ? "ghost" : "primary"}`} disabled={submitting || uploading} onClick={() => submit("pending")}>
+                    {submitting ? "Submitting…" : "Submit order (pay later)"}
+                  </button>
+                  {!enough && <Link href="/package" className="cart-dd-btn ghost checkout-topup">Top up wallet</Link>}
+                </>
               )}
-              <p className="cart-sum-note">By placing this order you agree to our terms. Final quote is confirmed after artwork check.</p>
+              <p className="cart-sum-note">Final quote is confirmed after our team checks your artwork.</p>
             </aside>
           </section>
         )}

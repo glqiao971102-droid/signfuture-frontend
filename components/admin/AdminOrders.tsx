@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type AdminOrderRow, type OrderDetail } from "@/lib/api";
+import { api, type AdminOrderRow, type OrderDetail, type NativeOrderDetail } from "@/lib/api";
 
 const PER_PAGE = 25;
 
@@ -31,10 +31,14 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Detail drawer
+  // Detail drawer (legacy)
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Detail drawer (native)
+  const [nativeStatuses, setNativeStatuses] = useState<{ value: string; label: string }[]>([]);
+  const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
 
   const load = useCallback(async (p: number, searchTerm: string, statusFilter: string) => {
     setLoading(true);
@@ -58,10 +62,8 @@ export default function AdminOrders() {
   }, []);
 
   useEffect(() => {
-    api
-      .adminOrderStatuses()
-      .then((r) => setStatuses(r.data))
-      .catch(() => setStatuses([]));
+    api.adminOrderStatuses().then((r) => setStatuses(r.data)).catch(() => setStatuses([]));
+    api.adminNativeStatuses().then((r) => setNativeStatuses(r.data)).catch(() => setNativeStatuses([]));
   }, []);
 
   useEffect(() => {
@@ -77,12 +79,20 @@ export default function AdminOrders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  async function openDetail(id: number) {
+  function closeDrawer() {
     setDetail(null);
+    setNativeDetail(null);
+  }
+
+  async function openDetail(row: AdminOrderRow) {
+    closeDrawer();
     setDetailLoading(true);
     try {
-      const d = await api.adminOrder(id);
-      setDetail(d);
+      if (row.source === "native") {
+        setNativeDetail(await api.adminNativeOrder(row.id));
+      } else {
+        setDetail(await api.adminOrder(row.id));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load order");
     } finally {
@@ -90,13 +100,33 @@ export default function AdminOrders() {
     }
   }
 
+  /** Legacy status change — WooCommerce order, with a confirmation. */
   async function changeStatus(newStatus: string) {
     if (!detail) return;
+    const label = statuses.find((s) => s.value === newStatus)?.label ?? newStatus;
+    if (!window.confirm(`Change order #${detail.id} status to "${label}"?`)) return;
     setSavingStatus(true);
     try {
       await api.adminUpdateOrderStatus(detail.id, newStatus);
-      // Reflect it locally + in the table without a full reload.
       setDetail((d) => (d ? { ...d, status: newStatus } : d));
+      await load(page, search, status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update status");
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
+  /** Native status change — confirms, then emails the customer. */
+  async function changeNativeStatus(newStatus: string) {
+    if (!nativeDetail) return;
+    const label = nativeStatuses.find((s) => s.value === newStatus)?.label ?? newStatus;
+    if (!window.confirm(`Change order ${nativeDetail.ref} to "${label}"?\n\nThe customer will be emailed this update.`)) return;
+    const note = window.prompt("Optional note to include in the email (leave blank to skip):") ?? undefined;
+    setSavingStatus(true);
+    try {
+      const r = await api.adminUpdateNativeStatus(nativeDetail.id, newStatus, note || undefined);
+      setNativeDetail((d) => (d ? { ...d, status: r.status, statusLabel: r.statusLabel } : d));
       await load(page, search, status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update status");
@@ -164,8 +194,11 @@ export default function AdminOrders() {
               </tr>
             )}
             {rows.map((o) => (
-              <tr key={o.id}>
-                <td className="adm-mono">#{o.id}</td>
+              <tr key={`${o.source ?? "legacy"}-${o.id}`}>
+                <td className="adm-mono">
+                  {o.source === "native" ? o.ref : `#${o.id}`}
+                  {o.source === "native" && <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span>}
+                </td>
                 <td>
                   {o.customerId ? (
                     <Link href={`/admin/users/${o.customerId}`} className="adm-edit-link">
@@ -176,17 +209,15 @@ export default function AdminOrders() {
                   )}
                 </td>
                 <td>
-                  <span className={stageClass(o.stage)}>{o.statusLabel}</span>
+                  <span className={o.source === "native" ? "adm-chip adm-chip-member" : stageClass(o.stage)}>
+                    {o.statusLabel}
+                  </span>
                 </td>
                 <td className="adm-num adm-mono">{money(o.total)}</td>
                 <td className="adm-num">{o.itemCount}</td>
                 <td className="adm-date">{formatDate(o.date)}</td>
                 <td>
-                  <button
-                    type="button"
-                    className="adm-edit-link"
-                    onClick={() => openDetail(o.id)}
-                  >
+                  <button type="button" className="adm-edit-link" onClick={() => openDetail(o)}>
                     View →
                   </button>
                 </td>
@@ -211,6 +242,83 @@ export default function AdminOrders() {
           >
             Next →
           </button>
+        </div>
+      )}
+
+      {/* Native order drawer */}
+      {nativeDetail && (
+        <div className="adm-modal-overlay" onClick={closeDrawer}>
+          <div className="adm-modal adm-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-card-head-row">
+              <h2>Order {nativeDetail.ref} <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span></h2>
+              <button type="button" className="adm-logout" onClick={closeDrawer}>Close</button>
+            </div>
+            <div className="adm-drawer-meta">
+              <div><span className="adm-key-label">Placed</span>{formatDate(nativeDetail.date)}</div>
+              <div><span className="adm-key-label">Total</span>RM {money(nativeDetail.total)}</div>
+              <div><span className="adm-key-label">Payment</span>{nativeDetail.paymentMethod}{nativeDetail.paidAt ? " (paid)" : ""}</div>
+              <div><span className="adm-key-label">Delivery</span>{nativeDetail.deliveryMethod ?? "—"}</div>
+              <div><span className="adm-key-label">Collect</span>{nativeDetail.collectDate ?? "—"}</div>
+              {nativeDetail.customerId ? (
+                <div><span className="adm-key-label">Customer</span>
+                  <Link href={`/admin/users/${nativeDetail.customerId}`} className="adm-edit-link">{nativeDetail.customer ?? "—"}</Link>
+                </div>
+              ) : null}
+            </div>
+
+            <label className="adm-modal-field">
+              <span>Status (customer is emailed on change)</span>
+              <select className="adm-select" value={nativeDetail.status} disabled={savingStatus}
+                onChange={(e) => changeNativeStatus(e.target.value)}>
+                {nativeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              {savingStatus && <em className="adm-card-sub">Saving…</em>}
+            </label>
+
+            <h3 className="adm-drawer-sub">Line items</h3>
+            <div className="adm-table-scroll">
+              <table className="adm-table">
+                <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th></tr></thead>
+                <tbody>
+                  {nativeDetail.lines.map((l) => (
+                    <tr key={l.id}>
+                      <td>
+                        {l.name}
+                        {l.options.length > 0 && (
+                          <div className="adm-line-opts">
+                            {l.options.map((o) => <span key={o.label}>{o.label}: {o.value}</span>)}
+                          </div>
+                        )}
+                        {l.artworkUrl && (
+                          <div className="adm-line-opts">
+                            <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
+                          </div>
+                        )}
+                      </td>
+                      <td className="adm-num">{l.quantity}</td>
+                      <td className="adm-num adm-mono">{money(l.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {nativeDetail.notes && (
+              <>
+                <h3 className="adm-drawer-sub">Notes</h3>
+                <p className="adm-drawer-addr">{nativeDetail.notes}</p>
+              </>
+            )}
+
+            <h3 className="adm-drawer-sub">Status history</h3>
+            <div className="adm-line-opts" style={{ flexDirection: "column", gap: 4 }}>
+              {nativeDetail.history.map((h, i) => (
+                <span key={i}>
+                  {formatDate(h.date)} — {h.from ? `${h.from} → ` : ""}{h.to}{h.note ? ` · ${h.note}` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
