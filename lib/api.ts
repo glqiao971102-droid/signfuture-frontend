@@ -617,7 +617,7 @@ export const api = {
     });
   },
 
-  adminGrantVoucher(id: number, target: { userIds?: number[]; registeredOn?: string }) {
+  adminGrantVoucher(id: number, target: { userIds?: number[]; registeredFrom?: string; registeredTo?: string }) {
     return request<{ success: boolean; granted: number; emailed: number; skipped: number; matched?: number }>(
       `/api/v1/admin/vouchers/${id}/grant`,
       { method: "POST", body: JSON.stringify(target) },

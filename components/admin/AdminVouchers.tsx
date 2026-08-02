@@ -37,7 +37,8 @@ export default function AdminVouchers() {
 
   // Grant
   const [grantFor, setGrantFor] = useState<VoucherRow | null>(null);
-  const [grantDate, setGrantDate] = useState("");
+  const [grantFrom, setGrantFrom] = useState("");
+  const [grantTo, setGrantTo] = useState("");
   const [grantUserIds, setGrantUserIds] = useState("");
   const [granting, setGranting] = useState(false);
   const [grantMsg, setGrantMsg] = useState<string | null>(null);
@@ -102,12 +103,12 @@ export default function AdminVouchers() {
     setGranting(true);
     setGrantMsg(null);
     try {
-      let target: { userIds?: number[]; registeredOn?: string };
-      if (grantDate) {
-        target = { registeredOn: grantDate };
+      let target: { userIds?: number[]; registeredFrom?: string; registeredTo?: string };
+      if (grantFrom) {
+        target = { registeredFrom: grantFrom, registeredTo: grantTo || grantFrom };
       } else {
         const ids = grantUserIds.split(",").map((s) => Number(s.trim())).filter((n) => n > 0);
-        if (!ids.length) { setGrantMsg("Enter a date or user IDs."); setGranting(false); return; }
+        if (!ids.length) { setGrantMsg("Enter a date range or user IDs."); setGranting(false); return; }
         target = { userIds: ids };
       }
       const r = await api.adminGrantVoucher(grantFor.id, target);
@@ -175,7 +176,7 @@ export default function AdminVouchers() {
         {/* Grant */}
         <div className="adm-card">
           <div className="adm-card-head-row"><h2>Send a voucher</h2></div>
-          <p className="adm-card-sub">Pick a voucher, then send it to everyone who registered on a date, or to specific user IDs (from Customers).</p>
+          <p className="adm-card-sub">Pick a voucher, then send it to everyone who registered within a date range (leave "To" blank for a single day), or to specific user IDs (from Customers).</p>
           <div className="adm-adjust-form">
             <label className="adm-modal-field"><span>Voucher</span>
               <select className="adm-select" value={grantFor?.id ?? ""} onChange={(e) => setGrantFor(rows.find((r) => r.id === Number(e.target.value)) ?? null)}>
@@ -183,11 +184,16 @@ export default function AdminVouchers() {
                 {rows.map((v) => <option key={v.id} value={v.id}>{v.code} — {v.title}</option>)}
               </select>
             </label>
-            <label className="adm-modal-field"><span>Send to everyone registered on</span>
-              <input type="date" value={grantDate} onChange={(e) => { setGrantDate(e.target.value); if (e.target.value) setGrantUserIds(""); }} />
-            </label>
+            <div className="adm-modal-field"><span>Send to everyone registered between</span>
+              <div className="adm-radio-row">
+                <input type="date" value={grantFrom} onChange={(e) => { setGrantFrom(e.target.value); if (e.target.value) setGrantUserIds(""); }} />
+                <span style={{ alignSelf: "center", color: "var(--muted)" }}>to</span>
+                <input type="date" value={grantTo} min={grantFrom || undefined} onChange={(e) => setGrantTo(e.target.value)} />
+              </div>
+              <em className="adm-card-sub">Leave “to” blank to target just the “from” day.</em>
+            </div>
             <label className="adm-modal-field"><span>…or specific user IDs (comma-separated)</span>
-              <input value={grantUserIds} onChange={(e) => { setGrantUserIds(e.target.value); if (e.target.value) setGrantDate(""); }} placeholder="12, 407, 410" />
+              <input value={grantUserIds} onChange={(e) => { setGrantUserIds(e.target.value); if (e.target.value) { setGrantFrom(""); setGrantTo(""); } }} placeholder="12, 407, 410" />
             </label>
             {grantMsg && <div className={grantMsg.startsWith("✓") ? "adm-save-ok" : "adm-save-err"}>{grantMsg}</div>}
             <button type="button" className="hero-btn primary" disabled={granting || !grantFor} onClick={grant}>{granting ? "Sending…" : "Send voucher"}</button>
