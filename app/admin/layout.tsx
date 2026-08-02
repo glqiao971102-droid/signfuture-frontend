@@ -20,6 +20,7 @@ const NAV = [
   { href: "/admin/wallet", label: "Wallet", icon: "◈" },
   { href: "/admin/invoices", label: "Invoices", icon: "▧" },
   { href: "/admin/coupons", label: "Coupons", icon: "✁" },
+  { href: "/admin/vouchers", label: "Vouchers", icon: "🎟" },
   { href: "/admin/tiers", label: "Membership", icon: "★" },
   { href: "/admin/products", label: "Products", icon: "▦" },
 ];

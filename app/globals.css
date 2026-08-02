@@ -3669,6 +3669,10 @@ a { color: inherit; text-decoration: none; }
 .checkout-hint.ok { color: var(--green); }
 .checkout-tnc { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 13px; }
 .checkout-tnc input { width: auto; }
+.checkout-voucher { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.checkout-voucher .adm-select { width: 100%; }
+.checkout-voucher-manual { display: flex; gap: 8px; }
+.checkout-voucher-manual input { flex: 1; background: var(--bg); border: 1px solid var(--line-soft); border-radius: 9px; color: var(--text); padding: 9px 11px; font-size: 13px; }
 
 /* ---------- Order line items (expanded order details) ---------- */
 .order-lines {

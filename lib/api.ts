@@ -361,6 +361,7 @@ export const api = {
     collectDate?: string;
     notes?: string;
     paymentMethod: "wallet" | "pending";
+    voucherCode?: string;
   }) {
     return request<{ id: number; ref: string; status: string; statusLabel: string; total: number }>(
       "/api/v1/orders",
@@ -593,6 +594,55 @@ export const api = {
     return request<{ data: AdminCouponRow[] }>("/api/v1/admin/coupons");
   },
 
+  // ----- Vouchers -----
+
+  adminVouchers() {
+    return request<{ data: VoucherRow[] }>("/api/v1/admin/vouchers");
+  },
+
+  adminCreateVoucher(input: {
+    code: string;
+    title: string;
+    description?: string;
+    discountType: "fixed" | "percent";
+    discountValue: number;
+    scopeType: "all" | "product" | "category";
+    scopeValues?: string[];
+    minSpend?: number;
+    expiresAt?: string;
+  }) {
+    return request<{ id: number; code: string }>("/api/v1/admin/vouchers", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  adminGrantVoucher(id: number, target: { userIds?: number[]; registeredOn?: string }) {
+    return request<{ success: boolean; granted: number; emailed: number; skipped: number; matched?: number }>(
+      `/api/v1/admin/vouchers/${id}/grant`,
+      { method: "POST", body: JSON.stringify(target) },
+    );
+  },
+
+  adminVoucherGrants(id: number) {
+    return request<{ data: { userId: number; login: string; email: string; status: string; usedAt: string | null }[] }>(
+      `/api/v1/admin/vouchers/${id}/grants`,
+    );
+  },
+
+  /** The signed-in member's available vouchers. */
+  myVouchers() {
+    return request<{ data: MemberVoucher[] }>("/api/v1/vouchers/mine");
+  },
+
+  /** Previews the discount a code gives for a set of cart items. */
+  previewVoucher(code: string, items: { productName: string; productSlug?: string; lineTotal: number }[]) {
+    return request<{ code: string; title: string; discount: number; eligibleNames: string[]; minSpend: number; applicable: boolean }>(
+      "/api/v1/vouchers/preview",
+      { method: "POST", body: JSON.stringify({ code, items }) },
+    );
+  },
+
   // ----- Admin: dashboard stats (with optional date range) -----
 
   adminStatsRanged(range?: { from?: string; to?: string }) {
@@ -685,6 +735,33 @@ export type AdminInvoiceRow = {
   total: number;
   email: string | null;
   paid: boolean;
+};
+
+export type VoucherRow = {
+  id: number;
+  code: string;
+  title: string;
+  discountType: "fixed" | "percent";
+  discountValue: number;
+  scopeType: "all" | "product" | "category";
+  scopeValues: string[];
+  minSpend: number;
+  expiresAt: string | null;
+  active: boolean;
+  granted: number;
+  used: number;
+};
+
+export type MemberVoucher = {
+  code: string;
+  title: string;
+  description: string | null;
+  discountType: "fixed" | "percent";
+  discountValue: number;
+  scopeType: "all" | "product" | "category";
+  scopeValues: string[];
+  minSpend: number;
+  expiresAt: string | null;
 };
 
 export type AdminCouponRow = {

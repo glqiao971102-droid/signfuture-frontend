@@ -6,7 +6,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type MemberVoucher } from "@/lib/api";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -49,6 +49,12 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Vouchers
+  const [vouchers, setVouchers] = useState<MemberVoucher[]>([]);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [voucherMsg, setVoucherMsg] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CHECKOUT_KEY);
@@ -59,8 +65,35 @@ export default function CheckoutPage() {
     setLoaded(true);
   }, []);
 
+  useEffect(() => {
+    if (user) api.myVouchers().then((r) => setVouchers(r.data)).catch(() => setVouchers([]));
+  }, [user]);
+
+  function orderScopeItems() {
+    return (order?.items ?? []).map((it) => ({ productName: it.label, lineTotal: it.price * it.qty }));
+  }
+
+  async function applyVoucher(code: string) {
+    setVoucherMsg(null);
+    setVoucherDiscount(0);
+    setVoucherCode(code);
+    if (!code) return;
+    try {
+      const r = await api.previewVoucher(code, orderScopeItems());
+      if (!r.applicable) {
+        setVoucherMsg("This voucher doesn't apply to any item in your cart.");
+        return;
+      }
+      setVoucherDiscount(r.discount);
+      setVoucherMsg(`✓ − RM ${r.discount.toFixed(2)} on: ${r.eligibleNames.join(", ")}`);
+    } catch (err) {
+      setVoucherMsg(err instanceof ApiError ? err.message : "Could not apply voucher.");
+      setVoucherCode("");
+    }
+  }
+
   const wallet = user?.wallet.balance ?? 0;
-  const total = order?.total ?? 0;
+  const total = Math.max(0, (order?.total ?? 0) - voucherDiscount);
   const enough = wallet >= total;
 
   async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
@@ -116,6 +149,7 @@ export default function CheckoutPage() {
         collectDate,
         notes: notes.trim() || undefined,
         paymentMethod,
+        voucherCode: voucherCode || undefined,
       });
       // Real balance changed on the server when paid by wallet.
       if (paymentMethod === "wallet") void refresh();
@@ -240,7 +274,31 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div className="cart-sum-row"><span>Shipping</span><span>{order.shipping.cost === 0 ? "Free" : formatRM(order.shipping.cost)}</span></div>
-              <div className="cart-sum-row total"><span>Total</span><strong>{formatRM(order.total)}</strong></div>
+              {voucherDiscount > 0 && (
+                <div className="cart-sum-row discount"><span>Voucher <strong>{voucherCode}</strong></span><span>− {formatRM(voucherDiscount)}</span></div>
+              )}
+              <div className="cart-sum-row total"><span>Total</span><strong>{formatRM(total)}</strong></div>
+
+              {user && (
+                <div className="checkout-voucher">
+                  <span className="checkout-block-title">Voucher</span>
+                  {vouchers.length > 0 && (
+                    <select className="adm-select" value={voucherCode} onChange={(e) => applyVoucher(e.target.value)}>
+                      <option value="">No voucher</option>
+                      {vouchers.map((v) => (
+                        <option key={v.code} value={v.code}>
+                          {v.code} — {v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`} off {v.scopeType === "all" ? "" : v.scopeValues.join("/")}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="checkout-voucher-manual">
+                    <input type="text" placeholder="Or enter a code" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} />
+                    <button type="button" className="cart-dd-btn ghost" onClick={() => applyVoucher(voucherCode)}>Apply</button>
+                  </div>
+                  {voucherMsg && <p className={`checkout-hint ${voucherMsg.startsWith("✓") ? "ok" : ""}`}>{voucherMsg}</p>}
+                </div>
+              )}
 
               <div className="checkout-wallet">
                 <div className="checkout-wallet-head">
