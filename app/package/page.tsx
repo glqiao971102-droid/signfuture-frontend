@@ -54,8 +54,9 @@ export default function PackagePage() {
               <div><span className="tier-status-label">Wallet balance</span><strong>{rm(user.wallet.balance)}</strong></div>
             </div>
             <p className="tier-status-note">
-              Your tier needs both: a single top-up ≥ the tier amount, and a wallet balance ≥ the tier amount.
-              Spending below a tier’s amount drops you to the next one.
+              A single top-up unlocks the matching tier permanently — it never expires. At checkout your
+              tier price applies automatically; if your wallet can’t cover the total you’ll see how much
+              topping up saves before you pay.
             </p>
           </section>
         )}
@@ -95,9 +96,9 @@ export default function PackagePage() {
           <div className="tier-note">
             <h3>How it works</h3>
             <p>
-              A single top-up unlocks the matching tier (e.g. RM 10,000 in one payment → Diamond). Topping up
-              in smaller amounts does not add up to a higher tier. Your tier is kept while your wallet balance
-              stays at or above the tier amount; the wallet is non-refundable and for online purchases only.
+              A single top-up unlocks the matching tier (e.g. RM 10,000 in one payment → Diamond) and it’s
+              permanent. Topping up in smaller amounts does not add up to a higher tier. The wallet is
+              non-refundable and can only be used for online purchases.
             </p>
           </div>
         </section>
