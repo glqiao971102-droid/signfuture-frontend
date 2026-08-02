@@ -14,15 +14,15 @@ const TIERS = [
 /** iPay88's own minimum test transaction is MYR 1.00. */
 const MIN_TOPUP = 1;
 
+// Only Stripe is offered for now. (iPay88 is temporarily hidden.)
 const METHODS: { id: PaymentProvider; label: string; hint: string }[] = [
-  { id: "ipay88", label: "Online Banking (FPX)", hint: "Pay from your bank account" },
   { id: "stripe", label: "Credit / Debit Card", hint: "Visa, Mastercard, Amex" },
 ];
 
 export default function CustomTopUp() {
   const { user, openLogin } = useAuth();
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<PaymentProvider>("ipay88");
+  const [method, setMethod] = useState<PaymentProvider>("stripe");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
