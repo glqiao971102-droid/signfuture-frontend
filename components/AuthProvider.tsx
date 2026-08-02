@@ -97,13 +97,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const openLogin = useCallback(() => setOpen(true), []);
   const closeLogin = useCallback(() => setOpen(false), []);
 
+  const clearAgentFlag = () => {
+    try { localStorage.removeItem("signfuture.agent"); } catch { /* ignore */ }
+  };
+
   const login = useCallback(async (identifier: string, password: string) => {
+    clearAgentFlag();
     const me = await api.login(identifier, password);
     setUser(me);
     setOpen(false);
   }, []);
 
   const logout = useCallback(() => {
+    clearAgentFlag();
     setUser(null);
     void api.logout();
   }, []);

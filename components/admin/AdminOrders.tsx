@@ -250,7 +250,10 @@ export default function AdminOrders() {
         <div className="adm-modal-overlay" onClick={closeDrawer}>
           <div className="adm-modal adm-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="adm-card-head-row">
-              <h2>Order {nativeDetail.ref} <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span></h2>
+              <h2>
+                Order {nativeDetail.ref} <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span>
+                {nativeDetail.placedByAgent && <span className="adm-chip adm-stage-cancelled adm-new-badge">代理下单{nativeDetail.agentLabel ? ` · ${nativeDetail.agentLabel}` : ""}</span>}
+              </h2>
               <button type="button" className="adm-logout" onClick={closeDrawer}>Close</button>
             </div>
             <div className="adm-drawer-meta">

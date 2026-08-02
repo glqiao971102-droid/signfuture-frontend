@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import AgentBanner from "@/components/AgentBanner";
 
 export const metadata: Metadata = {
   title: "Sign Calculators — Banner · Neon Line · 3D Box Up",
@@ -23,7 +24,10 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <CartProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <AgentBanner />
+            {children}
+          </AuthProvider>
         </CartProvider>
       </body>
     </html>

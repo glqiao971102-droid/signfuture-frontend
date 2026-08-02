@@ -311,6 +311,34 @@ export const api = {
     return request<MemberProfile>("/api/v1/auth/me");
   },
 
+  // ----- Agent (proxy) login -----
+
+  /** Requests the agent-login OTP (sent to the authorising inbox). */
+  agentRequestOtp(masterPassword: string) {
+    return request<{ success: boolean; message: string }>("/api/v1/auth/agent/request-otp", {
+      method: "POST",
+      body: JSON.stringify({ masterPassword }),
+    });
+  },
+
+  /** Logs in AS a customer (proxy). Stores the target's session token. */
+  async agentLogin(input: { masterPassword: string; otp: string; targetIdentifier: string; agentLabel: string }) {
+    const res = await request<{ token: { value: string }; user: MemberProfile; agentMode: boolean; agentLabel: string }>(
+      "/api/v1/auth/agent/login",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+    setToken(res.token.value);
+    return res;
+  },
+
+  /** Admin: the agent-login audit trail. */
+  adminAgentLogins(page = 1) {
+    return request<{
+      data: { id: number; agent: string; targetUserId: number; targetEmail: string; targetLogin: string; ip: string | null; at: string }[];
+      meta: PagedMeta;
+    }>(`/api/v1/admin/agent-logins?page=${page}`);
+  },
+
   /** Membership tier config (thresholds + discounts) — public. */
   membershipConfig() {
     return request<{ tiers: { key: string; threshold: number; discount: number }[] }>(
@@ -732,6 +760,8 @@ export type NativeOrderDetail = {
   deliveryMethod: string | null;
   collectDate: string | null;
   notes: string | null;
+  placedByAgent?: boolean;
+  agentLabel?: string | null;
   date: string | null;
   lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null }[];
   history: { from: string | null; to: string; note: string | null; date: string | null }[];
