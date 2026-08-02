@@ -535,6 +535,7 @@
       background: rgba(53, 216, 255, 0.08);
       box-shadow: 0 0 16px rgba(53, 216, 255, 0.65), inset 0 0 12px rgba(53, 216, 255, 0.16);
     }
+    .choice.is-hidden { display: none; }
 
     .option-image {
       position: relative;
@@ -876,7 +877,7 @@
 
     .collect-date-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       border: 1px solid rgba(63, 176, 255, 0.58);
       border-radius: 10px;
@@ -909,6 +910,29 @@
       border-color: #35d8ff;
       box-shadow: 0 0 16px rgba(53, 216, 255, 0.78), inset 0 0 12px rgba(53, 216, 255, 0.14);
       background: rgba(53, 216, 255, 0.08);
+    }
+
+    /* Time-locked (e.g. Next Working Days after the 4pm cut-off). */
+    .collect-date-option.is-disabled {
+      opacity: 0.45;
+      filter: grayscale(0.65);
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+    .collect-date-option.is-disabled::after {
+      content: "Closed after 4:00pm";
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      bottom: 6px;
+      padding: 3px 4px;
+      border-radius: 5px;
+      background: rgba(196, 24, 44, 0.92);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 0.2px;
     }
 
     .collect-date-option img {
@@ -1292,28 +1316,28 @@
               <label class="native-select-hidden" for="printing">
                 Printing
                 <select id="printing" required>
-                  <option value="uv">UV Ink 1220dpi</option>
-                  <option value="solvent">Eco Solvent 1440dpi</option>
+                  <option value="uv">UV Ink 1200dpi</option>
+                  <option value="solvent">Eco Solvent Ink 1440dpi</option>
                 </select>
               </label>
               <div class="field-label">Printing</div>
               <div class="product-picker" id="printingPicker" data-picker>
                 <button type="button" class="product-toggle" id="printingToggle" data-icon="◈" aria-expanded="false" aria-controls="printingChoices">
-                  <span id="selectedPrintingLabel">UV Ink 1220dpi</span>
+                  <span id="selectedPrintingLabel">UV Ink 1200dpi</span>
                 </button>
                 <div class="addon-grid" id="printingChoices">
                   <label class="choice is-selected">
                     <input type="radio" name="printingChoice" value="uv" checked>
-                    <div class="option-image"><img src="assets/inkjet-bunting-hero.png" alt="UV Ink 1220dpi"><span class="image-zoom-button"></span></div>
+                    <div class="option-image"><img src="assets/inkjet-bunting-hero.png" alt="UV Ink 1200dpi"><span class="image-zoom-button"></span></div>
                     <div class="choice-text">
-                      <strong>UV Ink 1220dpi</strong>
+                      <strong>UV Ink 1200dpi</strong>
                     </div>
                   </label>
                   <label class="choice">
                     <input type="radio" name="printingChoice" value="solvent">
-                    <div class="option-image"><img src="assets/inkjet-bunting-hero.png" alt="Eco Solvent 1440dpi"><span class="image-zoom-button"></span></div>
+                    <div class="option-image"><img src="assets/inkjet-bunting-hero.png" alt="Eco Solvent Ink 1440dpi"><span class="image-zoom-button"></span></div>
                     <div class="choice-text">
-                      <strong>Eco Solvent 1440dpi</strong>
+                      <strong>Eco Solvent Ink 1440dpi</strong>
                     </div>
                   </label>
                 </div>
@@ -1327,7 +1351,8 @@
                   <option value="380">Tarpaulin 380gsm</option>
                   <option value="440">Tarpaulin 440gsm</option>
                   <option value="510">Tarpaulin 510gsm</option>
-                  <option value="synthetic">Synthetic Paper 210 Micron</option>
+                  <option value="synthetic180">Synthetic Paper 180 Micron</option>
+                  <option value="synthetic210">Synthetic Paper 210 Micron</option>
                 </select>
               </label>
               <div class="field-label">Choose Material</div>
@@ -1358,7 +1383,14 @@
                     </div>
                   </label>
                   <label class="choice">
-                    <input type="radio" name="materialChoice" value="synthetic">
+                    <input type="radio" name="materialChoice" value="synthetic180">
+                    <div class="option-image"><img src="assets/finishing-cut-to-size.png" alt="Synthetic Paper 180 Micron"><span class="image-zoom-button"></span></div>
+                    <div class="choice-text">
+                      <strong>Synthetic Paper 180 Micron</strong>
+                    </div>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="materialChoice" value="synthetic210">
                     <div class="option-image"><img src="assets/finishing-cut-to-size.png" alt="Synthetic Paper 210 Micron"><span class="image-zoom-button"></span></div>
                     <div class="choice-text">
                       <strong>Synthetic Paper 210 Micron</strong>
@@ -1448,7 +1480,13 @@
             <h3 class="collect-date-title">Collect Date</h3>
             <div class="collect-date-grid" id="collectChoices">
               <label class="collect-date-option is-selected">
-                <input type="radio" name="collect" value="normal" checked>
+                <input type="radio" name="collect" value="standard7" checked>
+                <img src="assets/collect-7-working-days.png" alt="7 Working Days (Standard)">
+                <span class="image-zoom-button"></span>
+                <strong>7 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="normal">
                 <img src="assets/collect-4-working-days.png" alt="4 Working Days">
                 <span class="image-zoom-button"></span>
                 <strong>4 Working Days</strong>
@@ -1481,13 +1519,13 @@
       <aside class="summary">
         <div class="section-head"><span class="section-icon" aria-hidden="true">◈</span><h2 class="section-title" data-kicker="Live Quote">Product Detail</h2></div>
         <div class="summary-list">
-          <div class="summary-line"><span data-icon="◈">Printing</span><strong id="sumPrinting">UV Ink 1220dpi</strong></div>
+          <div class="summary-line"><span data-icon="◈">Printing</span><strong id="sumPrinting">UV Ink 1200dpi</strong></div>
           <div class="summary-line"><span data-icon="▤">Material</span><strong id="sumMaterial">Tarpaulin 380gsm</strong></div>
           <div class="summary-line"><span data-icon="⤢">Size</span><strong id="sumSize">48 x 72 in</strong></div>
           <div class="summary-line"><span data-icon="▦">Total Area</span><strong id="sumArea">24.00 sq.ft.</strong></div>
           <div class="summary-line"><span data-icon="◫">Artwork</span><strong id="sumArtwork">Not selected</strong></div>
           <div class="summary-line is-wide"><span data-icon="✎">Finishing</span><strong id="sumFinishing">Welded rope with eyelets</strong></div>
-          <div class="summary-line is-wide"><span data-icon="▣">Collect</span><strong id="sumCollect">4 Working Days</strong></div>
+          <div class="summary-line is-wide"><span data-icon="▣">Collect</span><strong id="sumCollect">7 Working Days</strong></div>
         </div>
       </aside>
 
@@ -1496,19 +1534,20 @@
           <h3 class="order-title">Order Summary</h3>
           <div class="agent-grid">
             <div class="agent-card">
-              <span>Normal Agent Price</span>
-              <strong id="agentA">RM 72.00</strong>
-              <em>RM 3 / sq.ft.</em>
+              <span>Agent Price</span>
+              <strong id="agentA">RM 0.00</strong>
+            </div>
+            <div class="agent-card">
+              <span>Silver Agent Price</span>
+              <strong id="agentSilver">RM 0.00</strong>
             </div>
             <div class="agent-card">
               <span>Gold Agent Price</span>
-              <strong id="agentB">RM 61.20</strong>
-              <em>15% margin</em>
+              <strong id="agentGold">RM 0.00</strong>
             </div>
             <div class="agent-card">
-              <span>Platinum Agent Price</span>
-              <strong id="agentC">RM 57.60</strong>
-              <em>20% margin</em>
+              <span>Diamond Agent Price</span>
+              <strong id="agentDiamond">RM 0.00</strong>
             </div>
           </div>
 
@@ -1558,15 +1597,94 @@
     const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
     const printingOptions = {
-      uv: { label: "UV Ink 1220dpi", multiplier: 1.1 },
-      solvent: { label: "Eco Solvent 1440dpi", multiplier: 1 }
+      uv: { label: "UV Ink 1200dpi" },
+      solvent: { label: "Eco Solvent Ink 1440dpi" }
     };
 
     const materialOptions = {
-      "380": { label: "Tarpaulin 380gsm", rate: 1.12 },
-      "440": { label: "Tarpaulin 440gsm", rate: 1.24 },
-      "510": { label: "Tarpaulin 510gsm", rate: 1.36 },
-      synthetic: { label: "Synthetic Paper 210 Micron", rate: 1.60 }
+      "380": { label: "Tarpaulin 380gsm" },
+      "440": { label: "Tarpaulin 440gsm" },
+      "510": { label: "Tarpaulin 510gsm" },
+      synthetic180: { label: "Synthetic Paper 180 Micron" },
+      synthetic210: { label: "Synthetic Paper 210 Micron" }
+    };
+
+    // Bunting price list (from the official price sheet).
+    // Keyed by size "WxH" (inches), then by "<printing>_<material>" combo.
+    // Each combo is [normal, sgd]:
+    //   normal = Agent Price
+    //   sgd    = Silver / Gold / Diamond Agent Price (all three share this rate)
+    // Prices are per single piece; finishing does not change the price.
+    const PRICE_TABLE = {
+      "12x12": { solvent_380:[11.44,8.58], solvent_440:[16.02,12.01], solvent_510:[16.46,12.34], solvent_synthetic180:[21.16,15.87], solvent_synthetic210:[21.52,16.1], uv_380:[14.3,10.7], uv_440:[15.44,11.6], uv_510:[19.45,14.6], uv_synthetic180:[15.44,11.6], uv_synthetic210:[16.02,12] },
+      "12x18": { solvent_380:[12.32,9.24], solvent_440:[17.25,12.94], solvent_510:[17.73,13.3], solvent_synthetic180:[22.79,17.09], solvent_synthetic210:[23.14,17.4], uv_380:[15.4,11.6], uv_440:[16.63,12.5], uv_510:[20.94,15.7], uv_synthetic180:[16.63,12.5], uv_synthetic210:[17.25,12.9] },
+      "12x24": { solvent_380:[13.2,9.9], solvent_440:[18.48,13.86], solvent_510:[19.01,14.26], solvent_synthetic180:[24.42,18.32], solvent_synthetic210:[24.82,18.6], uv_380:[16.5,12.4], uv_440:[17.82,13.4], uv_510:[22.44,16.8], uv_synthetic180:[17.82,13.4], uv_synthetic210:[18.48,13.9] },
+      "12x30": { solvent_380:[14.08,10.56], solvent_440:[19.71,14.78], solvent_510:[20.28,15.21], solvent_synthetic180:[26.05,19.54], solvent_synthetic210:[26.49,19.9], uv_380:[17.6,13.2], uv_440:[19.01,14.3], uv_510:[23.94,18], uv_synthetic180:[19.01,14.3], uv_synthetic210:[19.71,14.8] },
+      "12x36": { solvent_380:[14.96,11.22], solvent_440:[20.94,15.71], solvent_510:[21.56,16.17], solvent_synthetic180:[27.68,20.76], solvent_synthetic210:[28.12,21.1], uv_380:[18.7,14], uv_440:[20.2,15.1], uv_510:[25.43,19.1], uv_synthetic180:[20.2,15.1], uv_synthetic210:[20.94,15.7] },
+      "18x12": { solvent_380:[12.76,9.57], solvent_440:[17.86,13.4], solvent_510:[18.39,13.79], solvent_synthetic180:[23.63,17.72], solvent_synthetic210:[23.98,18], uv_380:[15.97,12], uv_440:[17.25,12.9], uv_510:[21.69,16.3], uv_synthetic180:[17.25,12.9], uv_synthetic210:[17.86,13.4] },
+      "18x18": { solvent_380:[13.64,10.23], solvent_440:[19.1,14.32], solvent_510:[19.62,14.72], solvent_synthetic180:[25.26,18.94], solvent_synthetic210:[25.65,19.2], uv_380:[17.07,12.8], uv_440:[18.44,13.8], uv_510:[23.19,17.4], uv_synthetic180:[18.44,13.8], uv_synthetic210:[19.1,14.3] },
+      "18x24": { solvent_380:[14.96,11.22], solvent_440:[20.94,15.71], solvent_510:[21.56,16.17], solvent_synthetic180:[27.68,20.76], solvent_synthetic210:[28.12,21.1], uv_380:[18.7,14], uv_440:[20.2,15.1], uv_510:[25.43,19.1], uv_synthetic180:[20.2,15.1], uv_synthetic210:[20.94,15.7] },
+      "18x30": { solvent_380:[16.28,12.21], solvent_440:[22.79,17.09], solvent_510:[23.45,17.59], solvent_synthetic180:[30.14,22.61], solvent_synthetic210:[30.62,23], uv_380:[20.37,15.3], uv_440:[22,16.5], uv_510:[27.68,20.8], uv_synthetic180:[22,16.5], uv_synthetic210:[22.79,17.1] },
+      "18x36": { solvent_380:[18.04,13.53], solvent_440:[25.26,18.94], solvent_510:[25.96,19.47], solvent_synthetic180:[33.4,25.05], solvent_synthetic210:[33.92,25.4], uv_380:[22.57,16.9], uv_440:[24.38,18.3], uv_510:[30.67,23], uv_synthetic180:[24.38,18.3], uv_synthetic210:[25.26,18.9] },
+      "18x42": { solvent_380:[20.68,15.51], solvent_440:[28.95,21.71], solvent_510:[29.79,22.34], solvent_synthetic180:[38.28,28.71], solvent_synthetic210:[38.9,29.2], uv_380:[25.87,19.4], uv_440:[27.94,21], uv_510:[35.16,26.4], uv_synthetic180:[27.94,21], uv_synthetic210:[28.95,21.7] },
+      "18x48": { solvent_380:[23.32,17.49], solvent_440:[32.65,24.49], solvent_510:[33.57,25.18], solvent_synthetic180:[43.16,32.37], solvent_synthetic210:[43.82,32.9], uv_380:[29.17,21.9], uv_440:[31.5,23.6], uv_510:[39.64,29.7], uv_synthetic180:[31.5,23.6], uv_synthetic210:[32.65,24.5] },
+      "24x12": { solvent_380:[14.08,10.56], solvent_440:[19.71,14.78], solvent_510:[20.28,15.21], solvent_synthetic180:[26.05,19.54], solvent_synthetic210:[26.49,19.9], uv_380:[17.6,13.2], uv_440:[19.01,14.3], uv_510:[23.94,18], uv_synthetic180:[19.01,14.3], uv_synthetic210:[19.71,14.8] },
+      "24x18": { solvent_380:[16.72,12.54], solvent_440:[23.41,17.56], solvent_510:[24.07,18.05], solvent_synthetic180:[30.93,23.2], solvent_synthetic210:[31.42,23.6], uv_380:[20.9,15.7], uv_440:[22.57,16.9], uv_510:[28.42,21.3], uv_synthetic180:[22.57,16.9], uv_synthetic210:[23.41,17.6] },
+      "24x24": { solvent_380:[17.16,12.87], solvent_440:[24.02,18.02], solvent_510:[24.73,18.55], solvent_synthetic180:[31.77,23.83], solvent_synthetic210:[32.25,24.2], uv_380:[21.47,16.1], uv_440:[23.19,17.4], uv_510:[29.17,21.9], uv_synthetic180:[23.19,17.4], uv_synthetic210:[24.02,18] },
+      "24x30": { solvent_380:[19.8,14.85], solvent_440:[27.72,20.79], solvent_510:[28.51,21.38], solvent_synthetic180:[36.65,27.49], solvent_synthetic210:[37.22,27.9], uv_380:[24.77,18.6], uv_440:[26.75,20.1], uv_510:[33.66,25.2], uv_synthetic180:[26.75,20.1], uv_synthetic210:[27.72,20.8] },
+      "24x36": { solvent_380:[23.32,17.49], solvent_440:[32.65,24.49], solvent_510:[33.57,25.18], solvent_synthetic180:[43.16,32.37], solvent_synthetic210:[43.82,32.9], uv_380:[29.17,21.9], uv_440:[31.5,23.6], uv_510:[39.64,29.7], uv_synthetic180:[31.5,23.6], uv_synthetic210:[32.65,24.5] },
+      "24x42": { solvent_380:[26.84,20.13], solvent_440:[37.58,28.18], solvent_510:[38.63,28.97], solvent_synthetic180:[49.68,37.26], solvent_synthetic210:[50.47,37.9], uv_380:[33.57,25.2], uv_440:[36.26,27.2], uv_510:[45.63,34.2], uv_synthetic180:[36.26,27.2], uv_synthetic210:[37.58,28.2] },
+      "24x48": { solvent_380:[30.36,22.77], solvent_440:[42.5,31.88], solvent_510:[43.74,32.8], solvent_synthetic180:[56.19,42.14], solvent_synthetic210:[57.07,42.8], uv_380:[37.97,28.5], uv_440:[41.01,30.8], uv_510:[51.61,38.7], uv_synthetic180:[41.01,30.8], uv_synthetic210:[42.5,31.9] },
+      "24x60": { solvent_380:[37.4,28.05], solvent_440:[52.36,39.27], solvent_510:[53.86,40.39], solvent_synthetic180:[69.21,51.91], solvent_synthetic210:[70.31,52.7], uv_380:[46.77,35.1], uv_440:[50.51,37.9], uv_510:[63.58,47.7], uv_synthetic180:[50.51,37.9], uv_synthetic210:[52.36,39.3] },
+      "24x72": { solvent_380:[44.44,33.33], solvent_440:[62.22,46.66], solvent_510:[63.98,47.98], solvent_synthetic180:[82.24,61.68], solvent_synthetic210:[83.56,62.7], uv_380:[55.57,41.7], uv_440:[60.02,45], uv_510:[75.55,56.7], uv_synthetic180:[60.02,45], uv_synthetic210:[62.22,46.7] },
+      "24x78": { solvent_380:[47.96,35.97], solvent_440:[67.14,50.36], solvent_510:[69.08,51.81], solvent_synthetic180:[88.75,66.56], solvent_synthetic210:[90.16,67.6], uv_380:[59.97,45], uv_440:[64.77,48.6], uv_510:[81.53,61.1], uv_synthetic180:[64.77,48.6], uv_synthetic210:[67.14,50.4] },
+      "24x84": { solvent_380:[51.48,38.61], solvent_440:[72.07,54.05], solvent_510:[74.14,55.61], solvent_synthetic180:[95.26,71.45], solvent_synthetic210:[96.8,72.6], uv_380:[64.37,48.3], uv_440:[69.52,52.1], uv_510:[87.52,65.6], uv_synthetic180:[69.52,52.1], uv_synthetic210:[72.07,54.1] },
+      "24x96": { solvent_380:[58.52,43.89], solvent_440:[81.93,61.45], solvent_510:[84.26,63.2], solvent_synthetic180:[108.28,81.21], solvent_synthetic210:[110,82.5], uv_380:[73.17,54.9], uv_440:[79.02,59.3], uv_510:[99.48,74.6], uv_synthetic180:[79.02,59.3], uv_synthetic210:[81.93,61.4] },
+      "30x12": { solvent_380:[16.28,12.21], solvent_440:[22.79,17.09], solvent_510:[23.45,17.59], solvent_synthetic180:[30.14,22.61], solvent_synthetic210:[30.62,23], uv_380:[20.37,15.3], uv_440:[22,16.5], uv_510:[27.68,20.8], uv_synthetic180:[22,16.5], uv_synthetic210:[22.79,17.1] },
+      "30x24": { solvent_380:[21.12,15.84], solvent_440:[29.57,22.18], solvent_510:[30.4,22.8], solvent_synthetic180:[39.07,29.3], solvent_synthetic210:[39.69,29.8], uv_380:[26.4,19.8], uv_440:[28.51,21.4], uv_510:[35.9,26.9], uv_synthetic180:[28.51,21.4], uv_synthetic210:[29.57,22.2] },
+      "30x30": { solvent_380:[25.52,19.14], solvent_440:[35.73,26.8], solvent_510:[36.74,27.56], solvent_synthetic180:[47.21,35.41], solvent_synthetic210:[47.96,36], uv_380:[31.9,23.9], uv_440:[34.45,25.8], uv_510:[43.38,32.5], uv_synthetic180:[34.45,25.8], uv_synthetic210:[35.73,26.8] },
+      "30x36": { solvent_380:[29.48,22.11], solvent_440:[41.27,30.95], solvent_510:[42.46,31.85], solvent_synthetic180:[54.56,40.92], solvent_synthetic210:[55.44,41.6], uv_380:[36.87,27.7], uv_440:[39.82,29.9], uv_510:[50.12,37.6], uv_synthetic180:[39.82,29.9], uv_synthetic210:[41.27,31] },
+      "30x42": { solvent_380:[33.88,25.41], solvent_440:[47.43,35.57], solvent_510:[48.8,36.6], solvent_synthetic180:[62.7,47.03], solvent_synthetic210:[63.71,47.8], uv_380:[42.37,31.8], uv_440:[45.76,34.3], uv_510:[57.6,43.2], uv_synthetic180:[45.76,34.3], uv_synthetic210:[47.43,35.6] },
+      "30x48": { solvent_380:[37.4,28.05], solvent_440:[52.36,39.27], solvent_510:[53.86,40.39], solvent_synthetic180:[69.21,51.91], solvent_synthetic210:[70.31,52.7], uv_380:[46.77,35.1], uv_440:[50.51,37.9], uv_510:[63.58,47.7], uv_synthetic180:[50.51,37.9], uv_synthetic210:[52.36,39.3] },
+      "30x60": { solvent_380:[46.2,34.65], solvent_440:[64.68,48.51], solvent_510:[66.53,49.9], solvent_synthetic180:[85.49,64.12], solvent_synthetic210:[86.86,65.1], uv_380:[57.77,43.3], uv_440:[62.39,46.8], uv_510:[78.54,58.9], uv_synthetic180:[62.39,46.8], uv_synthetic210:[64.68,48.5] },
+      "30x72": { solvent_380:[55,41.25], solvent_440:[77,57.75], solvent_510:[79.2,59.4], solvent_synthetic180:[101.77,76.33], solvent_synthetic210:[103.4,77.6], uv_380:[68.77,51.6], uv_440:[74.27,55.7], uv_510:[93.5,70.1], uv_synthetic180:[74.27,55.7], uv_synthetic210:[77,57.8] },
+      "30x78": { solvent_380:[59.4,44.55], solvent_440:[83.16,62.37], solvent_510:[85.54,64.15], solvent_synthetic180:[109.91,82.43], solvent_synthetic210:[111.67,83.8], uv_380:[74.27,55.7], uv_440:[80.21,60.2], uv_510:[100.98,75.7], uv_synthetic180:[80.21,60.2], uv_synthetic210:[83.16,62.4] },
+      "30x84": { solvent_380:[63.8,47.85], solvent_440:[89.32,66.99], solvent_510:[91.87,68.9], solvent_synthetic180:[118.05,88.54], solvent_synthetic210:[119.94,90], uv_380:[79.77,59.8], uv_440:[86.15,64.6], uv_510:[108.46,81.3], uv_synthetic180:[86.15,64.6], uv_synthetic210:[89.32,67] },
+      "30x96": { solvent_380:[72.6,54.45], solvent_440:[101.64,76.23], solvent_510:[104.54,78.41], solvent_synthetic180:[134.33,100.75], solvent_synthetic210:[136.49,102.4], uv_380:[90.77,68.1], uv_440:[98.03,73.5], uv_510:[123.42,92.6], uv_synthetic180:[98.03,73.5], uv_synthetic210:[101.64,76.2] },
+      "36x12": { solvent_380:[17.6,13.2], solvent_440:[24.64,18.48], solvent_510:[25.34,19.01], solvent_synthetic180:[32.56,24.42], solvent_synthetic210:[33.09,24.8], uv_380:[22,16.5], uv_440:[23.76,17.8], uv_510:[29.92,22.4], uv_synthetic180:[23.76,17.8], uv_synthetic210:[24.64,18.5] },
+      "36x18": { solvent_380:[21.12,15.84], solvent_440:[29.57,22.18], solvent_510:[30.4,22.8], solvent_synthetic180:[39.07,29.3], solvent_synthetic210:[39.69,29.8], uv_380:[26.4,19.8], uv_440:[28.51,21.4], uv_510:[35.9,26.9], uv_synthetic180:[28.51,21.4], uv_synthetic210:[29.57,22.2] },
+      "36x24": { solvent_380:[24.64,18.48], solvent_440:[34.5,25.87], solvent_510:[35.46,26.6], solvent_synthetic180:[45.58,34.19], solvent_synthetic210:[46.33,34.7], uv_380:[30.8,23.1], uv_440:[33.26,24.9], uv_510:[41.89,31.4], uv_synthetic180:[33.26,24.9], uv_synthetic210:[34.5,25.9] },
+      "36x30": { solvent_380:[29.92,22.44], solvent_440:[41.89,31.42], solvent_510:[43.08,32.31], solvent_synthetic180:[55.35,41.51], solvent_synthetic210:[56.23,42.2], uv_380:[37.4,28.1], uv_440:[40.39,30.3], uv_510:[50.86,38.1], uv_synthetic180:[40.39,30.3], uv_synthetic210:[41.89,31.4] },
+      "36x36": { solvent_380:[34.76,26.07], solvent_440:[48.66,36.5], solvent_510:[50.07,37.55], solvent_synthetic180:[64.33,48.25], solvent_synthetic210:[65.34,49], uv_380:[43.47,32.6], uv_440:[46.95,35.2], uv_510:[59.09,44.3], uv_synthetic180:[46.95,35.2], uv_synthetic210:[48.66,36.5] },
+      "36x48": { solvent_380:[44.88,33.66], solvent_440:[62.83,47.12], solvent_510:[64.64,48.48], solvent_synthetic180:[83.03,62.27], solvent_synthetic210:[84.39,63.3], uv_380:[56.1,42.1], uv_440:[60.59,45.4], uv_510:[76.3,57.2], uv_synthetic180:[60.59,45.4], uv_synthetic210:[62.83,47.1] },
+      "36x60": { solvent_380:[55,41.25], solvent_440:[77,57.75], solvent_510:[79.2,59.4], solvent_synthetic180:[101.77,76.33], solvent_synthetic210:[103.4,77.6], uv_380:[68.77,51.6], uv_440:[74.27,55.7], uv_510:[93.5,70.1], uv_synthetic180:[74.27,55.7], uv_synthetic210:[77,57.8] },
+      "36x72": { solvent_380:[65.56,49.17], solvent_440:[91.78,68.84], solvent_510:[94.42,70.82], solvent_synthetic180:[121.31,90.98], solvent_synthetic210:[123.24,92.4], uv_380:[81.97,61.5], uv_440:[88.53,66.4], uv_510:[111.45,83.6], uv_synthetic180:[88.53,66.4], uv_synthetic210:[91.78,68.8] },
+      "36x78": { solvent_380:[70.84,53.13], solvent_440:[99.18,74.38], solvent_510:[101.99,76.49], solvent_synthetic180:[131.08,98.31], solvent_synthetic210:[133.19,99.9], uv_380:[88.57,66.4], uv_440:[95.66,71.7], uv_510:[120.43,90.3], uv_synthetic180:[95.66,71.7], uv_synthetic210:[99.18,74.4] },
+      "36x84": { solvent_380:[76.12,57.09], solvent_440:[106.57,79.93], solvent_510:[109.6,82.2], solvent_synthetic180:[140.84,105.63], solvent_synthetic210:[143.09,107.3], uv_380:[95.17,71.4], uv_440:[102.78,77.1], uv_510:[129.4,97.1], uv_synthetic180:[102.78,77.1], uv_synthetic210:[106.57,79.9] },
+      "36x96": { solvent_380:[86.68,65.01], solvent_440:[121.35,91.01], solvent_510:[124.83,93.62], solvent_synthetic180:[160.38,120.29], solvent_synthetic210:[162.98,122.2], uv_380:[108.37,81.3], uv_440:[117.04,87.8], uv_510:[147.36,110.5], uv_synthetic180:[117.04,87.8], uv_synthetic210:[121.35,91] },
+      "36x108": { solvent_380:[97.24,72.93], solvent_440:[136.14,102.1], solvent_510:[140.01,105.01], solvent_synthetic180:[179.92,134.94], solvent_synthetic210:[182.82,137.1], uv_380:[121.57,91.2], uv_440:[131.3,98.5], uv_510:[165.31,124], uv_synthetic180:[131.3,98.5], uv_synthetic210:[136.14,102.1] },
+      "36x120": { solvent_380:[107.8,80.85], solvent_440:[150.92,113.19], solvent_510:[155.23,116.42], solvent_synthetic180:[199.45,149.59], solvent_synthetic210:[202.66,152], uv_380:[134.77,101.1], uv_440:[145.55,109.2], uv_510:[183.26,137.4], uv_synthetic180:[145.55,109.2], uv_synthetic210:[150.92,113.2] },
+      "48x12": { solvent_380:[21.56,16.17], solvent_440:[30.18,22.64], solvent_510:[31.06,23.3], solvent_synthetic180:[39.91,29.93], solvent_synthetic210:[40.52,30.4], uv_380:[26.97,20.2], uv_440:[29.13,21.8], uv_510:[36.65,27.5], uv_synthetic180:[29.13,21.8], uv_synthetic210:[30.18,22.6] },
+      "48x18": { solvent_380:[28.6,21.45], solvent_440:[40.04,30.03], solvent_510:[41.18,30.89], solvent_synthetic180:[52.93,39.7], solvent_synthetic210:[53.77,40.3], uv_380:[35.77,26.8], uv_440:[38.63,29], uv_510:[48.62,36.5], uv_synthetic180:[38.63,29], uv_synthetic210:[40.04,30] },
+      "48x24": { solvent_380:[33.88,25.41], solvent_440:[47.43,35.57], solvent_510:[48.8,36.6], solvent_synthetic180:[62.7,47.03], solvent_synthetic210:[63.71,47.8], uv_380:[42.37,31.8], uv_440:[45.76,34.3], uv_510:[57.6,43.2], uv_synthetic180:[45.76,34.3], uv_synthetic210:[47.43,35.6] },
+      "48x30": { solvent_380:[40.04,30.03], solvent_440:[56.06,42.04], solvent_510:[57.64,43.23], solvent_synthetic180:[74.1,55.57], solvent_synthetic210:[75.28,56.5], uv_380:[50.07,37.6], uv_440:[54.08,40.6], uv_510:[68.07,51.1], uv_synthetic180:[54.08,40.6], uv_synthetic210:[56.06,42] },
+      "48x36": { solvent_380:[47.08,35.31], solvent_440:[65.91,49.43], solvent_510:[67.8,50.85], solvent_synthetic180:[87.12,65.34], solvent_synthetic210:[88.53,66.4], uv_380:[58.87,44.2], uv_440:[63.58,47.7], uv_510:[80.04,60], uv_synthetic180:[63.58,47.7], uv_synthetic210:[65.91,49.4] },
+      "48x48": { solvent_380:[60.72,45.54], solvent_440:[85.01,63.76], solvent_510:[87.43,65.57], solvent_synthetic180:[112.33,84.25], solvent_synthetic210:[114.14,85.6], uv_380:[75.9,56.9], uv_440:[81.97,61.5], uv_510:[103.22,77.4], uv_synthetic180:[81.97,61.5], uv_synthetic210:[85.01,63.8] },
+      "48x60": { solvent_380:[74.36,55.77], solvent_440:[104.1,78.08], solvent_510:[107.1,80.32], solvent_synthetic180:[137.59,103.19], solvent_synthetic210:[139.79,104.8], uv_380:[92.97,69.7], uv_440:[100.41,75.3], uv_510:[126.41,94.8], uv_synthetic180:[100.41,75.3], uv_synthetic210:[104.1,78.1] },
+      "48x72": { solvent_380:[88,66], solvent_440:[123.2,92.4], solvent_510:[126.72,95.04], solvent_synthetic180:[162.8,122.1], solvent_synthetic210:[165.44,124.1], uv_380:[110,82.5], uv_440:[118.8,89.1], uv_510:[149.6,112.2], uv_synthetic180:[118.8,89.1], uv_synthetic210:[123.2,92.4] },
+      "48x84": { solvent_380:[100.76,75.57], solvent_440:[141.06,105.8], solvent_510:[145.11,108.83], solvent_synthetic180:[186.43,139.82], solvent_synthetic210:[189.42,142.1], uv_380:[125.97,94.5], uv_440:[136.05,102], uv_510:[171.29,128.5], uv_synthetic180:[136.05,102], uv_synthetic210:[141.06,105.8] },
+      "48x96": { solvent_380:[114.84,86.13], solvent_440:[160.78,120.58], solvent_510:[165.35,124.01], solvent_synthetic180:[212.48,159.36], solvent_synthetic210:[215.91,161.9], uv_380:[143.57,107.7], uv_440:[155.06,116.3], uv_510:[195.23,146.4], uv_synthetic180:[155.06,116.3], uv_synthetic210:[160.78,120.6] },
+      "48x108": { solvent_380:[128.92,96.69], solvent_440:[180.49,135.37], solvent_510:[185.64,139.23], solvent_synthetic180:[238.52,178.89], solvent_synthetic210:[242.35,181.8], uv_380:[161.17,120.9], uv_440:[174.06,130.5], uv_510:[219.16,164.4], uv_synthetic180:[174.06,130.5], uv_synthetic210:[180.49,135.4] },
+      "48x120": { solvent_380:[143,107.25], solvent_440:[200.2,150.15], solvent_510:[205.92,154.44], solvent_synthetic180:[264.57,198.43], solvent_synthetic210:[268.84,201.6], uv_380:[178.77,134.1], uv_440:[193.07,144.8], uv_510:[243.1,182.3], uv_synthetic180:[193.07,144.8], uv_synthetic210:[200.2,150.2] },
+      "60x24": { solvent_380:[41.36,31.02], solvent_440:[57.9,43.43], solvent_510:[59.58,44.68], solvent_synthetic180:[76.52,57.39], solvent_synthetic210:[77.75,58.3], uv_380:[51.7,38.8], uv_440:[55.84,41.9], uv_510:[70.31,52.7], uv_synthetic180:[55.84,41.9], uv_synthetic210:[57.9,43.4] },
+      "60x36": { solvent_380:[57.64,43.23], solvent_440:[80.7,60.52], solvent_510:[82.98,62.24], solvent_synthetic180:[106.66,79.99], solvent_synthetic210:[108.37,81.3], uv_380:[72.07,54.1], uv_440:[77.84,58.4], uv_510:[97.99,73.5], uv_synthetic180:[77.84,58.4], uv_synthetic210:[80.7,60.5] },
+      "60x48": { solvent_380:[75.24,56.43], solvent_440:[105.34,79], solvent_510:[108.33,81.25], solvent_synthetic180:[139.22,104.41], solvent_synthetic210:[141.46,106.1], uv_380:[94.07,70.6], uv_440:[101.6,76.2], uv_510:[127.91,95.9], uv_synthetic180:[101.6,76.2], uv_synthetic210:[105.34,79] },
+      "60x60": { solvent_380:[90.2,67.65], solvent_440:[126.28,94.71], solvent_510:[129.89,97.42], solvent_synthetic180:[166.89,125.17], solvent_synthetic210:[169.58,127.2], uv_380:[112.77,84.6], uv_440:[121.79,91.3], uv_510:[153.34,115], uv_synthetic180:[121.79,91.3], uv_synthetic210:[126.28,94.7] },
+      "60x72": { solvent_380:[107.8,80.85], solvent_440:[150.92,113.19], solvent_510:[155.23,116.42], solvent_synthetic180:[199.45,149.59], solvent_synthetic210:[202.66,152], uv_380:[134.77,101.1], uv_440:[145.55,109.2], uv_510:[183.26,137.4], uv_synthetic180:[145.55,109.2], uv_synthetic210:[150.92,113.2] },
+      "60x84": { solvent_380:[125.4,94.05], solvent_440:[175.56,131.67], solvent_510:[180.58,135.43], solvent_synthetic180:[232.01,174.01], solvent_synthetic210:[235.75,176.8], uv_380:[156.77,117.6], uv_440:[169.31,127], uv_510:[213.18,159.9], uv_synthetic180:[169.31,127], uv_synthetic210:[175.56,131.7] },
+      "60x96": { solvent_380:[143,107.25], solvent_440:[200.2,150.15], solvent_510:[205.92,154.44], solvent_synthetic180:[264.57,198.43], solvent_synthetic210:[268.84,201.6], uv_380:[178.77,134.1], uv_440:[193.07,144.8], uv_510:[243.1,182.3], uv_synthetic180:[193.07,144.8], uv_synthetic210:[200.2,150.2] },
+      "60x108": { solvent_380:[160.6,120.45], solvent_440:[224.84,168.63], solvent_510:[231.26,173.45], solvent_synthetic180:[297.13,222.85], solvent_synthetic210:[301.93,226.4], uv_380:[200.77,150.6], uv_440:[216.83,162.6], uv_510:[273.02,204.8], uv_synthetic180:[216.83,162.6], uv_synthetic210:[224.84,168.6] },
+      "60x120": { solvent_380:[178.2,133.65], solvent_440:[249.48,187.11], solvent_510:[256.61,192.46], solvent_synthetic180:[329.69,247.27], solvent_synthetic210:[335.02,251.3], uv_380:[222.77,167.1], uv_440:[240.59,180.4], uv_510:[302.94,227.2], uv_synthetic180:[240.59,180.4], uv_synthetic210:[249.48,187.1] },
     };
 
     const finishingOptions = {
@@ -1579,6 +1697,7 @@
     };
 
     const collectOptions = {
+      standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
       normal: { label: "4 Working Days", days: 4, multiplier: 1 },
       quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
       rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
@@ -1690,16 +1809,27 @@
       const { width, height } = selectedSize();
       const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
       const area = width * height / 144;
-      const printing = printingOptions[$("#printing").value];
-      const material = materialOptions[$("#material").value];
+      const printingKey = $("#printing").value;
+      const materialKey = $("#material").value;
+      const printing = printingOptions[printingKey];
+      const material = materialOptions[materialKey];
       const finishing = finishingOptions[selectedValue("finishing")];
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
-      const subtotal = area * 3 * quantity;
-      const total = Math.max(0, subtotal);
+
+      // Unit prices come straight from the price sheet, keyed by size + the
+      // printing/material combo. Finishing never changes the price. Each entry
+      // is [normal, sgd]: normal = Agent Price, sgd = Silver/Gold/Diamond price.
+      const sizeKey = `${width}x${height}`;
+      const rates = (PRICE_TABLE[sizeKey] && PRICE_TABLE[sizeKey][`${printingKey}_${materialKey}`]) || [0, 0];
+      const normalUnit = rates[0] || 0;
+      const sgdUnit = rates[1] || 0;
+      const normalTotal = Math.max(0, normalUnit * quantity);
+      const sgdTotal = Math.max(0, sgdUnit * quantity);
+      const total = normalTotal;
 
       const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
 
-      return { height, width, quantity, area, printing, material, finishing, collect, artworkQty, total };
+      return { height, width, quantity, area, printing, material, finishing, collect, artworkQty, normalUnit, sgdUnit, normalTotal, sgdTotal, total };
     };
 
     const validate = () => {
@@ -1727,8 +1857,30 @@
       setPickerOpen("finishingPicker", isOpen);
     };
 
+    // Material -> finishing availability. Synthetic Paper cannot take the wood
+    // finishings (Wood and Wire / Wood Only), so those choices are hidden when a
+    // Synthetic Paper material is selected; if one was selected, fall back to the
+    // first still-available finishing.
+    const WOOD_ONLY_FINISHINGS = ["wood_wire", "wood_only"];
+    const applyFinishingAvailability = () => {
+      const isSynthetic = /^synthetic/.test($("#material").value);
+      let selectedBlocked = false;
+      $$('#finishingChoices input[name="finishing"]').forEach((input) => {
+        const blocked = isSynthetic && WOOD_ONLY_FINISHINGS.includes(input.value);
+        input.disabled = blocked;
+        const label = input.closest(".choice");
+        if (label) label.classList.toggle("is-hidden", blocked);
+        if (blocked && input.checked) selectedBlocked = true;
+      });
+      if (selectedBlocked) {
+        const firstAvailable = $('#finishingChoices input[name="finishing"]:not(:disabled)');
+        if (firstAvailable) firstAvailable.checked = true;
+      }
+    };
+
     const update = () => {
       updateDates();
+      applyFinishingAvailability();
       setChoiceState();
       const q = quote();
       const sizeText = sizeLabel(q.width, q.height);
@@ -1753,9 +1905,12 @@
       $("#selectedMaterialLabel").textContent = q.material.label;
       $("#selectedFinishingLabel").textContent = q.finishing.label;
       $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
-      $("#agentA").textContent = money(q.total);
-      $("#agentB").textContent = money(q.total * 0.85);
-      $("#agentC").textContent = money(q.total * 0.8);
+      // Agent tiers from the price sheet: Agent Price = Normal column;
+      // Silver / Gold / Diamond all share the S/G/D column price.
+      $("#agentA").textContent = money(q.normalTotal);
+      $("#agentSilver").textContent = money(q.sgdTotal);
+      $("#agentGold").textContent = money(q.sgdTotal);
+      $("#agentDiamond").textContent = money(q.sgdTotal);
 
       validate();
     };
@@ -1957,6 +2112,38 @@
     populateSizes();
     populateArtworkQty();
     update();
+  </script>
+  <script>
+    // "Next Working Days" collection closes each day at 4:00pm — after the
+    // cut-off the option is greyed out and can't be picked. Re-checked on a
+    // timer so a page left open across 4pm locks it automatically.
+    (function () {
+      var CUTOFF_HOUR = 16; // 4:00pm
+      function apply() {
+        var nextInput = document.querySelector('input[name="collect"][value="next"]');
+        if (!nextInput) return;
+        var card = nextInput.closest(".collect-date-option");
+        var closed = new Date().getHours() >= CUTOFF_HOUR;
+        nextInput.disabled = closed;
+        if (card) card.classList.toggle("is-disabled", closed);
+        // If it was selected when the cut-off hits, fall back to the default.
+        if (closed && nextInput.checked) {
+          var fallback =
+            document.querySelector('input[name="collect"][value="standard7"]') ||
+            document.querySelector('input[name="collect"]:not([value="next"])');
+          if (fallback) {
+            fallback.checked = true;
+            fallback.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }
+      }
+      function boot() {
+        apply();
+        setInterval(apply, 30000);
+      }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+      else boot();
+    })();
   </script>
   <script src="/apps/_shared/single-option.js" defer></script>
 </body>

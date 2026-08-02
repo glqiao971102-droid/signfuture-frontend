@@ -128,60 +128,222 @@ export type RasterEntry = {
   bbox_in: { x_in: number; y_in: number; width_in: number; height_in: number };
   highlight_pct: { left: number; top: number; width: number; height: number } | null;
   led_clearance: { too_small: boolean; min_clearance_cm: number } | null;
-  source: "raster-outline";
+  source: "raster-outline" | "spec";
 };
 
-export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0, maxItems = 120, renderScale = 1.0): RasterEntry[] {
+// The bbox of all non-white artwork on the page, in pixels (y-down from top). Used
+// to express a record's position as a fraction of the artwork for the preview.
+function contentArtBboxPx(page: RenderedPage): PxBbox | null {
+  const { width, height, rgb } = page;
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity, any = false;
+  for (let y = 0; y < height; y++) {
+    const base = y * width * 3;
+    for (let x = 0; x < width; x++) {
+      const i = base + x * 3;
+      if (rgb[i] < 245 || rgb[i + 1] < 245 || rgb[i + 2] < 245) { any = true; if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y; }
+    }
+  }
+  return any ? [x1, y1, x2, y2] : null;
+}
+
+// Build records straight from an uploaded "spec" (exported from Illustrator, where
+// grouping still exists). Each spec item -> one record with the EXACT file size; the
+// rendered page is used only for the masked thumbnail. This bypasses all pixel/vector
+// detection so the result matches the AI file's real grouping and dimensions.
+export type SpecItem = { box: PxBbox; isLogo: boolean; sizeIn: { x_in: number; y_in: number; width_in: number; height_in: number } };
+export function recordsFromSpec(page: RenderedPage, items: SpecItem[]): RasterEntry[] {
+  const content = contentArtBboxPx(page);
+  const entries: RasterEntry[] = [];
+  let letterN = 0, logoN = 0;
+  for (const it of items) {
+    if (it.sizeIn.width_in < 0.05 || it.sizeIn.height_in < 0.05) continue;
+    const box = it.box;
+    const rawArea = (box[2] - box[0] + 1) * (box[3] - box[1] + 1);
+    const maskInfo = rawArea <= 600_000 ? connectedMaskForBbox(page, box) : null;
+    const cropUrl = rasterCropDataUrl(page, box, 150, maskInfo != null, maskInfo);
+    let highlightPct: RasterEntry["highlight_pct"] = null;
+    if (content) {
+      const [cx1, cy1, cx2, cy2] = content;
+      const cw = Math.max(1, cx2 - cx1 + 1), ch = Math.max(1, cy2 - cy1 + 1);
+      highlightPct = { left: (box[0] - cx1) / cw, top: (box[1] - cy1) / ch, width: (box[2] - box[0] + 1) / cw, height: (box[3] - box[1] + 1) / ch };
+    }
+    const minCm = Math.min(it.sizeIn.width_in, it.sizeIn.height_in) * 2.54;
+    const label = `${it.isLogo ? "Logo" : "Letter"} ${it.isLogo ? ++logoN : ++letterN}`;
+    entries.push({
+      label,
+      image_data_url: cropUrl,
+      width_in: it.sizeIn.width_in,
+      height_in: it.sizeIn.height_in,
+      bbox_in: it.sizeIn,
+      highlight_pct: highlightPct,
+      led_clearance: { too_small: minCm < 1.2, min_clearance_cm: minCm },
+      source: "spec",
+    });
+  }
+  return entries;
+}
+
+// Merge candidate letter boxes that belong to the same compound-path fill group
+// (Ctrl+8 in Illustrator). `fillGroupsPx` are the compound-path bounding boxes in
+// pixel space. Any candidates whose centres fall inside the same group box are
+// replaced by a single union box; ungrouped candidates pass through unchanged.
+function mergeByFillGroups(boxes: PxBbox[], fillGroupsPx: PxBbox[]): PxBbox[] {
+  if (!fillGroupsPx.length) return boxes;
+  const centerIn = (b: PxBbox, g: PxBbox) => {
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    return cx >= g[0] && cx <= g[2] && cy >= g[1] && cy <= g[3];
+  };
+  const groupArea = (g: PxBbox) => Math.max(1, g[2] - g[0]) * Math.max(1, g[3] - g[1]);
+  const assigned = new Array(boxes.length).fill(-1);
+  boxes.forEach((b, bi) => {
+    let best = -1, bestArea = Infinity;
+    fillGroupsPx.forEach((g, gi) => {
+      // Assign to the SMALLEST group that contains the box's centre, so nested
+      // compound paths merge at the tightest level.
+      if (centerIn(b, g)) { const a = groupArea(g); if (a < bestArea) { bestArea = a; best = gi; } }
+    });
+    assigned[bi] = best;
+  });
+  const out: PxBbox[] = [];
+  const usedGroup = new Map<number, PxBbox>();
+  const groupMembers = new Map<number, number>();
+  assigned.forEach((gi) => { if (gi >= 0) groupMembers.set(gi, (groupMembers.get(gi) || 0) + 1); });
+  boxes.forEach((b, bi) => {
+    const gi = assigned[bi];
+    if (gi < 0 || (groupMembers.get(gi) || 0) < 2) { out.push(b); return; }
+    const cur = usedGroup.get(gi);
+    if (!cur) { usedGroup.set(gi, [b[0], b[1], b[2], b[3]]); }
+    else { cur[0] = Math.min(cur[0], b[0]); cur[1] = Math.min(cur[1], b[1]); cur[2] = Math.max(cur[2], b[2]); cur[3] = Math.max(cur[3], b[3]); }
+  });
+  for (const g of usedGroup.values()) out.push(g);
+  return out;
+}
+
+const boxArea = (b: PxBbox) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+const overlapArea = (a: PxBbox, b: PxBbox) =>
+  Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+
+// Cluster boxes that HEAVILY overlap (one contains/covers most of the other) — a
+// single letter's own inner+outer contours (e.g. the ring and counter of an "O")
+// so they aren't torn apart. Separate letters barely overlap, so they stay apart.
+function clusterHeavyOverlap(boxes: PxBbox[]): PxBbox[] {
+  const parent = boxes.map((_, i) => i);
+  const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const ov = overlapArea(boxes[i], boxes[j]);
+      const minA = Math.max(1, Math.min(boxArea(boxes[i]), boxArea(boxes[j])));
+      if (ov / minA > 0.6) { const a = find(i), b = find(j); if (a !== b) parent[b] = a; }
+    }
+  }
+  const groups = new Map<number, PxBbox>();
+  boxes.forEach((b, i) => {
+    const r = find(i), cur = groups.get(r);
+    if (!cur) groups.set(r, [b[0], b[1], b[2], b[3]]);
+    else { cur[0] = Math.min(cur[0], b[0]); cur[1] = Math.min(cur[1], b[1]); cur[2] = Math.max(cur[2], b[2]); cur[3] = Math.max(cur[3], b[3]); }
+  });
+  return [...groups.values()];
+}
+
+// Merge a letter's inner COUNTERS (the enclosed holes of 8 6 9 0 O A P R 4) back
+// into the letter. When a letter is drawn as an OUTLINE (contours only, no fill —
+// common for cut/box-up artwork) each counter is a separate closed loop, so the
+// raster sees it as its own connected component and it becomes a phantom record.
+// A counter is a box fully inside a LARGER box. The parent-size cap keeps a real
+// small letter that happens to sit inside a big LOGO's bbox from being swallowed —
+// that must survive as its own record (a logo is far bigger than any letter).
+function mergeCounters(boxes: PxBbox[], maxParentPx: number): PxBbox[] {
+  const parent = boxes.map((_, i) => i);
+  const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const inside = (s: PxBbox, big: PxBbox) => s[0] >= big[0] - 1 && s[1] >= big[1] - 1 && s[2] <= big[2] + 1 && s[3] <= big[3] + 1;
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const ai = boxArea(boxes[i]), aj = boxArea(boxes[j]);
+      const big = ai >= aj ? boxes[i] : boxes[j];
+      const small = ai >= aj ? boxes[j] : boxes[i];
+      const bigMin = Math.min(big[2] - big[0], big[3] - big[1]);
+      // parent must be letter-sized; child strictly smaller and fully enclosed.
+      if (bigMin <= maxParentPx && Math.min(ai, aj) < 0.9 * Math.max(1, Math.max(ai, aj)) && inside(small, big)) {
+        const a = find(i), b = find(j); if (a !== b) parent[b] = a;
+      }
+    }
+  }
+  const groups = new Map<number, PxBbox>();
+  boxes.forEach((b, i) => {
+    const r = find(i), cur = groups.get(r);
+    if (!cur) groups.set(r, [b[0], b[1], b[2], b[3]]);
+    else { cur[0] = Math.min(cur[0], b[0]); cur[1] = Math.min(cur[1], b[1]); cur[2] = Math.max(cur[2], b[2]); cur[3] = Math.max(cur[3], b[3]); }
+  });
+  return [...groups.values()];
+}
+
+// Push apart sibling letter boxes that overlap, by cutting the shared strip at its
+// midline (along the axis of smaller overlap). Stacked/interleaved letters have
+// overlapping bounding boxes even when their shapes are separate; this makes each
+// crop show only its own letter instead of a slice of the neighbour.
+function separateSiblings(boxes: PxBbox[]): PxBbox[] {
+  const out = boxes.map((b) => [b[0], b[1], b[2], b[3]] as PxBbox);
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      const a = out[i], b = out[j];
+      const ox = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
+      const oy = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+      if (ox <= 0 || oy <= 0) continue;
+      if (oy <= ox) {
+        const [top, bot] = a[1] <= b[1] ? [a, b] : [b, a];
+        const mid = Math.round((Math.max(top[1], bot[1]) + Math.min(top[3], bot[3])) / 2);
+        top[3] = Math.min(top[3], mid); bot[1] = Math.max(bot[1], mid);
+      } else {
+        const [left, right] = a[0] <= b[0] ? [a, b] : [b, a];
+        const mid = Math.round((Math.max(left[0], right[0]) + Math.min(left[2], right[2])) / 2);
+        left[2] = Math.min(left[2], mid); right[0] = Math.max(right[0], mid);
+      }
+    }
+  }
+  return out;
+}
+
+// Split a merged blob into its letters using the vector fills inside it. Stacked
+// letters that touch at native resolution (e.g. "A/Y/L") form one raster blob but
+// are separate vector fills — break the blob at those fills. A dense illustration
+// (a logo = many tiny fills) is left whole. Returns null when it shouldn't split.
+function splitBlobByFills(blob: PxBbox, fillBoxesPx: PxBbox[]): PxBbox[] | null {
+  const blobW = blob[2] - blob[0];
+  const blobH = blob[3] - blob[1];
+  const blobArea = Math.max(1, blobW * blobH);
+  const inside = fillBoxesPx.filter((f) => {
+    const cx = (f[0] + f[2]) / 2, cy = (f[1] + f[3]) / 2;
+    return cx >= blob[0] && cx <= blob[2] && cy >= blob[1] && cy <= blob[3];
+  });
+  // < 2 fills = a single shape; > 8 = a dense illustration (logo) -> leave whole.
+  if (inside.length < 2 || inside.length > 8) return null;
+  const substantial = inside
+    .filter((f) => {
+      const w = f[2] - f[0], h = f[3] - f[1];
+      return w * h >= 0.18 * blobArea && h >= 0.25 * blobH && w >= 0.25 * blobW;
+    })
+    .map((f) => [Math.max(blob[0], f[0]), Math.max(blob[1], f[1]), Math.min(blob[2], f[2]), Math.min(blob[3], f[3])] as PxBbox);
+  if (substantial.length < 2) return null;
+  // Merge a letter's own overlapping parts (inner+outer of "O"); a real letter with
+  // parts collapses to one cluster, so a single-letter blob won't be split.
+  const letters = clusterHeavyOverlap(substantial);
+  if (letters.length < 2) return null;
+  // Separate touching sibling boxes, then round to integer pixels (fractional coords
+  // corrupt pixel indexing in the mask/crop and blow up the run time).
+  return separateSiblings(letters).map((b) => [Math.round(b[0]), Math.round(b[1]), Math.round(b[2]), Math.round(b[3])] as PxBbox);
+}
+
+export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0, maxItems = 120, renderScale = 1.0, fillGroupsPx: PxBbox[] = [], fillBoxesPx: PxBbox[] = [], logoClustersPx: PxBbox[] = [], clipBoxesPx: PxBbox[] = []): RasterEntry[] {
   const { width: widthPx, height: heightPx, rgb } = page;
   const scale = renderScale || 2.0;
-  const px = (x: number, y: number): [number, number, number] => {
-    const i = (y * widthPx + x) * 3;
-    return [rgb[i], rgb[i + 1], rgb[i + 2]];
-  };
-  // LED channel clearance: largest inscribed circle inside the letter (distance
-  // transform) = widest channel that can hold an LED. If < 1.2cm it can't fit.
+  // LED clearance = the letter's own MINIMUM overall dimension (its shortest side).
+  // The LED module has to sit inside the letter, so a wide/tall letter (U, O) fits
+  // while a thin letter (I, a thin stroke) does not. Measured from the record's
+  // bounding box, not the stroke thickness. Flag if the shortest side < 1.2cm.
   const ledClearanceFor = (bbox: PxBbox): RasterEntry["led_clearance"] => {
-    const [x1, y1, x2, y2] = bbox;
-    const w = x2 - x1 + 1;
-    const h = y2 - y1 + 1;
-    if (w < 2 || h < 2 || w * h > 3_000_000) return null;
-    const INF = 1e9;
-    const dist = new Float64Array(w * h);
-    for (let yy = 0; yy < h; yy++) {
-      for (let xx = 0; xx < w; xx++) {
-        const [r, g, b] = px(x1 + xx, y1 + yy);
-        dist[yy * w + xx] = isArtworkPixel(r, g, b) ? INF : 0;
-      }
-    }
-    const R2 = Math.SQRT2;
-    for (let yy = 0; yy < h; yy++) {
-      for (let xx = 0; xx < w; xx++) {
-        const idx = yy * w + xx;
-        if (dist[idx] === 0) continue;
-        let d = Math.min(dist[idx], xx + 1, yy + 1); // bbox left/top edge = background
-        if (xx > 0) d = Math.min(d, dist[idx - 1] + 1);
-        if (yy > 0) d = Math.min(d, dist[idx - w] + 1);
-        if (xx > 0 && yy > 0) d = Math.min(d, dist[idx - w - 1] + R2);
-        if (xx < w - 1 && yy > 0) d = Math.min(d, dist[idx - w + 1] + R2);
-        dist[idx] = d;
-      }
-    }
-    let maxDist = 0;
-    for (let yy = h - 1; yy >= 0; yy--) {
-      for (let xx = w - 1; xx >= 0; xx--) {
-        const idx = yy * w + xx;
-        if (dist[idx] === 0) continue;
-        let d = Math.min(dist[idx], w - xx, h - yy); // bbox right/bottom edge = background
-        if (xx < w - 1) d = Math.min(d, dist[idx + 1] + 1);
-        if (yy < h - 1) d = Math.min(d, dist[idx + w] + 1);
-        if (xx < w - 1 && yy < h - 1) d = Math.min(d, dist[idx + w + 1] + R2);
-        if (xx > 0 && yy < h - 1) d = Math.min(d, dist[idx + w - 1] + R2);
-        dist[idx] = d;
-        if (d > maxDist) maxDist = d;
-      }
-    }
-    const channelPx = 2 * maxDist;
-    const cm = (channelPx / scale / POINTS_PER_INCH) * measurementScale * 2.54;
+    const wIn = ((bbox[2] - bbox[0] + 1) / scale / POINTS_PER_INCH) * measurementScale;
+    const hIn = ((bbox[3] - bbox[1] + 1) / scale / POINTS_PER_INCH) * measurementScale;
+    const cm = Math.min(wIn, hIn) * 2.54;
     return { too_small: cm < 1.2, min_clearance_cm: cm };
   };
   const artByRow: number[][] = new Array(heightPx);
@@ -232,52 +394,123 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
     if (any) contentArtBbox = [minX, minY, maxX, maxY];
   }
 
+  // One record per connected shape — never proximity- or overlap-group them.
+  // The AI file's own grouping is NOT recoverable (Illustrator flattens it away
+  // on PDF export), so we always keep shapes separate; the customer joins a
+  // logo's pieces with the "Group" button when they want to.
+  const candidateBoxes: PxBbox[] = [];
   for (const [rowTop, rowBottom] of rows) {
     if (rowBottom <= rowTop) continue;
-    const rowHeight = rowBottom - rowTop + 1;
-    let rowLowerArtwork = false;
-    if (contentArtBbox) {
-      const cy1 = contentArtBbox[1], cy2 = contentArtBbox[3];
-      rowLowerArtwork = rowTop >= cy1 + (cy2 - cy1 + 1) * 0.55;
+    for (const box of connectedComponentBoxes(artByRow, rowTop, rowBottom)) {
+      if (box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4) candidateBoxes.push(box);
     }
-    let rowBoxes: PxBbox[] = [];
-    if (rowLowerArtwork) {
-      rowBoxes = connectedComponentBoxes(artByRow, rowTop, rowBottom);
-    } else {
-      const colHasArt: boolean[] = new Array(widthPx).fill(false);
-      for (let x = 0; x < widthPx; x++) {
-        for (let yy = rowTop; yy <= rowBottom; yy++) {
-          const [r, g, b] = px(x, yy);
-          if (isArtworkPixel(r, g, b)) { colHasArt[x] = true; break; }
-        }
+  }
+  // Keep pieces of the same compound path (Ctrl+8) together as one record.
+  const fillGrouped = mergeByFillGroups(candidateBoxes, fillGroupsPx);
+  // Merge outlined letters' inner counters (holes) back into the letter. Parent cap
+  // = 3in so a big logo never absorbs a neighbouring letter that sits in its bbox.
+  const groupedBoxes = mergeCounters(fillGrouped, (3.0 / measurementScale) * POINTS_PER_INCH * scale);
+  // Split blobs that fused a few touching letters into their separate vector letters
+  // (e.g. a stacked "A/Y/L" column). Dense logos (many fills) are left whole. Only
+  // attempt it on record-sized blobs — the many tiny components (filtered out later)
+  // would make the per-blob fill scan O(blobs x fills) and dominate the run time.
+  const minRecordPx = (0.25 / measurementScale) * POINTS_PER_INCH * scale;
+  // Splitting only helps letter designs (a handful of fills). A file with thousands
+  // of fills is a detailed illustration where letter-splitting doesn't apply, and
+  // the per-blob fill scan would be far too slow — skip it there.
+  const canSplit = fillBoxesPx.length > 0 && fillBoxesPx.length <= 4000;
+  const splitBoxes: PxBbox[] = [];
+  for (const box of groupedBoxes) {
+    const recordSized = box[2] - box[0] + 1 >= minRecordPx && box[3] - box[1] + 1 >= minRecordPx;
+    const parts = canSplit && recordSized ? splitBlobByFills(box, fillBoxesPx) : null;
+    if (parts && parts.length >= 2) splitBoxes.push(...parts);
+    else splitBoxes.push(box);
+  }
+  const mergedBoxes = splitBoxes.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  // Snap each logo record to its vector-fill cluster box, so its reported size
+  // matches the AI file (the raster box under-measures light-edged logos). For each
+  // logo cluster, the raster candidate that overlaps it most IS the logo -> replace
+  // its box with the cluster box. Guards: (1) the winner must cover MOST of the
+  // cluster (bestOv > 0.5*clusterArea) so a letter merely sitting in a corner of the
+  // cluster bbox can't be promoted, and a fragmented logo (no single dominant blob)
+  // is left alone rather than mis-snapped; (2) a candidate already claimed by an
+  // earlier cluster can't be claimed again. Letters (separate small clusters) are
+  // untouched. NOTE: we deliberately do NOT remove other boxes inside the cluster
+  // bbox — a real neighbour letter (e.g. an "A" in the logo's empty corner) sits
+  // inside the bbox and must survive as its own record.
+  const snappedLogos = new Set<PxBbox>();
+  const claimed = new Set<number>();
+  for (const cluster of logoClustersPx) {
+    let best = -1, bestOv = 0;
+    mergedBoxes.forEach((b, i) => { if (claimed.has(i)) return; const ov = overlapArea(b, cluster); if (ov > bestOv) { bestOv = ov; best = i; } });
+    if (best >= 0 && bestOv > 0.5 * boxArea(cluster)) {
+      const snapped: PxBbox = [Math.round(cluster[0]), Math.round(cluster[1]), Math.round(cluster[2]), Math.round(cluster[3])];
+      mergedBoxes[best] = snapped;
+      claimed.add(best);
+      snappedLogos.add(snapped);
+    }
+  }
+  // GENERAL vector-size snap. The raster box under-measures any record with LIGHT
+  // edges (a gold gradient, a soft glow): near-white pixels (>=245) fall below the
+  // art threshold, so the pixel box is smaller than the AI file (a gradient "運" read
+  // 11.0x9.9in when the file is 11.6x11.0in). The vector FILLS are the true geometry —
+  // the same source Illustrator measures. Grow each non-logo record box to the union
+  // of the individual fills whose centre lies in it, so the box, size, highlight AND
+  // LED are all measured from the true extent. Guard: accept the union only when it is
+  // within [0.7x, 1.7x] of the raster box in BOTH dims, so light edges are recovered
+  // but a record never balloons by swallowing an overlapping neighbour's fill. Snapped
+  // boxes skip the mask tight-trim below (which would shrink them back to the ink core).
+  // Fills AND clip paths are both true vector geometry (gradient art is a fill clipped
+  // to a letter shape, so the clip bbox is the letter). Use both as the size source.
+  const sizeVectorsPx = fillBoxesPx.concat(clipBoxesPx);
+  const snappedFills = new Set<PxBbox>();
+  if (sizeVectorsPx.length > 0 && sizeVectorsPx.length <= 8000) {
+    for (let i = 0; i < mergedBoxes.length; i++) {
+      const b = mergedBoxes[i];
+      if (snappedLogos.has(b)) continue;
+      let ux1 = Infinity, uy1 = Infinity, ux2 = -Infinity, uy2 = -Infinity, cnt = 0;
+      for (const f of sizeVectorsPx) {
+        const fcx = (f[0] + f[2]) / 2, fcy = (f[1] + f[3]) / 2;
+        if (fcx < b[0] || fcx > b[2] || fcy < b[1] || fcy > b[3]) continue;
+        if (f[0] < ux1) ux1 = f[0]; if (f[1] < uy1) uy1 = f[1]; if (f[2] > ux2) ux2 = f[2]; if (f[3] > uy2) uy2 = f[3]; cnt++;
       }
-      const characterGap = Math.max(2, pyRound(rowHeight * 0.035));
-      let x = 0;
-      while (x < widthPx) {
-        while (x < widthPx && !colHasArt[x]) x++;
-        if (x >= widthPx) break;
-        const start = x;
-        let lastArt = x;
-        let gap = 0;
-        x++;
-        while (x < widthPx) {
-          if (colHasArt[x]) { lastArt = x; gap = 0; }
-          else { gap++; if (gap > characterGap) break; }
-          x++;
-        }
-        if (lastArt > start) {
-          const tightBox = tightBboxForSpan(artByRow, start, lastArt, rowTop, rowBottom);
-          if (tightBox) {
-            const boxWidth = tightBox[2] - tightBox[0] + 1;
-            const boxHeight = tightBox[3] - tightBox[1] + 1;
-            if (boxWidth > boxHeight * 3 && boxHeight < rowHeight * 0.75) rowBoxes.push(...splitWideFlatBox(artByRow, tightBox));
-            else rowBoxes.push(tightBox);
+      if (cnt === 0) continue;
+      const bw = b[2] - b[0], bh = b[3] - b[1], uw = ux2 - ux1, uh = uy2 - uy1;
+      if (uw < bw * 0.7 || uw > bw * 1.7 || uh < bh * 0.7 || uh > bh * 1.7) continue;
+      const snapped: PxBbox = [Math.round(ux1), Math.round(uy1), Math.round(ux2), Math.round(uy2)];
+      mergedBoxes[i] = snapped;
+      snappedFills.add(snapped);
+    }
+  }
+  {
+    for (const rawBox of mergedBoxes) {
+      const isLogo = snappedLogos.has(rawBox) || snappedFills.has(rawBox);
+      // Compute this record's own-shape mask ONCE and reuse it for the thumbnail,
+      // the LED clearance and a TIGHT bbox. The tight bbox = the mask's real extent,
+      // so a neighbour letter that merely clipped the corner is excluded from the
+      // reported size, the highlight rectangle and the LED measurement.
+      // Only small/medium boxes (where tightly-packed neighbours actually intrude)
+      // are masked; a big letter or logo skips it — the connected-component flood
+      // over millions of pixels would be far too slow and it doesn't need it.
+      const rawArea = (rawBox[2] - rawBox[0] + 1) * (rawBox[3] - rawBox[1] + 1);
+      const maskInfo = rawArea <= 600_000 ? connectedMaskForBbox(page, rawBox) : null;
+      let bboxPx = rawBox;
+      // For a snapped LOGO, keep the vector cluster box as the size/frame (the mask
+      // is still used to clean the thumbnail). Only letters get the tight-bbox trim.
+      if (maskInfo && !isLogo) {
+        const { mask, width: mw, height: mh, x1: mx, y1: my } = maskInfo;
+        let mnX = mw, mnY = mh, mxX = -1, mxY = -1;
+        for (let ry = 0; ry < mh; ry++) {
+          for (let rx = 0; rx < mw; rx++) {
+            if (!mask[ry * mw + rx]) continue;
+            if (rx < mnX) mnX = rx;
+            if (rx > mxX) mxX = rx;
+            if (ry < mnY) mnY = ry;
+            if (ry > mxY) mxY = ry;
           }
         }
+        if (mxX >= mnX && mxY >= mnY) bboxPx = [mx + mnX, my + mnY, mx + mxX, my + mxY];
       }
-    }
-    rowBoxes = rowBoxes.filter((box) => box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4);
-    for (const bboxPx of rowBoxes) {
       const widthIn = ((bboxPx[2] - bboxPx[0] + 1) / scale / POINTS_PER_INCH) * measurementScale;
       const heightIn = ((bboxPx[3] - bboxPx[1] + 1) / scale / POINTS_PER_INCH) * measurementScale;
       if (widthIn >= 0.25 && heightIn >= 0.25) {
@@ -302,7 +535,10 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
         const labelPrefix = looksLikeLogo ? "Logo" : "Letter";
         const labelCount = 1 + entries.filter((item) => item.label.startsWith(labelPrefix)).length;
         const label = `${labelPrefix} ${labelCount}`;
-        const cropUrl = rasterCropDataUrl(page, bboxPx, 150, lowerArtwork);
+        // Mask the thumbnail to this record's shape (neighbours clipped in the box
+        // are whitened). Crop the ORIGINAL box so the letter keeps a little margin.
+        // Big boxes (maskInfo === null) skip masking — a plain crop, no extra flood.
+        const cropUrl = rasterCropDataUrl(page, rawBox, 150, maskInfo != null, maskInfo);
         entries.push({
           label,
           image_data_url: cropUrl,
@@ -315,6 +551,7 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
             height_in: snapDisplayMeasurement(heightIn),
           },
           highlight_pct: highlightPct,
+          // LED clearance from the tight letter box (its shortest side).
           led_clearance: ledClearanceFor(bboxPx),
           source: "raster-outline",
         });
@@ -332,7 +569,10 @@ export function rasterContentBbox(page: RenderedPage, renderScale = 1.0): Bbox |
     const base = y * width * 3;
     for (let x = 0; x < width; x++) {
       const i = base + x * 3;
-      if (rgb[i] < 105 && rgb[i + 1] < 105 && rgb[i + 2] < 105) {
+      // Use the same non-white test as letter detection (was dark-only < 105,
+      // which missed coloured artwork like blue letters — that made the preview
+      // crop fall back to the vector bbox and mis-align every highlight box).
+      if (isArtworkPixel(rgb[i], rgb[i + 1], rgb[i + 2])) {
         any = true;
         if (x < x1) x1 = x;
         if (x > x2) x2 = x;
@@ -347,67 +587,80 @@ export function rasterContentBbox(page: RenderedPage, renderScale = 1.0): Bbox |
 }
 
 // ---- letter crop thumbnails (PNG data URLs) ----
+// Build a mask of just THIS record's shape. We flood-fill connected components in
+// a region padded around the box, then keep only components that live MOSTLY
+// inside the box. A neighbouring letter that merely pokes into the box has most of
+// its body outside the box -> dropped. The record's own letter (and its own parts,
+// e.g. the dot of an "i") sits fully inside -> kept. Never returns blank: if
+// nothing qualifies, it falls back to the component with the most in-box pixels.
 function connectedMaskForBbox(page: RenderedPage, bboxPx: PxBbox): { mask: Uint8Array; width: number; height: number; x1: number; y1: number } | null {
-  const { width: imgW, rgb } = page;
+  const { width: imgW, height: imgH, rgb } = page;
   const [x1, y1, x2, y2] = bboxPx;
-  const width = x2 - x1 + 1;
-  const height = y2 - y1 + 1;
-  const artwork = new Uint8Array(width * height);
-  for (let y = 0; y < height; y++) {
-    const gy = y1 + y;
-    for (let x = 0; x < width; x++) {
-      const gx = x1 + x;
-      const i = (gy * imgW + gx) * 3;
-      if (rgb[i] < 245 || rgb[i + 1] < 245 || rgb[i + 2] < 245) artwork[y * width + x] = 1;
+  const boxW = x2 - x1 + 1;
+  const boxH = y2 - y1 + 1;
+  // Padded region so we can see whether a component continues beyond the box.
+  // Capped in absolute pixels so a big letter at high DPI doesn't flood a giant area.
+  const padX = Math.min(80, Math.max(6, Math.round(boxW * 0.9)));
+  const padY = Math.min(80, Math.max(6, Math.round(boxH * 0.9)));
+  const rx1 = Math.max(0, x1 - padX), ry1 = Math.max(0, y1 - padY);
+  const rx2 = Math.min(imgW - 1, x2 + padX), ry2 = Math.min(imgH - 1, y2 + padY);
+  const rw = rx2 - rx1 + 1, rh = ry2 - ry1 + 1;
+  const artwork = new Uint8Array(rw * rh);
+  for (let y = 0; y < rh; y++) {
+    const gy = ry1 + y;
+    for (let x = 0; x < rw; x++) {
+      const i = (gy * imgW + (rx1 + x)) * 3;
+      if (rgb[i] < 245 || rgb[i + 1] < 245 || rgb[i + 2] < 245) artwork[y * rw + x] = 1;
     }
   }
-  const visited = new Uint8Array(width * height);
-  type Comp = { indices: number[]; bx1: number; by1: number; bx2: number; by2: number };
+  // Box position within the region.
+  const bL = x1 - rx1, bT = y1 - ry1, bR = bL + boxW - 1, bB = bT + boxH - 1;
+  const visited = new Uint8Array(rw * rh);
+  type Comp = { indices: number[]; inside: number };
   const components: Comp[] = [];
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const start = y * width + x;
+  for (let y = 0; y < rh; y++) {
+    for (let x = 0; x < rw; x++) {
+      const start = y * rw + x;
       if (visited[start]) continue;
       visited[start] = 1;
       if (!artwork[start]) continue;
       const stack = [start];
       const indices: number[] = [];
-      let minX = x, maxX = x, minY = y, maxY = y;
+      let inside = 0;
       while (stack.length) {
         const current = stack.pop()!;
         indices.push(current);
-        const px = current % width;
-        const py = (current / width) | 0;
-        if (px < minX) minX = px;
-        if (px > maxX) maxX = px;
-        if (py < minY) minY = py;
-        if (py > maxY) maxY = py;
+        const px = current % rw;
+        const py = (current / rw) | 0;
+        if (px >= bL && px <= bR && py >= bT && py <= bB) inside++;
         const neigh = [[px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]];
         for (const [nx, ny] of neigh) {
-          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-          const ni = ny * width + nx;
+          if (nx < 0 || nx >= rw || ny < 0 || ny >= rh) continue;
+          const ni = ny * rw + nx;
           if (visited[ni]) continue;
           visited[ni] = 1;
           if (artwork[ni]) stack.push(ni);
         }
       }
-      if (indices.length) components.push({ indices, bx1: minX, by1: minY, bx2: maxX, by2: maxY });
+      if (inside > 0) components.push({ indices, inside });
     }
   }
   if (!components.length) return null;
-  const score = (c: Comp): [number, number] => {
-    const edgeHits = (c.bx1 <= 1 ? 1 : 0) + (c.by1 <= 1 ? 1 : 0) + (c.bx2 >= width - 2 ? 1 : 0) + (c.by2 >= height - 2 ? 1 : 0);
-    return [edgeHits, c.indices.length];
+  const mask = new Uint8Array(boxW * boxH);
+  const paint = (c: Comp) => {
+    for (const idx of c.indices) {
+      const px = idx % rw, py = (idx / rw) | 0;
+      if (px >= bL && px <= bR && py >= bT && py <= bB) mask[(py - bT) * boxW + (px - bL)] = 1;
+    }
   };
-  let chosen = components[0];
-  for (const c of components) {
-    const sc = score(c);
-    const sb = score(chosen);
-    if (sc[0] > sb[0] || (sc[0] === sb[0] && sc[1] > sb[1])) chosen = c;
-  }
-  const mask = new Uint8Array(width * height);
-  for (const index of chosen.indices) mask[index] = 1;
-  return { mask, width, height, x1, y1 };
+  // Keep ONLY this record's own shape = the connected component with the most
+  // pixels inside the box. Any OTHER shape that merely overlaps the box — a
+  // separate letter sitting inside a big logo's bounding box, or a neighbour that
+  // clips the corner — is a different record and gets whitened out of this crop.
+  let best = components[0];
+  for (const c of components) if (c.inside > best.inside) best = c;
+  paint(best);
+  return { mask, width: boxW, height: boxH, x1, y1 };
 }
 
 // Simple area-average downscale (thumbnail-only; visual parity with PIL LANCZOS).
@@ -435,11 +688,13 @@ function downscaleRgb(src: Uint8Array, sw: number, sh: number, dw: number, dh: n
   return out;
 }
 
-function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false): string {
+type MaskInfo = { mask: Uint8Array; width: number; height: number; x1: number; y1: number };
+
+function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false, precomputedMask: MaskInfo | null = null): string {
   const { width: imgW, height: imgH, rgb } = page;
   const [x1, y1, x2, y2] = bboxPx;
   const pad = 16;
-  const selectedMask = maskShape ? connectedMaskForBbox(page, bboxPx) : null;
+  const selectedMask = maskShape ? (precomputedMask ?? connectedMaskForBbox(page, bboxPx)) : null;
   const cx1 = Math.max(0, x1 - pad);
   const cy1 = Math.max(0, y1 - pad);
   const cx2 = Math.min(imgW, x2 + pad + 1);

@@ -909,7 +909,7 @@
 
     .collect-date-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       border: 1px solid rgba(63, 176, 255, 0.58);
       border-radius: 10px;
@@ -1403,7 +1403,13 @@
             <h3 class="collect-date-title">Collect Date</h3>
             <div class="collect-date-grid" id="collectChoices">
               <label class="collect-date-option is-selected">
-                <input type="radio" name="collect" value="normal" checked>
+                <input type="radio" name="collect" value="standard7" checked>
+                <img src="assets/collect-7-working-days.png" alt="7 Working Days (Standard)">
+                <span class="image-zoom-button"></span>
+                <strong>7 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="normal">
                 <img src="assets/collect-4-working-days.png" alt="4 Working Days">
                 <span class="image-zoom-button"></span>
                 <strong>4 Working Days</strong>
@@ -1449,19 +1455,24 @@
           <h3 class="order-title">Order Summary</h3>
           <div class="agent-grid">
             <div class="agent-card">
-              <span>Normal Agent Price</span>
-              <strong id="agentA">RM 72.00</strong>
-              <em>RM 3 / sq.ft.</em>
+              <span>Agent Price</span>
+              <strong id="agentA">RM 0.00</strong>
+              <em id="rateA"></em>
+            </div>
+            <div class="agent-card">
+              <span>Silver Agent Price</span>
+              <strong id="agentSilver">RM 0.00</strong>
+              <em id="rateSilver"></em>
             </div>
             <div class="agent-card">
               <span>Gold Agent Price</span>
-              <strong id="agentB">RM 61.20</strong>
-              <em>15% margin</em>
+              <strong id="agentGold">RM 0.00</strong>
+              <em id="rateGold"></em>
             </div>
             <div class="agent-card">
-              <span>Platinum Agent Price</span>
-              <strong id="agentC">RM 57.60</strong>
-              <em>20% margin</em>
+              <span>Diamond Agent Price</span>
+              <strong id="agentDiamond">RM 0.00</strong>
+              <em id="rateDiamond"></em>
             </div>
           </div>
 
@@ -1525,6 +1536,7 @@
     const MAX_WIDTH_IN = 60;
 
     const collectOptions = {
+      standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
       normal: { label: "4 Working Days", days: 4, multiplier: 1 },
       quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
       rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
@@ -1588,6 +1600,16 @@
     const unitToInch = { in: 1, cm: 1 / 2.54, mm: 1 / 25.4, m: 39.3700787, ft: 12 };
     const unitLabels = { in: "in", cm: "cm", mm: "mm", m: "m", ft: "ft" };
 
+    // Per-sq.ft. price from the official price sheet (draft paper Excel).
+    //   MATERIAL_RATE[material] = [Agent, Silver, Gold, Diamond]  (RM per sq.ft.)
+    // Draft paper has no printing choice.
+    const MATERIAL_RATE = {
+      draft70: [2.2, 2.0, 2.0, 2.0]
+    };
+    const FINISHING_RATE = {
+      cut: [0, 0, 0, 0]
+    };
+
     const quote = () => {
       const height = Math.max(0, Number($("#height").value) || 0);
       const width = Math.max(0, Number($("#width").value) || 0);
@@ -1597,15 +1619,21 @@
       const widthIn = width * factor;
       const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
       const area = heightIn * widthIn / 144;
-      const material = materialOptions[$("#material").value];
-      const finishing = finishingOptions[selectedValue("finishing")];
+      const materialKey = $("#material").value;
+      const material = materialOptions[materialKey];
+      const finishingKey = selectedValue("finishing");
+      const finishing = finishingOptions[finishingKey];
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
-      const subtotal = area * 3 * quantity;
-      const total = Math.max(0, subtotal);
+
+      const rates = MATERIAL_RATE[materialKey] || [0, 0, 0, 0];
+      const finRates = FINISHING_RATE[finishingKey] || [0, 0, 0, 0];
+      const tierRates = rates.map((rate, i) => rate + (finRates[i] || 0));
+      const tierTotals = tierRates.map((rate) => Math.max(0, area * rate * quantity));
+      const total = tierTotals[0];
 
       const widthOverMax = widthIn > MAX_WIDTH_IN + 1e-9;
 
-      return { height, width, widthIn, unit, quantity, area, material, finishing, collect, widthOverMax, total };
+      return { height, width, widthIn, unit, quantity, area, material, finishing, collect, widthOverMax, total, tierTotals, tierRates };
     };
 
     const validate = () => {
@@ -1662,9 +1690,10 @@
       $("#selectedMaterialLabel").textContent = q.material.label;
       $("#selectedFinishingLabel").textContent = q.finishing.label;
       $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
-      $("#agentA").textContent = money(q.total);
-      $("#agentB").textContent = money(q.total * 0.85);
-      $("#agentC").textContent = money(q.total * 0.8);
+      const tierCardIds = ["agentA", "agentSilver", "agentGold", "agentDiamond"];
+      tierCardIds.forEach((id, i) => { const el = $("#" + id); if (el) el.textContent = money(q.tierTotals[i] || 0); });
+      const tierEmIds = ["rateA", "rateSilver", "rateGold", "rateDiamond"];
+      tierEmIds.forEach((id, i) => { const el = $("#" + id); if (el) el.textContent = "RM " + (q.tierRates[i] || 0).toFixed(2) + " / sq.ft."; });
 
       validate();
     };
@@ -1855,6 +1884,31 @@
     $("#editOrder").addEventListener("click", () => $(".panel").scrollIntoView({ behavior: "smooth" }));
 
     update();
+  </script>
+  <style>
+    .collect-date-option.is-disabled { position: relative; opacity: 0.45; filter: grayscale(0.65); pointer-events: none; cursor: not-allowed; }
+    .collect-date-option.is-disabled::after { content: "Closed after 4:00pm"; position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 4px; border-radius: 5px; background: rgba(196,24,44,0.92); color: #fff; font-size: 10px; font-weight: 800; text-align: center; }
+  </style>
+  <script>
+    // "Next Working Days" collection closes each day at 4:00pm.
+    (function () {
+      var CUTOFF_HOUR = 16;
+      function apply() {
+        var nextInput = document.querySelector('input[name="collect"][value="next"]');
+        if (!nextInput) return;
+        var card = nextInput.closest(".collect-date-option");
+        var closed = new Date().getHours() >= CUTOFF_HOUR;
+        nextInput.disabled = closed;
+        if (card) card.classList.toggle("is-disabled", closed);
+        if (closed && nextInput.checked) {
+          var fb = document.querySelector('input[name="collect"][value="standard7"]') || document.querySelector('input[name="collect"]:not([value="next"])');
+          if (fb) { fb.checked = true; fb.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      }
+      function boot() { apply(); setInterval(apply, 30000); }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+      else boot();
+    })();
   </script>
   <script src="/apps/_shared/single-option.js" defer></script>
 </body>

@@ -535,6 +535,7 @@
       background: rgba(53, 216, 255, 0.08);
       box-shadow: 0 0 16px rgba(53, 216, 255, 0.65), inset 0 0 12px rgba(53, 216, 255, 0.16);
     }
+    .choice.is-hidden { display: none; }
 
     .option-image {
       position: relative;
@@ -874,7 +875,7 @@
 
     .collect-date-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       border: 1px solid rgba(63, 176, 255, 0.58);
       border-radius: 10px;
@@ -1393,7 +1394,6 @@
                   <option value="blockout_grey120">Blockout Sticker Matt (Grey Back) 120 Micron</option>
                   <option value="clear100">Clear Sticker 100 Micron</option>
                   <option value="frosted">Frosted Sticker</option>
-                  <option value="backlit100">Backlit Sticker 100 Micron (Lightbox Sticker)</option>
                 </select>
               </label>
               <div class="field-label">Choose Material</div>
@@ -1437,13 +1437,6 @@
                       <strong>Frosted Sticker</strong>
                     </div>
                   </label>
-                  <label class="choice">
-                    <input type="radio" name="materialChoice" value="backlit100">
-                    <div class="option-image"><img src="assets/finishing-edge-eyelets.png" alt="Backlit Sticker 100 Micron (Lightbox Sticker)"><span class="image-zoom-button"></span></div>
-                    <div class="choice-text">
-                      <strong>Backlit Sticker 100 Micron (Lightbox Sticker)</strong>
-                    </div>
-                  </label>
                 </div>
               </div>
             </div>
@@ -1477,20 +1470,52 @@
             <div class="field-label">Lamination</div>
             <div class="lamination-grid">
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="indoor_matt55" checked>
-                <span>Indoor Matt Lam 55micron</span>
+                <input type="radio" name="lamination" value="matt100" checked>
+                <span>Matt Lam 100micron</span>
               </label>
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="indoor_gloss55">
-                <span>Indoor Gloss Lam 55micron</span>
+                <input type="radio" name="lamination" value="gloss100">
+                <span>Gloss Lam 100micron</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Clear Sticker only (mirrors the old Clear Sticker product); update() shows it. -->
+          <div class="lamination-panel" id="clearTypePanel" hidden>
+            <div class="field-label">Choose Options</div>
+            <div class="lamination-grid">
+              <label class="lamination-option">
+                <input type="radio" name="clearType" value="normal_print" checked>
+                <span>Normal Print</span>
               </label>
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="outdoor_matt100">
-                <span>Outdoor Matt Lam 100micron</span>
+                <input type="radio" name="clearType" value="white_sticker_laminate">
+                <span>White Sticker Laminate</span>
               </label>
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="outdoor_gloss100">
-                <span>Outdoor Gloss Lam 100micron</span>
+                <input type="radio" name="clearType" value="with_white_ink_2layer">
+                <span>(With White Ink) 2 Layer</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Clear Sticker only; images match Window Clear Sticker "Choose Finishing". update() shows it. -->
+          <div id="clearStickPanel" hidden>
+            <div class="field-label">Choose Type</div>
+            <div class="addon-grid">
+              <label class="choice is-selected">
+                <input type="radio" name="clearStick" value="inside" checked>
+                <div class="option-image cut"><img src="assets/finishing-cut-to-size.png" alt="Stick from Inside Window (Reverse)"><span class="image-zoom-button"></span></div>
+                <div class="choice-text">
+                  <strong>Stick from Inside Window (Reverse)</strong>
+                </div>
+              </label>
+              <label class="choice">
+                <input type="radio" name="clearStick" value="outside">
+                <div class="option-image eyelets"><img src="assets/finishing-edge-eyelets.png" alt="Stick from Outside Window"><span class="image-zoom-button"></span></div>
+                <div class="choice-text">
+                  <strong>Stick from Outside Window</strong>
+                </div>
               </label>
             </div>
           </div>
@@ -1516,7 +1541,13 @@
             <h3 class="collect-date-title">Collect Date</h3>
             <div class="collect-date-grid" id="collectChoices">
               <label class="collect-date-option is-selected">
-                <input type="radio" name="collect" value="normal" checked>
+                <input type="radio" name="collect" value="standard7" checked>
+                <img src="assets/collect-7-working-days.png" alt="7 Working Days (Standard)">
+                <span class="image-zoom-button"></span>
+                <strong>7 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="normal">
                 <img src="assets/collect-4-working-days.png" alt="4 Working Days">
                 <span class="image-zoom-button"></span>
                 <strong>4 Working Days</strong>
@@ -1555,7 +1586,7 @@
           <div class="summary-line"><span data-icon="▦">Total Area</span><strong id="sumArea">24.00 sq.ft.</strong></div>
           <div class="summary-line"><span data-icon="◫">Artwork</span><strong id="sumArtwork">Not selected</strong></div>
           <div class="summary-line is-wide"><span data-icon="✎">Finishing</span><strong id="sumFinishing">Diecut Only</strong></div>
-          <div class="summary-line is-wide" id="sumLaminationRow" hidden><span data-icon="◐">Lamination</span><strong id="sumLamination">Indoor Matt Lam 55micron</strong></div>
+          <div class="summary-line is-wide" id="sumLaminationRow" hidden><span data-icon="◐">Lamination</span><strong id="sumLamination">Matt Lam 100micron</strong></div>
           <div class="summary-line is-wide"><span data-icon="▣">Collect</span><strong id="sumCollect">4 Working Days</strong></div>
         </div>
       </aside>
@@ -1565,19 +1596,24 @@
           <h3 class="order-title">Order Summary</h3>
           <div class="agent-grid">
             <div class="agent-card">
-              <span>Normal Agent Price</span>
-              <strong id="agentA">RM 72.00</strong>
-              <em>RM 3 / sq.ft.</em>
+              <span>Agent Price</span>
+              <strong id="agentA">RM 0.00</strong>
+              <em id="rateA"></em>
+            </div>
+            <div class="agent-card">
+              <span>Silver Agent Price</span>
+              <strong id="agentSilver">RM 0.00</strong>
+              <em id="rateSilver"></em>
             </div>
             <div class="agent-card">
               <span>Gold Agent Price</span>
-              <strong id="agentB">RM 61.20</strong>
-              <em>15% margin</em>
+              <strong id="agentGold">RM 0.00</strong>
+              <em id="rateGold"></em>
             </div>
             <div class="agent-card">
-              <span>Platinum Agent Price</span>
-              <strong id="agentC">RM 57.60</strong>
-              <em>20% margin</em>
+              <span>Diamond Agent Price</span>
+              <strong id="agentDiamond">RM 0.00</strong>
+              <em id="rateDiamond"></em>
             </div>
           </div>
 
@@ -1637,8 +1673,7 @@
       blockout_white120: { label: "Blockout Sticker Matt (White Back) 120 Micron", rate: 1.36 },
       blockout_grey120: { label: "Blockout Sticker Matt (Grey Back) 120 Micron", rate: 1.36 },
       clear100: { label: "Clear Sticker 100 Micron", rate: 1.24 },
-      frosted: { label: "Frosted Sticker", rate: 1.24 },
-      backlit100: { label: "Backlit Sticker 100 Micron (Lightbox Sticker)", rate: 1.24 }
+      frosted: { label: "Frosted Sticker", rate: 1.24 }
     };
 
     const finishingOptions = {
@@ -1649,13 +1684,343 @@
     const LAMINATION_PRINTING = ["solvent", "epson"];
 
     const laminationOptions = {
-      indoor_matt55: { label: "Indoor Matt Lam 55micron", rate: 0 },
-      indoor_gloss55: { label: "Indoor Gloss Lam 55micron", rate: 0 },
-      outdoor_matt100: { label: "Outdoor Matt Lam 100micron", rate: 0 },
-      outdoor_gloss100: { label: "Outdoor Gloss Lam 100micron", rate: 0 }
+      matt100: { label: "Matt Lam 100micron", rate: 0 },
+      gloss100: { label: "Gloss Lam 100micron", rate: 0 }
+    };
+
+    // ---- Per-Standard-Size price tables [Agent, Silver, Gold, Diamond] ----
+    // Diecut sticker is NOT priced per sq.ft. Each Standard Size has its own
+    // full price (RM per 1 piece), and it varies by printing x material.
+    // PRICE_TABLE[printing][material][sizeKey] = [Agent, Silver, Gold, Diamond].
+    // sizeKey = `${height}x${width}` (matches the Standard Size dropdown value).
+    // Populated from "diecut sticker price (template).xlsx"; missing = [0,0,0,0].
+    const PRICE_TABLE = {
+      uv: {
+        white80: {
+          "12x21": [17.42, 13.07, 13.07, 13.07],
+          "12x33": [26.14, 19.6, 19.6, 19.6],
+          "12x39": [30.49, 22.87, 22.87, 22.87],
+          "12x46": [34.85, 26.14, 26.14, 26.14],
+          "18x21": [26.14, 19.6, 19.6, 19.6],
+          "18x33": [39.2, 29.4, 29.4, 29.4],
+          "18x39": [47.92, 35.94, 35.94, 35.94],
+          "18x46": [52.27, 39.2, 39.2, 39.2],
+          "24x21": [34.85, 26.14, 26.14, 26.14],
+          "24x33": [52.27, 39.2, 39.2, 39.2],
+          "24x39": [60.98, 45.74, 45.74, 45.74],
+          "24x46": [69.7, 52.27, 52.27, 52.27],
+          "30x21": [43.56, 32.67, 32.67, 32.67],
+          "30x33": [65.34, 49.01, 49.01, 49.01],
+          "30x39": [78.41, 58.81, 58.81, 58.81],
+          "30x46": [87.12, 65.34, 65.34, 65.34],
+          "36x21": [52.27, 39.2, 39.2, 39.2],
+          "36x33": [78.41, 58.81, 58.81, 58.81],
+          "36x39": [91.48, 68.61, 68.61, 68.61],
+          "36x46": [104.54, 78.41, 78.41, 78.41]
+        },
+        blockout_white120: {
+          "12x21": [20.06, 15.05, 15.05, 15.05],
+          "12x33": [30.1, 22.57, 22.57, 22.57],
+          "12x39": [35.11, 26.33, 26.33, 26.33],
+          "12x46": [40.13, 30.1, 30.1, 30.1],
+          "18x21": [30.1, 22.57, 22.57, 22.57],
+          "18x33": [45.14, 33.86, 33.86, 33.86],
+          "18x39": [55.18, 41.38, 41.38, 41.38],
+          "18x46": [60.19, 45.14, 45.14, 45.14],
+          "24x21": [40.13, 30.1, 30.1, 30.1],
+          "24x33": [60.19, 45.14, 45.14, 45.14],
+          "24x39": [70.22, 52.67, 52.67, 52.67],
+          "24x46": [80.26, 60.19, 60.19, 60.19],
+          "30x21": [50.16, 37.62, 37.62, 37.62],
+          "30x33": [75.24, 56.43, 56.43, 56.43],
+          "30x39": [90.29, 67.72, 67.72, 67.72],
+          "30x46": [100.32, 75.24, 75.24, 75.24],
+          "36x21": [60.19, 45.14, 45.14, 45.14],
+          "36x33": [90.29, 67.72, 67.72, 67.72],
+          "36x39": [105.34, 79, 79, 79],
+          "36x46": [120.38, 90.29, 90.29, 90.29]
+        },
+        blockout_grey120: {
+          "12x21": [20.68, 15.51, 15.51, 15.51],
+          "12x33": [31.02, 23.27, 23.27, 23.27],
+          "12x39": [36.21, 27.16, 27.16, 27.16],
+          "12x46": [41.36, 31.02, 31.02, 31.02],
+          "18x21": [31.02, 23.27, 23.27, 23.27],
+          "18x33": [46.51, 34.88, 34.88, 34.88],
+          "18x39": [56.89, 42.67, 42.67, 42.67],
+          "18x46": [62.04, 46.53, 46.53, 46.53],
+          "24x21": [41.36, 31.02, 31.02, 31.02],
+          "24x33": [62.04, 46.53, 46.53, 46.53],
+          "24x39": [72.38, 54.29, 54.29, 54.29],
+          "24x46": [82.72, 62.04, 62.04, 62.04],
+          "30x21": [51.7, 38.78, 38.78, 38.78],
+          "30x33": [77.57, 58.18, 58.18, 58.18],
+          "30x39": [93.06, 69.8, 69.8, 69.8],
+          "30x46": [103.4, 77.55, 77.55, 77.55],
+          "36x21": [62.04, 46.53, 46.53, 46.53],
+          "36x33": [93.06, 69.8, 69.8, 69.8],
+          "36x39": [108.59, 81.44, 81.44, 81.44],
+          "36x46": [124.08, 93.06, 93.06, 93.06]
+        },
+        frosted: {
+          "12x21": [19.8, 14.85, 14.85, 14.85],
+          "12x33": [29.7, 22.28, 22.28, 22.28],
+          "12x39": [34.67, 26, 26, 26],
+          "12x46": [39.6, 29.7, 29.7, 29.7],
+          "18x21": [29.7, 22.28, 22.28, 22.28],
+          "18x33": [44.57, 33.43, 33.43, 33.43],
+          "18x39": [54.47, 40.85, 40.85, 40.85],
+          "18x46": [59.4, 44.55, 44.55, 44.55],
+          "24x21": [39.6, 29.7, 29.7, 29.7],
+          "24x33": [59.4, 44.55, 44.55, 44.55],
+          "24x39": [69.3, 51.98, 51.98, 51.98],
+          "24x46": [79.2, 59.4, 59.4, 59.4],
+          "30x21": [49.5, 37.13, 37.13, 37.13],
+          "30x33": [74.27, 55.7, 55.7, 55.7],
+          "30x39": [89.1, 66.83, 66.83, 66.83],
+          "30x46": [99, 74.25, 74.25, 74.25],
+          "36x21": [59.4, 44.55, 44.55, 44.55],
+          "36x33": [89.1, 66.83, 66.83, 66.83],
+          "36x39": [103.97, 77.98, 77.98, 77.98],
+          "36x46": [118.8, 89.1, 89.1, 89.1]
+        }
+      },
+      solvent: {
+        white80: {
+          "12x21": [20.68, 15.51, 15.51, 15.51],
+          "12x33": [31.02, 23.27, 23.27, 23.27],
+          "12x39": [36.21, 27.16, 27.16, 27.16],
+          "12x46": [41.36, 31.02, 31.02, 31.02],
+          "18x21": [31.02, 23.27, 23.27, 23.27],
+          "18x33": [46.51, 34.88, 34.88, 34.88],
+          "18x39": [56.89, 42.67, 42.67, 42.67],
+          "18x46": [62.04, 46.53, 46.53, 46.53],
+          "24x21": [41.36, 31.02, 31.02, 31.02],
+          "24x33": [62.04, 46.53, 46.53, 46.53],
+          "24x39": [72.38, 54.29, 54.29, 54.29],
+          "24x46": [82.72, 62.04, 62.04, 62.04],
+          "30x21": [51.7, 38.78, 38.78, 38.78],
+          "30x33": [77.57, 58.18, 58.18, 58.18],
+          "30x39": [93.06, 69.8, 69.8, 69.8],
+          "30x46": [103.4, 77.55, 77.55, 77.55],
+          "36x21": [62.04, 46.53, 46.53, 46.53],
+          "36x33": [93.06, 69.8, 69.8, 69.8],
+          "36x39": [108.59, 81.44, 81.44, 81.44],
+          "36x46": [124.08, 93.06, 93.06, 93.06]
+        },
+        blockout_white120: {
+          "12x21": [23.58, 17.69, 17.69, 17.69],
+          "12x33": [35.38, 26.53, 26.53, 26.53],
+          "12x39": [41.27, 30.95, 30.95, 30.95],
+          "12x46": [47.17, 35.38, 35.38, 35.38],
+          "18x21": [35.38, 26.53, 26.53, 26.53],
+          "18x33": [53.06, 39.8, 39.8, 39.8],
+          "18x39": [64.86, 48.64, 48.64, 48.64],
+          "18x46": [70.75, 53.06, 53.06, 53.06],
+          "24x21": [47.17, 35.38, 35.38, 35.38],
+          "24x33": [70.75, 53.06, 53.06, 53.06],
+          "24x39": [82.54, 61.91, 61.91, 61.91],
+          "24x46": [94.34, 70.75, 70.75, 70.75],
+          "30x21": [58.96, 44.22, 44.22, 44.22],
+          "30x33": [88.44, 66.33, 66.33, 66.33],
+          "30x39": [106.13, 79.6, 79.6, 79.6],
+          "30x46": [117.92, 88.44, 88.44, 88.44],
+          "36x21": [70.75, 53.06, 53.06, 53.06],
+          "36x33": [106.13, 79.6, 79.6, 79.6],
+          "36x39": [123.82, 92.86, 92.86, 92.86],
+          "36x46": [141.5, 106.13, 106.13, 106.13]
+        },
+        blockout_grey120: {
+          "12x21": [23.94, 17.95, 17.95, 17.95],
+          "12x33": [35.9, 26.93, 26.93, 26.93],
+          "12x39": [41.89, 31.42, 31.42, 31.42],
+          "12x46": [47.87, 35.9, 35.9, 35.9],
+          "18x21": [35.9, 26.93, 26.93, 26.93],
+          "18x33": [53.86, 40.39, 40.39, 40.39],
+          "18x39": [65.82, 49.37, 49.37, 49.37],
+          "18x46": [71.81, 53.86, 53.86, 53.86],
+          "24x21": [47.87, 35.9, 35.9, 35.9],
+          "24x33": [71.81, 53.86, 53.86, 53.86],
+          "24x39": [83.78, 62.83, 62.83, 62.83],
+          "24x46": [95.74, 71.81, 71.81, 71.81],
+          "30x21": [59.84, 44.88, 44.88, 44.88],
+          "30x33": [89.76, 67.32, 67.32, 67.32],
+          "30x39": [107.71, 80.78, 80.78, 80.78],
+          "30x46": [119.68, 89.76, 89.76, 89.76],
+          "36x21": [71.81, 53.86, 53.86, 53.86],
+          "36x33": [107.71, 80.78, 80.78, 80.78],
+          "36x39": [125.66, 94.25, 94.25, 94.25],
+          "36x46": [143.62, 107.71, 107.71, 107.71]
+        }
+      },
+      epson: {
+        white80: {
+          "12x21": [27.1, 20.33, 20.33, 20.33],
+          "12x33": [40.66, 30.49, 30.49, 30.49],
+          "12x39": [47.43, 35.57, 35.57, 35.57],
+          "12x46": [54.21, 40.66, 40.66, 40.66],
+          "18x21": [40.66, 30.49, 30.49, 30.49],
+          "18x33": [60.98, 45.74, 45.74, 45.74],
+          "18x39": [74.54, 55.9, 55.9, 55.9],
+          "18x46": [81.31, 60.98, 60.98, 60.98],
+          "24x21": [54.21, 40.66, 40.66, 40.66],
+          "24x33": [81.31, 60.98, 60.98, 60.98],
+          "24x39": [94.86, 71.15, 71.15, 71.15],
+          "24x46": [108.42, 81.31, 81.31, 81.31],
+          "30x21": [67.76, 50.82, 50.82, 50.82],
+          "30x33": [101.64, 76.23, 76.23, 76.23],
+          "30x39": [121.97, 91.48, 91.48, 91.48],
+          "30x46": [135.52, 101.64, 101.64, 101.64],
+          "36x21": [81.31, 60.98, 60.98, 60.98],
+          "36x33": [121.97, 91.48, 91.48, 91.48],
+          "36x39": [142.3, 106.72, 106.72, 106.72],
+          "36x46": [162.62, 121.97, 121.97, 121.97]
+        },
+        blockout_white120: {
+          "12x21": [29.57, 22.18, 22.18, 22.18],
+          "12x33": [44.35, 33.26, 33.26, 33.26],
+          "12x39": [51.74, 38.81, 38.81, 38.81],
+          "12x46": [59.14, 44.35, 44.35, 44.35],
+          "18x21": [44.35, 33.26, 33.26, 33.26],
+          "18x33": [66.53, 49.9, 49.9, 49.9],
+          "18x39": [81.31, 60.98, 60.98, 60.98],
+          "18x46": [88.7, 66.53, 66.53, 66.53],
+          "24x21": [59.14, 44.35, 44.35, 44.35],
+          "24x33": [88.7, 66.53, 66.53, 66.53],
+          "24x39": [103.49, 77.62, 77.62, 77.62],
+          "24x46": [118.27, 88.7, 88.7, 88.7],
+          "30x21": [73.92, 55.44, 55.44, 55.44],
+          "30x33": [110.88, 83.16, 83.16, 83.16],
+          "30x39": [133.06, 99.79, 99.79, 99.79],
+          "30x46": [147.84, 110.88, 110.88, 110.88],
+          "36x21": [88.7, 66.53, 66.53, 66.53],
+          "36x33": [133.06, 99.79, 99.79, 99.79],
+          "36x39": [155.23, 116.42, 116.42, 116.42],
+          "36x46": [177.41, 133.06, 133.06, 133.06]
+        },
+        blockout_grey120: {
+          "12x21": [30.01, 22.51, 22.51, 22.51],
+          "12x33": [45.01, 33.76, 33.76, 33.76],
+          "12x39": [52.54, 39.4, 39.4, 39.4],
+          "12x46": [60.02, 45.01, 45.01, 45.01],
+          "18x21": [45.01, 33.76, 33.76, 33.76],
+          "18x33": [67.5, 50.62, 50.62, 50.62],
+          "18x39": [82.54, 61.91, 61.91, 61.91],
+          "18x46": [90.02, 67.52, 67.52, 67.52],
+          "24x21": [60.02, 45.01, 45.01, 45.01],
+          "24x33": [90.02, 67.52, 67.52, 67.52],
+          "24x39": [105.03, 78.77, 78.77, 78.77],
+          "24x46": [120.03, 90.02, 90.02, 90.02],
+          "30x21": [75.02, 56.27, 56.27, 56.27],
+          "30x33": [112.51, 84.38, 84.38, 84.38],
+          "30x39": [135.04, 101.28, 101.28, 101.28],
+          "30x46": [150.04, 112.53, 112.53, 112.53],
+          "36x21": [90.02, 67.52, 67.52, 67.52],
+          "36x33": [135.04, 101.28, 101.28, 101.28],
+          "36x39": [157.52, 118.14, 118.14, 118.14],
+          "36x46": [180.05, 135.04, 135.04, 135.04]
+        }
+      }
+    };
+
+    const CLEAR_PRICE = {
+      normal_print: {
+        "12x21": [19.36, 14.52, 14.52, 14.52],
+        "12x33": [29.04, 21.78, 21.78, 21.78],
+        "12x39": [33.88, 25.41, 25.41, 25.41],
+        "12x46": [38.72, 29.04, 29.04, 29.04],
+        "18x21": [29.04, 21.78, 21.78, 21.78],
+        "18x33": [43.56, 32.67, 32.67, 32.67],
+        "18x39": [53.24, 39.93, 39.93, 39.93],
+        "18x46": [58.08, 43.56, 43.56, 43.56],
+        "24x21": [38.72, 29.04, 29.04, 29.04],
+        "24x33": [58.08, 43.56, 43.56, 43.56],
+        "24x39": [67.76, 50.82, 50.82, 50.82],
+        "24x46": [77.44, 58.08, 58.08, 58.08],
+        "30x21": [48.4, 36.3, 36.3, 36.3],
+        "30x33": [72.6, 54.45, 54.45, 54.45],
+        "30x39": [87.12, 65.34, 65.34, 65.34],
+        "30x46": [96.8, 72.6, 72.6, 72.6],
+        "36x21": [58.08, 43.56, 43.56, 43.56],
+        "36x33": [87.12, 65.34, 65.34, 65.34],
+        "36x39": [101.64, 76.23, 76.23, 76.23],
+        "36x46": [116.16, 87.12, 87.12, 87.12]
+      },
+      white_sticker_laminate: {
+        "12x21": [22.88, 17.16, 17.16, 17.16],
+        "12x33": [34.32, 25.74, 25.74, 25.74],
+        "12x39": [40.04, 30.03, 30.03, 30.03],
+        "12x46": [45.76, 34.32, 34.32, 34.32],
+        "18x21": [34.32, 25.74, 25.74, 25.74],
+        "18x33": [51.48, 38.61, 38.61, 38.61],
+        "18x39": [62.92, 47.19, 47.19, 47.19],
+        "18x46": [68.64, 51.48, 51.48, 51.48],
+        "24x21": [45.76, 34.32, 34.32, 34.32],
+        "24x33": [68.64, 51.48, 51.48, 51.48],
+        "24x39": [80.08, 60.06, 60.06, 60.06],
+        "24x46": [91.52, 68.64, 68.64, 68.64],
+        "30x21": [57.2, 42.9, 42.9, 42.9],
+        "30x33": [85.8, 64.35, 64.35, 64.35],
+        "30x39": [102.96, 77.22, 77.22, 77.22],
+        "30x46": [114.4, 85.8, 85.8, 85.8],
+        "36x21": [68.64, 51.48, 51.48, 51.48],
+        "36x33": [102.96, 77.22, 77.22, 77.22],
+        "36x39": [120.12, 90.09, 90.09, 90.09],
+        "36x46": [137.28, 102.96, 102.96, 102.96]
+      },
+      with_white_ink_2layer: {
+        "12x21": [25.08, 18.81, 18.81, 18.81],
+        "12x33": [37.62, 28.22, 28.22, 28.22],
+        "12x39": [43.91, 32.93, 32.93, 32.93],
+        "12x46": [50.16, 37.62, 37.62, 37.62],
+        "18x21": [37.62, 28.22, 28.22, 28.22],
+        "18x33": [56.41, 42.31, 42.31, 42.31],
+        "18x39": [68.99, 51.74, 51.74, 51.74],
+        "18x46": [75.24, 56.43, 56.43, 56.43],
+        "24x21": [50.16, 37.62, 37.62, 37.62],
+        "24x33": [75.24, 56.43, 56.43, 56.43],
+        "24x39": [87.78, 65.84, 65.84, 65.84],
+        "24x46": [100.32, 75.24, 75.24, 75.24],
+        "30x21": [62.7, 47.03, 47.03, 47.03],
+        "30x33": [94.07, 70.55, 70.55, 70.55],
+        "30x39": [112.86, 84.65, 84.65, 84.65],
+        "30x46": [125.4, 94.05, 94.05, 94.05],
+        "36x21": [75.24, 56.43, 56.43, 56.43],
+        "36x33": [112.86, 84.65, 84.65, 84.65],
+        "36x39": [131.69, 98.77, 98.77, 98.77],
+        "36x46": [150.48, 112.86, 112.86, 112.86]
+      }
+    };
+    // Lamination add-on (flat RM per piece; Eco Solvent & Epson only).
+    const LAMINATION_ADD = {
+      matt100: [0, 0, 0, 0],
+      gloss100: [0, 0, 0, 0]
+    };
+    // Finishing add-on (flat RM per piece).
+    const FINISHING_ADD = {
+      diecut: [0, 0, 0, 0]
+    };
+
+    // Clear Sticker only: extra "Laminate" field that mirrors the old Clear
+    // Sticker product. Flat RM per piece add-on (0 for now).
+    // Clear Sticker "Choose Options" — selects which CLEAR_PRICE variant is used.
+    const clearTypeOptions = {
+      normal_print: { label: "Normal Print" },
+      white_sticker_laminate: { label: "White Sticker Laminate" },
+      with_white_ink_2layer: { label: "(With White Ink) 2 Layer" }
+    };
+    // Clear Sticker only: "Choose Type" field (images match Window Clear Sticker).
+    const clearStickOptions = {
+      inside: { label: "Stick from Inside Window (Reverse)" },
+      outside: { label: "Stick from Outside Window" }
+    };
+    const CLEAR_STICK_ADD = {
+      inside: [0, 0, 0, 0],
+      outside: [0, 0, 0, 0]
     };
 
     const collectOptions = {
+      standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
       normal: { label: "4 Working Days", days: 4, multiplier: 1 },
       quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
       rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
@@ -1760,25 +2125,52 @@
       const { width, height } = selectedSize();
       const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
       const area = width * height / 144;
-      const printing = printingOptions[$("#printing").value];
-      const material = materialOptions[$("#material").value];
-      const finishing = finishingOptions[selectedValue("finishing")];
+      const printingKey = $("#printing").value;
+      const materialKey = $("#material").value;
+      const finishingKey = selectedValue("finishing");
+      const printing = printingOptions[printingKey];
+      const material = materialOptions[materialKey];
+      const finishing = finishingOptions[finishingKey];
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
-      const subtotal = area * 3 * quantity;
-      const total = Math.max(0, subtotal);
 
       const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
 
       // Lamination only applies to Eco Solvent / Epson; treat it as absent
       // otherwise so a stale choice can't leak into the quote or the cart.
-      const laminationAvailable = LAMINATION_PRINTING.includes($("#printing").value);
+      const laminationAvailable = LAMINATION_PRINTING.includes(printingKey);
+      const laminationKey = laminationAvailable ? selectedValue("lamination") : null;
       const lamination = laminationAvailable
-        ? laminationOptions[selectedValue("lamination")] || laminationOptions.indoor_matt55
+        ? laminationOptions[laminationKey] || laminationOptions.matt100
         : null;
+
+      // Clear Sticker only: extra Laminate + Choose Type fields (mirrors old site).
+      const isClear = materialKey === "clear100";
+      const clearTypeKey = isClear ? selectedValue("clearType") : null;
+      const clearType = isClear ? clearTypeOptions[clearTypeKey] : null;
+      const clearStickKey = isClear ? selectedValue("clearStick") : null;
+      const clearStick = isClear ? clearStickOptions[clearStickKey] : null;
+
+      // Flat per-piece price by Standard Size, then add lamination/finishing.
+      // Clear Sticker's base price is chosen by the Choose Options variant
+      // (Normal Print / White Sticker Laminate / (With White Ink) 2 Layer).
+      const sizeKey = `${height}x${width}`;
+      const baseTiers = isClear
+        ? ((CLEAR_PRICE[clearTypeKey] && CLEAR_PRICE[clearTypeKey][sizeKey]) || [0, 0, 0, 0])
+        : ((PRICE_TABLE[printingKey] && PRICE_TABLE[printingKey][materialKey] &&
+            PRICE_TABLE[printingKey][materialKey][sizeKey]) || [0, 0, 0, 0]);
+      const finAdd = FINISHING_ADD[finishingKey] || [0, 0, 0, 0];
+      const lamAdd = (laminationAvailable && LAMINATION_ADD[laminationKey]) || [0, 0, 0, 0];
+      const clearStickAdd = (isClear && CLEAR_STICK_ADD[clearStickKey]) || [0, 0, 0, 0];
+      const tierUnit = baseTiers.map(
+        (b, i) => b + (finAdd[i] || 0) + (lamAdd[i] || 0) + (clearStickAdd[i] || 0)
+      );
+      const tierTotals = tierUnit.map((u) => Math.max(0, u * quantity));
+      const total = tierTotals[0];
 
       return {
         height, width, quantity, area, printing, material, finishing,
-        collect, artworkQty, laminationAvailable, lamination, total
+        collect, artworkQty, laminationAvailable, lamination,
+        isClear, clearType, clearStick, total, tierTotals, tierUnit
       };
     };
 
@@ -1807,8 +2199,31 @@
       setPickerOpen("finishingPicker", isOpen);
     };
 
+    // Eco Solvent & Epson only offer the first 3 materials; UV offers all 5.
+    // Hide the unavailable material choices and reset a stale selection.
+    const MATERIAL_LIMITS = {
+      solvent: ["white80", "blockout_white120", "blockout_grey120"],
+      epson: ["white80", "blockout_white120", "blockout_grey120"]
+    };
+    const applyMaterialAvailability = () => {
+      const printingKey = $("#printing").value;
+      const allowed = MATERIAL_LIMITS[printingKey]; // undefined => all allowed
+      $$('input[name="materialChoice"]').forEach((input) => {
+        const ok = !allowed || allowed.includes(input.value);
+        const choice = input.closest(".choice");
+        if (choice) choice.classList.toggle("is-hidden", !ok);
+        input.disabled = !ok;
+      });
+      if (allowed && !allowed.includes($("#material").value)) {
+        const def = $('input[name="materialChoice"][value="white80"]');
+        if (def) def.checked = true;
+        $("#material").value = "white80";
+      }
+    };
+
     const update = () => {
       updateDates();
+      applyMaterialAvailability();
       setChoiceState();
       const q = quote();
       const sizeText = sizeLabel(q.height, q.width);
@@ -1832,15 +2247,26 @@
       $("#laminationPanel").hidden = !q.laminationAvailable;
       $("#sumLaminationRow").hidden = !q.laminationAvailable;
       if (q.lamination) $("#sumLamination").textContent = q.lamination.label;
+
+      // Clear Sticker only: Laminate + Choose Type panels.
+      $("#clearTypePanel").hidden = !q.isClear;
+      $("#clearStickPanel").hidden = !q.isClear;
       const remarkEl = $("#remark");
       $("#remarkCount").textContent = `${remarkEl.value.length} / ${remarkEl.maxLength}`;
       $("#selectedPrintingLabel").textContent = q.printing.label;
       $("#selectedMaterialLabel").textContent = q.material.label;
       $("#selectedFinishingLabel").textContent = q.finishing.label;
       $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
-      $("#agentA").textContent = money(q.total);
-      $("#agentB").textContent = money(q.total * 0.85);
-      $("#agentC").textContent = money(q.total * 0.8);
+      const tierCardIds = ["agentA", "agentSilver", "agentGold", "agentDiamond"];
+      tierCardIds.forEach((id, i) => {
+        const el = $("#" + id);
+        if (el) el.textContent = money(q.tierTotals[i] || 0);
+      });
+      const tierEmIds = ["rateA", "rateSilver", "rateGold", "rateDiamond"];
+      tierEmIds.forEach((id, i) => {
+        const el = $("#" + id);
+        if (el) el.textContent = "RM " + (q.tierUnit[i] || 0).toFixed(2) + " / pc";
+      });
 
       validate();
     };
@@ -2043,6 +2469,31 @@
     populateSizes();
     populateArtworkQty();
     update();
+  </script>
+  <style>
+    .collect-date-option.is-disabled { position: relative; opacity: 0.45; filter: grayscale(0.65); pointer-events: none; cursor: not-allowed; }
+    .collect-date-option.is-disabled::after { content: "Closed after 4:00pm"; position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 4px; border-radius: 5px; background: rgba(196,24,44,0.92); color: #fff; font-size: 10px; font-weight: 800; text-align: center; }
+  </style>
+  <script>
+    // "Next Working Days" collection closes each day at 4:00pm.
+    (function () {
+      var CUTOFF_HOUR = 16;
+      function apply() {
+        var nextInput = document.querySelector('input[name="collect"][value="next"]');
+        if (!nextInput) return;
+        var card = nextInput.closest(".collect-date-option");
+        var closed = new Date().getHours() >= CUTOFF_HOUR;
+        nextInput.disabled = closed;
+        if (card) card.classList.toggle("is-disabled", closed);
+        if (closed && nextInput.checked) {
+          var fb = document.querySelector('input[name="collect"][value="standard7"]') || document.querySelector('input[name="collect"]:not([value="next"])');
+          if (fb) { fb.checked = true; fb.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      }
+      function boot() { apply(); setInterval(apply, 30000); }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+      else boot();
+    })();
   </script>
   <script src="/apps/_shared/single-option.js" defer></script>
 </body>

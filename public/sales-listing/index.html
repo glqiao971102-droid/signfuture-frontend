@@ -1,0 +1,1019 @@
+﻿<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sales Performance Ledger</title>
+    <link rel="stylesheet" href="src/styles.css?v=20260610-1215" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img id="brandLogo" class="brand-logo" src="src/sign-future-logo.jpg" alt="Sign Future" />
+          <input id="logoImageInput" class="hidden" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+        </div>
+
+<div class="filter-panel">
+          <label for="dateFromFilter">From / To Date</label>
+          <div class="date-range-row">
+            <input id="dateFromFilter" type="date" />
+            <input id="dateToFilter" type="date" aria-label="To Date" />
+          </div>
+          <label for="salespersonFilter">Salesperson</label>
+          <select id="salespersonFilter"></select>
+          <label for="searchInput">Search</label>
+          <input id="searchInput" type="search" placeholder="IV2606-001, SF7959..." />
+        </div>
+
+        <div class="import-panel">
+          <label for="importType">Upload type</label>
+          <select id="importType">
+            <option value="invoice">Invoice</option>
+            <option value="cost:Sign Future">Upload Sign Future</option>
+            <option value="cost:S&Y Printing">Upload S&amp;Y Printing</option>
+            <option value="cost:Lalamove">Upload Lalamove</option>
+            <option value="cost:Purchase">Upload Purchase</option>
+          </select>
+          <label class="invoice-upload-only" for="importSalesperson">This Excel belongs to</label>
+          <select id="importSalesperson" class="invoice-upload-only"></select>
+          <label for="importMonth">Year and month</label>
+          <input id="importMonth" type="month" />
+          <label class="file-button import-button">
+            Upload Excel file
+            <input id="invoiceReportInput" type="file" accept=".xls,.xlsx,.csv,.tsv,application/vnd.ms-excel" />
+          </label>
+          <p id="importStatus">Use the template or AutoCount report. File names like Galvin.xls will be detected automatically.</p>
+        </div>
+        <div class="side-actions">
+          <button id="exportCsvButton" type="button">Export report CSV</button>
+          <button id="exportJsonButton" type="button">Backup JSON</button>
+          <label class="file-button">
+            Restore JSON
+            <input id="importJsonInput" type="file" accept="application/json" />
+          </label>
+          <button id="pasteJsonButton" type="button">Paste JSON</button>
+          <button id="resetButton" class="danger-ghost" type="button">Reset data</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="view-title-wrap">
+            <h2 id="viewTitle">Dashboard</h2>
+          </div>
+          <nav class="nav-tabs" aria-label="Main navigation">
+            <button class="nav-tab active" data-view="dashboard" type="button">Dashboard</button>
+            <button class="nav-tab" data-view="invoices" type="button">Invoices</button>
+            <button class="nav-tab" data-view="costs" type="button">Costs</button>
+            <button class="nav-tab" data-view="installation" type="button">Installation</button>
+            <button class="nav-tab" data-view="scorecard" type="button">Sales Scorecard</button>
+            <button class="nav-tab" data-view="mission" type="button">Mission</button>
+            <button class="nav-tab" data-view="facebook" type="button">Facebook Listing</button>
+            <button class="nav-tab" data-view="settings" type="button">Settings</button>
+          </nav>
+          <button id="quickEntryButton" class="quick-entry-button" type="button">New invoice / cost</button>
+          <button id="newMissionButton" class="quick-entry-button" type="button" style="display:none;">New Mission</button>
+        </header>
+
+        <section id="dashboardView" class="view active">
+          <div id="emptyHero" class="empty-hero">
+            <div>
+              <p class="eyebrow">Start fresh</p>
+              <h3>Record your first invoice, then link every cost bill to it.</h3>
+              <p>Use this system for Rayson, Galvin and Jiro. Every month will be calculated from the invoice and cost records you enter here.</p>
+            </div>
+            <button class="primary" type="button" data-view-jump="entry">Create first record</button>
+          </div>
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <div class="dashboard-grid">
+            <section class="panel performance-panel sales-person-panel">
+              <div class="panel-header">
+                <h3>Sales Person</h3>
+                <span id="dashboardScope"></span>
+              </div>
+              <div id="salespersonCards" class="salesperson-cards"></div>
+              <input id="salesPersonImageInput" class="hidden" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+            </section>
+            <section class="panel target-panel">
+              <div class="panel-header">
+                <h3>Sales Target 2026</h3>
+                <span>Year target RM10,000,000 · Monthly target RM1,000,000</span>
+              </div>
+              <div class="target-scroll-area">
+                <canvas id="targetChart" height="250"></canvas>
+                <div id="targetSummary" class="target-summary"></div>
+              </div>
+            </section>
+            <section class="panel cost-breakdown-panel">
+              <div class="panel-header">
+                <h3>Unticked Invoices</h3>
+                <button id="openScorecardButton" class="panel-action-button" type="button">Sales Scorecard</button>
+              </div>
+              <div id="costTypeBars" class="bar-list"></div>
+            </section>
+            <section class="panel latest-profit-panel performance-panel">
+              <div class="panel-header">
+                <h3>Unlinked Cost</h3>
+              </div>
+              <div id="latestInvoices" class="linked-list"></div>
+            </section>
+            <section class="panel trend-panel">
+              <div class="panel-header">
+                <h3>Sales Person Trend</h3>
+              </div>
+              <div class="trend-scroll-area">
+                <canvas id="trendChart" height="250"></canvas>
+                <div class="trend-summary-scroll">
+                  <div id="trendSummary" class="trend-summary"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="installationView" class="view">
+          <div class="records-toolbar">
+            <div>
+              <h3>Installation</h3>
+              <p id="installationSummary">Schedule and complete installation jobs.</p>
+            </div>
+          </div>
+          <div class="installation-layout">
+            <section class="panel installation-map-panel">
+              <div class="panel-header">
+                <h3>Malaysia Installation Map</h3>
+                <span>Scheduled lorry route markers</span>
+              </div>
+              <div id="installationMap" class="malaysia-map osm-map" aria-label="Malaysia installation map">
+                <div id="installationMapTiles" class="osm-map-tiles"></div>
+                <div id="installationMapMarkers" class="installation-map-markers"></div>
+                <div class="osm-map-controls" aria-label="Map controls">
+                  <button id="installationMapZoomIn" type="button" title="Zoom in">+</button>
+                  <button id="installationMapZoomOut" type="button" title="Zoom out">-</button>
+                  <button id="installationMapReset" type="button" title="Reset Malaysia view">MY</button>
+                </div>
+                <div class="osm-map-credit">OpenStreetMap</div>
+              </div>
+            </section>
+            <section class="panel installation-jobs-panel">
+              <div class="panel-header">
+                <h3>Installation Jobs</h3>
+                <span id="installationJobCount"></span>
+              </div>
+              <div id="installationJobs" class="installation-jobs"></div>
+              <div id="installationEmpty" class="empty-state">
+                <h3>No installation jobs yet</h3>
+                <p>Select Installation in Invoice Entry, add address and time, then save the invoice.</p>
+              </div>
+            </section>
+            <section class="panel installation-calendar-panel">
+              <div class="panel-header">
+                <h3>Installation Calendar</h3>
+                <div class="installation-calendar-controls">
+                  <button id="installationCalendarPrev" type="button" title="Previous month">&lt;</button>
+                  <input id="installationCalendarMonthInput" type="month" />
+                  <button id="installationCalendarNext" type="button" title="Next month">&gt;</button>
+                </div>
+              </div>
+              <div id="installationCalendarMonth" class="installation-calendar-title"></div>
+              <div id="installationCalendar" class="installation-calendar"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="scorecardView" class="view">
+          <div class="scorecard-page" id="scorecardPanel">
+            <div class="scorecard-hero">
+              <div>
+                <h3 id="scorecardTitle">Sales Scorecard</h3>
+                <p id="scorecardSubtitle">Sales performance and commission statement</p>
+              </div>
+              <div class="scorecard-controls">
+                <label>Sales Person<select id="scorecardSalesperson"></select></label>
+                <label>Month<input id="scorecardMonth" type="month" /></label>
+                <button id="backToDashboardButton" type="button">Back Dashboard</button>
+              </div>
+            </div>
+            <div id="scorecardMetrics" class="scorecard-metrics"></div>
+            <section class="scorecard-commission">
+              <div>
+                <span>Commission Earned</span>
+                <strong id="scorecardCommission">RM 0.00</strong>
+              </div>
+              <div>
+                <span>Net Profit Commission</span>
+                <label class="commission-rate-control">
+                  <input id="scorecardRateInput" type="number" min="0" max="100" step="0.1" value="20" />
+                  <strong id="scorecardRate">20%</strong>
+                </label>
+              </div>
+            </section>
+            <div class="scorecard-targets">
+              <article>
+                <h4>Profit Target</h4>
+                <div class="target-row"><span>Requirement</span><strong>RM 15,000</strong></div>
+                <div class="target-row"><span>Actual</span><strong id="scorecardProfitActual">RM 0.00</strong></div>
+                <div class="score-progress"><span id="scorecardProfitProgress"></span></div>
+              </article>
+              <article>
+                <h4>Sales Target</h4>
+                <div class="target-row"><span>Requirement</span><strong>RM 80,000</strong></div>
+                <div class="target-row"><span>Actual</span><strong id="scorecardSalesActual">RM 0.00</strong></div>
+                <div class="score-progress blue"><span id="scorecardSalesProgress"></span></div>
+              </article>
+            </div>
+            <section class="scorecard-payout">
+              <span>Total Commission Payout</span>
+              <strong id="scorecardPayout">RM 0.00</strong>
+              <small id="scorecardNote">Calculated from current system records.</small>
+            </section>
+          </div>
+        </section>
+
+        <section id="missionView" class="view">
+          <div class="mission-page">
+            <div class="mission-header">
+              <div class="mission-title">
+                <span class="mission-title-icon">◎</span>
+                <div>
+                  <h2>Mission Center</h2>
+                  <p>Complete missions, challenge the company, and earn amazing rewards!</p>
+                </div>
+              </div>
+              <div class="mission-header-controls">
+                <div class="mission-period-pill" id="missionPeriodPill">📅 May – Oct 2026 (6 Months Challenge)</div>
+                <select class="mission-person-select" id="missionPersonSelect">
+                  <option>All Salesperson</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mission-top-grid">
+              <section class="mission-card mission-progress-card">
+                <h3 class="mission-card-title">My Overall Progress</h3>
+                <div class="mission-progress-body">
+                  <div class="mission-avatar"><img src="src/sales-person-mascot.jpg" alt="Mission avatar" /></div>
+                  <div class="mission-progress-info">
+                    <div class="mission-name-row"><strong id="missionPersonName">RAYSON</strong><span class="mission-badge" id="missionPersonBadge">⭐ Top Performer</span></div>
+                    <span class="mission-muted">Total Sales (This Period)</span>
+                    <strong class="mission-bigfig" id="missionPersonSales">RM 0.00</strong>
+                    <span class="mission-muted" id="missionPersonTargetLabel">vs Company Target RM 600,000</span>
+                    <div class="mission-bar"><span id="missionPersonBar" style="width:0%"></span></div>
+                    <span class="mission-pct" id="missionPersonPct">0%</span>
+                  </div>
+                </div>
+                <div class="mission-stat-row">
+                  <div><span>Missions Completed</span><strong id="missionStatCompleted">2 / 6</strong></div>
+                  <div><span>Total Rewards Earned</span><strong class="mission-green" id="missionStatRewards">RM 2,100</strong></div>
+                  <div><span>Current Ranking</span><strong id="missionStatRanking">2 / 12</strong></div>
+                </div>
+              </section>
+
+              <section class="mission-card mission-pk-card">
+                <div class="mission-card-head">
+                  <h3 class="mission-card-title">PK Challenge: Beat the Company Target!</h3>
+                  <span class="mission-howit">❔ How it works?</span>
+                </div>
+                <p class="mission-muted">Work together as a team to beat the company target and unlock big bonuses!</p>
+                <div class="mission-pk-vs">
+                  <div class="mission-pk-side">
+                    <span class="mission-pk-icon team">👥</span>
+                    <span class="mission-muted">Our Team <small>(All Sales)</small></span>
+                    <strong class="mission-pk-fig" id="missionTeamSales">RM 0.00</strong>
+                    <div class="mission-bar"><span id="missionTeamBar" style="width:0%"></span></div>
+                    <span class="mission-pct" id="missionTeamPct">0%</span>
+                  </div>
+                  <div class="mission-vs">VS</div>
+                  <div class="mission-pk-side">
+                    <span class="mission-pk-icon company">🏢</span>
+                    <span class="mission-muted">Company Target</span>
+                    <strong class="mission-pk-fig">RM 1,500,600.00</strong>
+                    <div class="mission-bar pink"><span style="width:100%"></span></div>
+                    <span class="mission-pct">100%</span>
+                  </div>
+                </div>
+                <div class="mission-pk-bottom">
+                  <div class="mission-countdown">
+                    <span class="mission-muted">Challenge Ends In</span>
+                    <div class="mission-clock">
+                      <div><strong id="missionClockDays">--</strong><span>Days</span></div>
+                      <i>:</i>
+                      <div><strong id="missionClockHours">--</strong><span>Hours</span></div>
+                      <i>:</i>
+                      <div><strong id="missionClockMins">--</strong><span>Mins</span></div>
+                      <i>:</i>
+                      <div><strong id="missionClockSecs">--</strong><span>Secs</span></div>
+                    </div>
+                  </div>
+                  <div class="mission-ifwin">
+                    <span class="mission-ifwin-head">🏆 If We Win</span>
+                    <div class="mission-ifwin-grid">
+                      <div><span>Team Bonus</span><strong class="mission-green">RM 15,000</strong></div>
+                      <div><span>Per Active Sales</span><strong class="mission-green">RM 500</strong></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div class="mission-milestone-stack">
+                <section class="mission-card mission-milestone-card mission-milestone-compact">
+                  <h3 class="mission-card-title">1 Month Challenge Milestones</h3>
+                  <div class="mission-milestones" id="missionMonthMilestones"></div>
+                  <div class="mission-next-milestone" id="missionMonthNext"></div>
+                </section>
+                <section class="mission-card mission-milestone-card mission-milestone-compact mission-year-card">
+                  <h3 class="mission-card-title">1 Year Challenge Milestones</h3>
+                  <div class="mission-milestones" id="missionYearMilestones"></div>
+                  <div class="mission-next-milestone" id="missionYearNext"></div>
+                </section>
+              </div>
+            </div>
+
+            <div class="mission-bottom-grid">
+              <section class="mission-card mission-table-card">
+                <div class="mission-subtabs" id="missionSubtabs">
+                  <button class="mission-subtab active" data-mission-tab="all">◎ All Missions</button>
+                </div>
+                <div class="mission-table-wrap">
+                  <table class="mission-table">
+                    <thead>
+                      <tr><th>MISSION</th><th>TYPE</th><th>TARGET</th><th>PROGRESS</th><th>REWARD</th><th>STATUS</th><th>PERIOD</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr data-mission-row="monthly">
+                        <td><div class="mission-cell"><span class="mission-row-icon">◎</span><div><strong>Monthly Sales Mission</strong><small>Achieve monthly sales target</small></div></div></td>
+                        <td><span class="mission-tag sales">Sales</span></td>
+                        <td><strong>RM 100,000</strong><small>Total Sales</small></td>
+                        <td><div class="mission-bar"><span id="missionRowMonthlyBar" style="width:0%"></span></div><small id="missionRowMonthlyText">--</small></td>
+                        <td><strong>RM 1,000</strong><small class="mission-green">+100 pts</small></td>
+                        <td><span class="mission-status" id="missionRowMonthlyStatus">--</span></td>
+                        <td>Monthly</td>
+                      </tr>
+                      <tr data-mission-row="team">
+                        <td><div class="mission-cell"><span class="mission-row-icon">👥</span><div><strong>Team Challenge</strong><small>Team total sales target</small></div></div></td>
+                        <td><span class="mission-tag team">Team</span></td>
+                        <td><strong>RM 500,000</strong><small>Team Total Sales</small></td>
+                        <td><div class="mission-bar"><span id="missionRowTeamBar" style="width:0%"></span></div><small id="missionRowTeamText">--</small></td>
+                        <td><strong>RM 2,000</strong><small class="mission-green">+200 pts</small></td>
+                        <td><span class="mission-status" id="missionRowTeamStatus">--</span></td>
+                        <td>6 Months</td>
+                      </tr>
+                      <tr data-mission-row="agent">
+                        <td><div class="mission-cell"><span class="mission-row-icon">🧑‍💼</span><div><strong>Agent Order Mission</strong><small>Achieve target from agent orders</small></div></div></td>
+                        <td><span class="mission-tag agent">Agent</span></td>
+                        <td><strong>RM 50,000</strong><small>Agent Orders</small></td>
+                        <td><div class="mission-bar"><span id="missionRowAgentBar" style="width:0%"></span></div><small id="missionRowAgentText">--</small></td>
+                        <td><strong>RM 500</strong><small class="mission-green">+50 pts</small></td>
+                        <td><span class="mission-status" id="missionRowAgentStatus">--</span></td>
+                        <td>6 Months</td>
+                      </tr>
+                      <tr data-mission-row="pk">
+                        <td><div class="mission-cell"><span class="mission-row-icon">⚔</span><div><strong>Company PK Challenge</strong><small>Beat the company target together!</small></div></div></td>
+                        <td><span class="mission-tag pk">PK</span></td>
+                        <td><strong>Beat Company</strong><small>RM 1,500,000</small></td>
+                        <td><div class="mission-bar"><span id="missionRowPkBar" style="width:0%"></span></div><small id="missionRowPkText">--</small></td>
+                        <td><strong>RM 15,000</strong><small>Team Bonus</small></td>
+                        <td><span class="mission-status" id="missionRowPkStatus">--</span></td>
+                        <td>6 Months</td>
+                      </tr>
+                      <tr data-mission-row="special">
+                        <td><div class="mission-cell"><span class="mission-row-icon">🏅</span><div><strong>Half Year Champion</strong><small>Top performer of 6 months</small></div></div></td>
+                        <td><span class="mission-tag special">Special</span></td>
+                        <td><strong>Highest Sales</strong><small>--</small></td>
+                        <td><div class="mission-bar"><span style="width:0%"></span></div><small>--</small></td>
+                        <td><strong>RM 3,000</strong><small class="mission-green">+Trophy</small></td>
+                        <td><span class="mission-status locked">Locked</span></td>
+                        <td>6 Months</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <button class="mission-view-completed" type="button">View Completed Missions ⌄</button>
+              </section>
+
+              <div class="mission-side">
+                <section class="mission-card mission-agent-summary">
+                  <div class="mission-card-head">
+                    <h3 class="mission-card-title">Agent Order Summary</h3>
+                    <button class="mission-viewall" type="button">View All</button>
+                  </div>
+                  <div class="mission-agent-top">
+                    <span class="mission-pk-icon company">🧑‍💼</span>
+                    <div>
+                      <span class="mission-muted">Total Agent Orders</span>
+                      <strong class="mission-bigfig sm">12 Orders</strong>
+                    </div>
+                    <div>
+                      <span class="mission-muted">This Period Sales</span>
+                      <strong class="mission-bigfig sm" id="missionAgentPeriodSales">RM 0.00</strong>
+                    </div>
+                  </div>
+                  <span class="mission-muted">vs Target (RM 50,000)</span>
+                  <div class="mission-bar"><span style="width:57%"></span></div>
+                  <span class="mission-pct">57%</span>
+                  <div class="mission-agent-list">
+                    <span class="mission-muted">Top Agent Orders</span>
+                    <div><span>AGT-2026-0524</span><strong class="mission-green">RM 8,250.00</strong></div>
+                    <div><span>AGT-2026-0521</span><strong>RM 6,500.00</strong></div>
+                    <div><span>AGT-2026-0515</span><strong>RM 4,800.00</strong></div>
+                  </div>
+                </section>
+
+                <section class="mission-card mission-rewards-preview">
+                  <h3 class="mission-card-title">Rewards Preview</h3>
+                  <div class="mission-rewards-grid">
+                    <div class="mission-reward"><span class="mission-reward-emoji">💵</span><strong>RM 15,000</strong><small>PK Challenge Team Bonus</small></div>
+                    <div class="mission-reward"><span class="mission-reward-emoji">🎁</span><strong>RM 3,000</strong><small>Half Year Champion</small></div>
+                    <div class="mission-reward"><span class="mission-reward-emoji">🏆</span><strong>Top Performer</strong><small>Special Trophy + Certificate</small></div>
+                    <div class="mission-reward"><span class="mission-reward-emoji">⭐</span><strong>Extra 1%</strong><small>Commission Boost For 3 Months</small></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="mission-footer-banner">ℹ️ Stay Active! Complete more missions to earn more rewards. Missions reset every month unless stated otherwise.</div>
+          </div>
+        </section>
+
+        <section id="invoicesView" class="view">
+          <div class="records-toolbar">
+            <div>
+              <h3>Invoice Ledger</h3>
+              <p id="invoiceSummary"></p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="selectAllInvoicesButton" type="button">Select all</button>
+              <button id="cancelInvoiceSelectionButton" type="button">Cancel</button>
+              <button id="trashSelectedInvoicesButton" class="danger-outline" type="button">Select</button>
+              <button id="addInvoiceButton" type="button">Add invoice</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="select-col">Select</th>
+                  <th><button class="table-sort-button" type="button" data-invoice-sort="invoice">Invoice</button></th>
+                  <th><button class="table-sort-button" type="button" data-invoice-sort="date">Date</button></th>
+                  <th>Salesperson</th>
+                  <th>Customer</th>
+                  <th>Sales</th>
+                  <th>Agent Sales</th>
+                  <th>Sign Future Cost</th>
+                  <th>S&amp;Y Printing Cost</th>
+                  <th>Lalamove Cost</th>
+                  <th>Purchase Cost</th>
+                  <th>Outstanding</th>
+                  <th>Profit</th>
+                  <th>Margin</th>
+                  <th>Cost Docs</th>
+                  <th>Installation</th>
+                  <th>Complete Tick</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="invoiceBody"></tbody>
+            </table>
+          </div>
+          <div id="invoiceEmpty" class="empty-state">
+            <h3>No invoices yet</h3>
+            <p>Create invoice numbers such as IV2606-001, then connect cost bills from Sign Future, S&Y Printing, Lalamove and Purchase.</p>
+            <button class="primary" type="button" data-view-jump="entry">Add invoice</button>
+          </div>
+        </section>
+
+        <dialog id="trashSettingsDialog" class="settings-detail-dialog">
+          <section id="trashView" class="settings-modal-panel">
+          <div class="records-toolbar">
+            <div>
+              <h3>Trash</h3>
+              <p id="trashSummary"></p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="restoreTrashButton" type="button">Restore selected month</button>
+              <button id="deleteTrashButton" class="danger-solid" type="button">Delete selected month forever</button>
+              <button id="closeTrashSettingsButton" type="button">Close</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>No</th>
+                  <th>Date</th>
+                  <th>Salesperson</th>
+                  <th>Details</th>
+                  <th>Amount</th>
+                  <th>Trash Date</th>
+                </tr>
+              </thead>
+              <tbody id="trashBody"></tbody>
+            </table>
+          </div>
+          <div id="trashEmpty" class="empty-state">
+            <h3>Trash is empty</h3>
+            <p>Invoices and costs moved to trash will appear here. You can restore them or delete the selected month forever.</p>
+          </div>
+          </section>
+        </dialog>
+
+        <dialog id="salespersonSettingsDialog" class="settings-detail-dialog">
+          <section id="salespeopleView" class="settings-modal-panel">
+          <div class="records-toolbar">
+            <div>
+              <h3>Sales Person</h3>
+              <p>Add or remove sales people from the system.</p>
+            </div>
+            <div class="inline-add salesperson-manager-add">
+              <input id="newSalespersonName" placeholder="Sales person name" />
+              <button id="addSalespersonButton" type="button">Add</button>
+              <button id="closeSalespersonSettingsButton" type="button">Close</button>
+            </div>
+          </div>
+          <form id="salesPersonEditPanel" class="form-section salesperson-edit-panel hidden">
+            <input id="editingSalespersonOriginalName" type="hidden" />
+            <div class="section-title">
+              <h3>Edit Sales Person</h3>
+              <p>Change the name or upload a JPG image for this sales person.</p>
+            </div>
+            <div class="salesperson-edit-layout">
+              <img id="salesPersonEditPreview" class="salesperson-edit-preview" src="src/sales-person-mascot.jpg" alt="Sales person preview" />
+              <div class="field-grid">
+                <label>Name<input id="editingSalespersonName" required /></label>
+                <label>Upload JPG<input id="editingSalespersonImage" type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/svg+xml" /></label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button id="cancelSalespersonEditButton" type="button">Cancel</button>
+              <button class="primary" type="submit">Save</button>
+            </div>
+          </form>
+          <div class="table-wrap">
+            <table class="compact-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Invoices</th>
+                  <th>Sales</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="salespersonManagerBody"></tbody>
+            </table>
+          </div>
+          </section>
+        </dialog>
+
+        <section id="settingsView" class="view">
+          <div class="records-toolbar">
+            <div>
+              <h3>Settings</h3>
+              <p>Manage sales people and automatic sales person pictures.</p>
+            </div>
+          </div>
+          <div class="settings-menu-grid">
+            <button id="openSalespersonSettingsButton" class="settings-menu-card" type="button">
+              <strong>Sales Person</strong>
+              <span>Add, edit or delete sales people.</span>
+            </button>
+            <button id="openTrashSettingsButton" class="settings-menu-card" type="button">
+              <strong>Trash</strong>
+              <span>Restore or permanently delete records.</span>
+            </button>
+            <button id="openPictureSettingsButton" class="settings-menu-card" type="button">
+              <strong>Picture</strong>
+              <span>Replace logo and sales person avatar pictures.</span>
+            </button>
+            <button id="openAgentSettingsButton" class="settings-menu-card" type="button">
+              <strong>Agent</strong>
+              <span>Link outside agents to sales people.</span>
+            </button>
+            <button id="openAccountSettingsButton" class="settings-menu-card" type="button">
+              <strong>Account Detail</strong>
+              <span>Manage your own account profile.</span>
+            </button>
+          </div>
+          <dialog id="agentSettingsDialog" class="settings-detail-dialog">
+            <section class="panel settings-agent-panel">
+              <div class="panel-header">
+                <h3>Agent</h3>
+                <button id="closeAgentSettingsButton" type="button">Close</button>
+              </div>
+              <p class="settings-dialog-subtitle">Link outside agents to sales people.</p>
+              <div class="settings-agent-form">
+                <label>Agent name<input id="agentNameInput" placeholder="Agent name" /></label>
+                <label>Link sales person<select id="agentSalespersonSelect"></select></label>
+                <button id="addAgentButton" class="primary" type="button">Add agent</button>
+              </div>
+              <div class="table-wrap settings-agent-table-wrap">
+                <table class="compact-table">
+                  <thead><tr><th>Agent</th><th>Sales Person</th><th></th></tr></thead>
+                  <tbody id="agentTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </dialog>
+          <dialog id="accountSettingsDialog" class="settings-detail-dialog">
+            <form id="accountDetailForm" class="panel settings-account-panel">
+              <div class="panel-header">
+                <h3>Account Detail</h3>
+                <button id="closeAccountSettingsButton" type="button">Close</button>
+              </div>
+              <p class="settings-dialog-subtitle">Manage your own account profile.</p>
+              <div class="field-grid account-detail-grid">
+                <label>Name<input id="accountNameInput" placeholder="Name" /></label>
+                <label>Email address<input id="accountEmailInput" type="email" placeholder="email@example.com" /></label>
+                <label class="span-2">Address<input id="accountAddressInput" placeholder="Address" /></label>
+                <label class="span-2">Phone number<input id="accountPhoneInput" type="tel" placeholder="Phone number" /></label>
+                <label>New password<input id="accountNewPasswordInput" type="password" placeholder="New password" autocomplete="new-password" /></label>
+                <label>Confirm new password<input id="accountConfirmPasswordInput" type="password" placeholder="Confirm new password" autocomplete="new-password" /></label>
+              </div>
+              <div class="form-actions">
+                <span id="accountSaveStatus" class="settings-save-status"></span>
+                <button class="primary" type="submit">Save account detail</button>
+              </div>
+            </form>
+          </dialog>
+          <dialog id="pictureSettingsDialog" class="settings-detail-dialog">
+            <section class="panel settings-picture-panel">
+              <div class="panel-header">
+                <h3>Picture</h3>
+                <button id="closePictureSettingsButton" type="button">Close</button>
+              </div>
+              <div class="picture-tier-grid logo-picture-grid">
+                <article class="picture-tier-card">
+                  <img id="logoPreview" src="src/sign-future-logo.jpg" alt="Company logo preview" />
+                  <div>
+                    <h4>Left Top Logo</h4>
+                    <p>Replace the company logo image.</p>
+                    <button id="pictureLogoUploadButton" type="button">Upload</button>
+                  </div>
+                </article>
+              </div>
+              <div class="panel-header picture-subheader">
+                <h3>Sales Person Avatar</h3>
+                <span>Auto changes by personal sales performance in the selected date range.</span>
+              </div>
+              <div class="picture-tier-grid">
+                <article class="picture-tier-card">
+                  <img id="avatarDefaultPreview" src="src/sales-person-mascot.jpg" alt="Normal avatar" />
+                  <div>
+                    <h4>Normal Avatar</h4>
+                    <p>Below RM20,000</p>
+                    <button class="avatar-upload-button" type="button" data-avatar-tier="default">Upload</button>
+                  </div>
+                </article>
+                <article class="picture-tier-card">
+                  <img id="avatar20Preview" src="src/sales-person-mascot.jpg" alt="20k avatar" />
+                  <div>
+                    <h4>20k Avatar</h4>
+                    <p>RM20,000 and above</p>
+                    <button class="avatar-upload-button" type="button" data-avatar-tier="tier20">Upload</button>
+                  </div>
+                </article>
+                <article class="picture-tier-card">
+                  <img id="avatar50Preview" src="src/sales-person-mascot.jpg" alt="50k avatar" />
+                  <div>
+                    <h4>50k Avatar</h4>
+                    <p>RM50,000 and above</p>
+                    <button class="avatar-upload-button" type="button" data-avatar-tier="tier50">Upload</button>
+                  </div>
+                </article>
+                <article class="picture-tier-card">
+                  <img id="avatar100Preview" src="src/sales-person-mascot.jpg" alt="100k avatar" />
+                  <div>
+                    <h4>100k Avatar</h4>
+                    <p>RM100,000 and above</p>
+                    <button class="avatar-upload-button" type="button" data-avatar-tier="tier100">Upload</button>
+                  </div>
+                </article>
+              </div>
+              <input id="avatarTierImageInput" class="hidden" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+            </section>
+          </dialog>
+        </section>
+
+        <section id="costsView" class="view">
+          <div class="records-toolbar">
+            <div>
+              <h3>Cost Bills</h3>
+              <p id="costSummary"></p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="selectAllCostsButton" type="button">Select all</button>
+              <button id="cancelCostSelectionButton" type="button">Cancel</button>
+              <button id="trashSelectedCostsButton" class="danger-outline" type="button">Select</button>
+              <button id="addCostButtonTop" type="button">Add cost</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="select-col">Select</th>
+                  <th>Cost Doc No</th>
+                  <th>Type</th>
+                  <th><button class="table-sort-button" type="button" data-cost-sort="date">Date</button></th>
+                  <th>Linked Invoice</th>
+                  <th>Salesperson</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="costBody"></tbody>
+            </table>
+          </div>
+          <div id="costEmpty" class="empty-state">
+            <h3>No cost bills yet</h3>
+            <p>After creating an invoice, record each supplier bill and select which invoice it belongs to.</p>
+            <button class="primary" type="button" data-view-jump="entry">Add cost</button>
+          </div>
+        </section>
+
+
+        <section id="facebookView" class="view">
+          <div class="records-toolbar facebook-toolbar">
+            <div>
+              <h3>Facebook Listing</h3>
+              <p id="facebookSummary"></p>
+            </div>
+            <div class="facebook-controls">
+              <label>Salesperson
+                <select id="facebookSalespersonFilter"></select>
+              </label>
+              <label>Status
+                <select id="facebookStatusFilter">
+                  <option value="All">All status</option>
+                </select>
+              </label>
+              <button id="addFacebookCustomerButton" class="primary facebook-add-button" type="button">Add Facebook Customer</button>
+            </div>
+          </div>
+          <div class="facebook-status-row">
+            <div id="facebookStatusCards" class="facebook-status-grid"></div>
+            <div id="facebookCashCards" class="facebook-cash-grid"></div>
+          </div>
+          <div id="facebookPostSummary" class="facebook-post-summary"></div>
+          <form id="facebookForm" class="form-section facebook-entry-panel hidden">
+            <input id="facebookId" type="hidden" />
+            <div class="section-title">
+              <h3>Add Facebook Customer</h3>
+              <p id="facebookModeLabel">Record every Facebook lead directly from the website.</p>
+            </div>
+            <div class="field-grid facebook-entry-grid">
+              <label>Date<input id="facebookDate" type="date" required /></label>
+              <label>Customer Number<span class="phone-prefix-field"><span>+601</span><input id="facebookCustomerNumber" placeholder="23456789" inputmode="numeric" required /></span></label>
+              <label>Post
+                <span class="facebook-post-picker">
+                  <select id="facebookPost"></select>
+                  <button id="facebookPostManageButton" type="button">Add/Delete</button>
+
+                </span>
+              </label>
+              <label>From
+                <select id="facebookSource">
+                  <option>Facebook</option>
+                  <option>Google</option>
+                  <option>TikTok</option>
+                  <option value="&#23567;&#32418;&#20070;">&#23567;&#32418;&#20070;</option>
+                  <option>Instagram</option>
+                </select>
+              </label>
+              <label>Salesperson
+                <select id="facebookSalespersonInput" required></select>
+              </label>
+
+            </div>
+            <div class="form-actions facebook-form-actions">
+              <button id="clearFacebookButton" type="button">Clear</button>
+              <button id="closeFacebookButton" type="button">Close</button>
+              <button class="primary" type="submit">Save Facebook customer</button>
+            </div>
+          </form>
+          <div class="table-wrap facebook-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Customer Number</th>
+                  <th>Date</th>
+                  <th>Post</th>
+                  <th>From</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
+                  <th>Salesperson</th>
+                  <th>Deal Dateline</th>
+                  <th>Invoice</th>
+                  <th>Amount</th>
+                  <th>Outstanding</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="facebookBody"></tbody>
+            </table>
+          </div>
+          <div id="facebookEmpty" class="empty-state">
+            <h3>No Facebook listing yet</h3>
+            <p>Add Facebook customers manually here, or upload the old Sales Order Schedule Excel to start from existing records.</p>
+          </div>
+        </section>
+        <section id="entryView" class="view">
+          <div class="entry-grid">
+            <form id="invoiceForm" class="form-section">
+              <input id="invoiceId" type="hidden" />
+              <div class="section-title">
+                <h3>Invoice Entry</h3>
+                <p id="invoiceModeLabel">Create invoice first, then link cost bills to it</p>
+              </div>
+              <div class="field-grid">
+                <label>Invoice No<input id="invoiceNo" placeholder="IV2606-001" required /></label>
+                <label>Date<input id="invoiceDate" type="date" required /></label>
+                <label>Salesperson
+                  <select id="invoiceSalesperson" required></select>
+                </label>
+                <label>Sales Amount (RM)<input id="invoiceAmount" type="number" min="0" step="0.01" placeholder="5000" required /></label>
+                <label>Agent Sales (RM)<input id="invoiceAgentOrder" type="number" min="0" step="0.01" placeholder="0" /></label>
+                <label>Outstanding (RM)<input id="invoiceOutstanding" type="number" min="0" step="0.01" placeholder="0" /></label>
+                <label class="span-2 invoice-job-type">Job type
+                  <select id="invoiceJobType">
+                    <option value="supply">Supply only</option>
+                    <option value="installation">Installation</option>
+                  </select>
+                </label>
+                <div id="invoiceInstallationFields" class="span-2 invoice-installation-fields hidden">
+                  <label class="span-2">Full address<input id="installationAddress" placeholder="Full installation address in Malaysia" /></label>
+                  <label>Postcode<input id="installationPostcode" inputmode="numeric" maxlength="5" placeholder="Postcode" /></label>
+                  <label>State<input id="installationState" placeholder="Auto state" readonly /></label>
+                  <label>Install date<input id="installationDate" type="date" /></label>
+                  <label>Start time<select id="installationStartTime"></select></label>
+                  <label>End time<select id="installationEndTime"></select></label>
+                </div>
+                <label class="span-2">Customer / Project<input id="invoiceCustomer" placeholder="Optional customer or project name" /></label>
+                <label class="span-2">Note<input id="invoiceNote" placeholder="Optional remark" /></label>
+              </div>
+              <div class="form-actions">
+                <button id="clearInvoiceButton" type="button">Clear</button>
+                <button class="primary" type="submit">Save invoice</button>
+              </div>
+            </form>
+
+            <form id="costForm" class="form-section">
+              <input id="costId" type="hidden" />
+              <div class="section-title">
+                <h3>Cost Entry</h3>
+                <p id="costModeLabel">Record each supplier bill and connect it to an invoice</p>
+              </div>
+              <div class="field-grid">
+                <label>Cost Type
+                  <select id="costType" required>
+                    <option value="Sign Future">Sign Future</option>
+                    <option value="S&Y Printing">S&Y Printing</option>
+                    <option value="Lalamove">Lalamove</option>
+                    <option value="Purchase">Purchase</option>
+                  </select>
+                </label>
+                <label>Cost Doc No<input id="costDocNo" placeholder="SF7959 / 728722 / 7095" required /></label>
+                <label>Amount (RM)<input id="costAmount" type="number" min="0" step="0.01" placeholder="1000" required /></label>
+                <label>Date<input id="costDate" type="date" required /></label>
+                <label class="span-2">Connect To Invoice
+                  <select id="linkedInvoice" required></select>
+                </label>
+                <label class="span-2">Note<input id="costNote" placeholder="Purchase detail, supplier name, remark..." /></label>
+              </div>
+              <div class="invoice-preview" id="linkedPreview"></div>
+              <div class="form-actions">
+                <button id="clearCostButton" type="button">Clear</button>
+                <button class="primary" type="submit">Save cost</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="tickDateDialog" class="tick-date-dialog">
+      <form method="dialog">
+        <div class="tick-date-card">
+          <div>
+            <h3 id="tickDateTitle">Choose Tick Date</h3>
+            <p id="tickDateMessage">Choose the settlement date for this record.</p>
+          </div>
+          <label>Tick Date
+            <input id="tickDateInput" type="date" required />
+          </label>
+          <div class="form-actions">
+            <button id="tickDateCancel" type="button">Cancel</button>
+            <button id="tickDateConfirm" class="primary" type="button">Confirm</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="advertisingCostDialog" class="tick-date-dialog">
+      <form method="dialog">
+        <div class="tick-date-card">
+          <div>
+            <h3>Advertising Cost</h3>
+            <p id="advertisingCostMessage">Enter the advertising cost for this scorecard month.</p>
+          </div>
+          <label>Amount (RM)
+            <input id="advertisingCostInput" type="number" min="0" step="0.01" placeholder="0.00" required />
+          </label>
+          <div class="form-actions">
+            <button id="advertisingCostCancel" type="button">Cancel</button>
+            <button id="advertisingCostConfirm" class="primary" type="button">Confirm</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="scorecardDetailDialog" class="scorecard-detail-dialog">
+      <form method="dialog">
+        <div class="scorecard-detail-card">
+          <div class="scorecard-detail-header">
+            <div>
+              <h3 id="scorecardDetailTitle">Scorecard Detail</h3>
+              <p id="scorecardDetailSummary"></p>
+            </div>
+            <button id="scorecardDetailClose" type="button">Close</button>
+          </div>
+          <div id="scorecardDetailBody" class="scorecard-detail-body"></div>
+        </div>
+      </form>
+    </dialog>
+
+
+
+    <dialog id="facebookPostDialog" class="facebook-post-dialog">
+      <form method="dialog">
+        <div class="facebook-post-dialog-card">
+          <div class="scorecard-detail-header">
+            <div>
+              <h3>Post Manager</h3>
+              <p>Add new post options or delete old post options.</p>
+            </div>
+            <button id="facebookPostDialogClose" type="button">Close</button>
+          </div>
+          <div class="facebook-post-dialog-grid">
+            <label>Add post
+              <input id="facebookPostNameInput" placeholder="Post name" />
+            </label>
+            <button id="facebookPostAddConfirm" class="primary" type="button">Add</button>
+            <label>Delete post
+              <select id="facebookPostDeleteSelect"></select>
+            </label>
+            <button id="facebookPostDeleteConfirm" type="button">Delete</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="jsonTransferDialog" class="json-transfer-dialog">
+      <form method="dialog">
+        <div class="json-transfer-card">
+          <div>
+            <h3 id="jsonTransferTitle">Backup JSON</h3>
+            <p id="jsonTransferMessage">Copy this JSON, then paste it in another browser with Paste JSON.</p>
+          </div>
+          <textarea id="jsonTransferText" spellcheck="false"></textarea>
+          <div class="tick-date-actions">
+            <button id="jsonCopyButton" type="button">Copy JSON</button>
+            <button id="jsonRestoreButton" type="button">Restore pasted JSON</button>
+            <button id="jsonCloseButton" type="button">Close</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+    <script src="src/seed-data.js?v=20260609-1905"></script>
+    <script src="src/app.js?v=20260610-1215"></script>
+    <!-- Bridge for the admin embed: open a specific tab via ?view= or postMessage. -->
+    <script>
+      (function () {
+        function applyView(v) {
+          if (!v) return false;
+          var tab = document.querySelector('.nav-tab[data-view="' + v + '"]');
+          if (tab) { tab.click(); return true; }
+          return false;
+        }
+        function initialView() {
+          var v = new URLSearchParams(location.search).get("view");
+          if (!v) return;
+          var tries = 0;
+          (function attempt() {
+            if (applyView(v) || tries++ > 60) return;
+            setTimeout(attempt, 50);
+          })();
+        }
+        window.addEventListener("message", function (ev) {
+          if (ev.data && ev.data.type === "sf-sales-view") applyView(ev.data.view);
+        });
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialView);
+        else initialView();
+      })();
+    </script>
+  </body>
+</html>
+
+
