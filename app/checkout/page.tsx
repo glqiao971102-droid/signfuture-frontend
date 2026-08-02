@@ -93,7 +93,10 @@ export default function CheckoutPage() {
   }
 
   const wallet = user?.wallet.balance ?? 0;
-  const total = Math.max(0, (order?.total ?? 0) - voucherDiscount);
+  // Member (tier) discount on the items subtotal — the server applies the same.
+  const tierPct = user?.tierDiscount ?? 0;
+  const memberDiscount = order ? Math.round(order.subtotal * tierPct) / 100 : 0;
+  const total = Math.max(0, (order?.total ?? 0) - memberDiscount - voucherDiscount);
   const enough = wallet >= total;
 
   async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
@@ -274,6 +277,9 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div className="cart-sum-row"><span>Shipping</span><span>{order.shipping.cost === 0 ? "Free" : formatRM(order.shipping.cost)}</span></div>
+              {memberDiscount > 0 && (
+                <div className="cart-sum-row discount"><span>Member <strong>{user?.tier} −{tierPct}%</strong></span><span>− {formatRM(memberDiscount)}</span></div>
+              )}
               {voucherDiscount > 0 && (
                 <div className="cart-sum-row discount"><span>Voucher <strong>{voucherCode}</strong></span><span>− {formatRM(voucherDiscount)}</span></div>
               )}

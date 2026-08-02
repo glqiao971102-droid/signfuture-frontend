@@ -21,6 +21,10 @@ export type MemberProfile = {
   lastName: string | null;
   /** null for accounts with no membership role — a plain WordPress customer. */
   tier: MemberTier | null;
+  /** The member's tier discount percentage (0 for Normal). */
+  tierDiscount: number;
+  /** Largest single top-up ever made (unlocks tiers). */
+  largestTopup: number;
   /** True when the account holds the WordPress `administrator` role. */
   isAdmin: boolean;
   memberNo: string;
@@ -305,6 +309,24 @@ export const api = {
 
   me() {
     return request<MemberProfile>("/api/v1/auth/me");
+  },
+
+  /** Membership tier config (thresholds + discounts) — public. */
+  membershipConfig() {
+    return request<{ tiers: { key: string; threshold: number; discount: number }[] }>(
+      "/api/v1/membership/config",
+    );
+  },
+
+  /** Tier discount settings (admin). */
+  adminTierDiscounts() {
+    return request<{ discounts: Record<string, number> }>("/api/v1/admin/settings/tier-discounts");
+  },
+  adminSetTierDiscounts(discounts: { Silver: number; Gold: number; Diamond: number }) {
+    return request<{ success: boolean; discounts: Record<string, number> }>(
+      "/api/v1/admin/settings/tier-discounts",
+      { method: "PUT", body: JSON.stringify(discounts) },
+    );
   },
 
   async logout() {

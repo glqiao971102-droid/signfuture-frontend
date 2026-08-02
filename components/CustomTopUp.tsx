@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { api, ApiError, submitToGateway, type PaymentProvider } from "@/lib/api";
 
@@ -23,6 +23,12 @@ export default function CustomTopUp() {
   const { user, openLogin } = useAuth();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentProvider>("stripe");
+
+  // Prefill from ?amount= (e.g. a tier card's "Top up RM 10,000" button).
+  useEffect(() => {
+    const a = new URLSearchParams(window.location.search).get("amount");
+    if (a && Number(a) > 0) setAmount(String(Number(a)));
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
