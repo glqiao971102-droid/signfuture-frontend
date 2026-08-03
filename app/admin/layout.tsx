@@ -15,23 +15,24 @@ import { useAuth } from "@/components/AuthProvider";
  */
 
 type NavChild = { view: string; label: string };
-type NavItem = { href: string; label: string; icon: string; children?: NavChild[] };
+type NavItem = { href: string; label: string; icon: string; section: string; children?: NavChild[] };
 
 const NAV: NavItem[] = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: "◆" },
-  { href: "/admin/orders", label: "Orders", icon: "▤" },
-  { href: "/admin/users", label: "Customers", icon: "☺" },
-  { href: "/admin/wallet", label: "Wallet", icon: "◈" },
-  { href: "/admin/invoices", label: "Invoices", icon: "▧" },
-  { href: "/admin/coupons", label: "Coupons", icon: "✁" },
-  { href: "/admin/vouchers", label: "Vouchers", icon: "🎟" },
-  { href: "/admin/tiers", label: "Membership", icon: "★" },
-  { href: "/admin/agent-logins", label: "Agent Logins", icon: "🔐" },
-  { href: "/admin/products", label: "Products", icon: "▦" },
+  { href: "/admin/dashboard", label: "Dashboard", icon: "◆", section: "dashboard" },
+  { href: "/admin/orders", label: "Orders", icon: "▤", section: "orders" },
+  { href: "/admin/users", label: "Customers", icon: "☺", section: "customers" },
+  { href: "/admin/wallet", label: "Wallet", icon: "◈", section: "wallet" },
+  { href: "/admin/invoices", label: "Invoices", icon: "▧", section: "invoices" },
+  { href: "/admin/coupons", label: "Coupons", icon: "✁", section: "coupons" },
+  { href: "/admin/vouchers", label: "Vouchers", icon: "🎟", section: "vouchers" },
+  { href: "/admin/tiers", label: "Membership", icon: "★", section: "tiers" },
+  { href: "/admin/agent-logins", label: "Agent Logins", icon: "🔐", section: "agent-logins" },
+  { href: "/admin/products", label: "Products", icon: "▦", section: "products" },
   {
     href: "/admin/sales-listing",
     label: "Sales Listing",
     icon: "₪",
+    section: "sales-listing",
     children: [
       { view: "dashboard", label: "Dashboard" },
       { view: "invoices", label: "Invoices" },
@@ -54,6 +55,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }));
   const toggleMenu = (href: string) =>
     setOpenMenus((m) => ({ ...m, [href]: !(m[href] ?? false) }));
+
+  // Sidebar reflects the account's permissions. Super admins see everything
+  // plus the Permissions tab; other admins only see their granted sections.
+  const isSuper = Boolean(user?.isSuperAdmin);
+  const perms = user?.adminPermissions ?? [];
+  const nav: NavItem[] = NAV.filter((i) => isSuper || perms.includes(i.section));
+  if (isSuper) nav.push({ href: "/admin/permissions", label: "Permissions", icon: "⚙", section: "permissions" });
 
   // Gate states get the full-screen centred treatment, without the sidebar.
   if (loading || !user || !user.isAdmin) {
@@ -105,7 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="adm-topbar-right">
           <span className="adm-whoami">
             {user.name}
-            <em> · administrator</em>
+            <em> · {isSuper ? "Super Admin" : "Admin"}</em>
           </span>
           <Link href="/" className="adm-link">
             ← Site
@@ -119,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="adm-body">
         <aside className="adm-sidebar">
           <nav>
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
 
               // Parent with children → click toggles the sub-menu open/closed.

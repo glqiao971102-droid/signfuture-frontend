@@ -25,8 +25,12 @@ export type MemberProfile = {
   tierDiscount: number;
   /** Largest single top-up ever made (unlocks tiers). */
   largestTopup: number;
-  /** True when the account holds the WordPress `administrator` role. */
+  /** True when the account is an admin (role or super-admin email). */
   isAdmin: boolean;
+  /** True when the account is a Super Admin (full access + manage permissions). */
+  isSuperAdmin?: boolean;
+  /** Admin sidebar sections this account may access (all for super admins). */
+  adminPermissions?: string[];
   memberNo: string;
   registeredAt: string | null;
   roles: string[];
@@ -329,6 +333,23 @@ export const api = {
     );
     setToken(res.token.value);
     return res;
+  },
+
+  // ----- Super admin: permissions -----
+
+  adminAccessSections() {
+    return request<{ sections: string[] }>("/api/v1/admin/access/sections");
+  },
+  adminAccessAdmins() {
+    return request<{ data: { id: number; login: string; email: string; level: "super" | "admin"; permissions: string[] }[] }>(
+      "/api/v1/admin/access/admins",
+    );
+  },
+  adminSetAccess(id: number, permissions: string[]) {
+    return request<{ success: boolean; permissions: string[] }>(
+      `/api/v1/admin/access/admins/${id}`,
+      { method: "PUT", body: JSON.stringify({ permissions }) },
+    );
   },
 
   /** Admin: the agent-login audit trail. */
