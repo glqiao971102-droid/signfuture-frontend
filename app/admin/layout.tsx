@@ -61,6 +61,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isSuper = Boolean(user?.isSuperAdmin);
   const perms = user?.adminPermissions ?? [];
   const nav: NavItem[] = NAV.filter((i) => isSuper || perms.includes(i.section));
+  // Launch QA checklist — available to every admin.
+  nav.push({ href: "/admin/launch-tests", label: "Launch Tests", icon: "🚀", section: "launch-tests" });
   if (isSuper) nav.push({ href: "/admin/permissions", label: "Permissions", icon: "⚙", section: "permissions" });
 
   // Gate states get the full-screen centred treatment, without the sidebar.
