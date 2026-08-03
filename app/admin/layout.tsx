@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -13,7 +14,10 @@ import { useAuth } from "@/components/AuthProvider";
  * reaches these pages.
  */
 
-const NAV = [
+type NavChild = { view: string; label: string };
+type NavItem = { href: string; label: string; icon: string; children?: NavChild[] };
+
+const NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "◆" },
   { href: "/admin/orders", label: "Orders", icon: "▤" },
   { href: "/admin/users", label: "Customers", icon: "☺" },
@@ -24,11 +28,32 @@ const NAV = [
   { href: "/admin/tiers", label: "Membership", icon: "★" },
   { href: "/admin/agent-logins", label: "Agent Logins", icon: "🔐" },
   { href: "/admin/products", label: "Products", icon: "▦" },
+  {
+    href: "/admin/sales-listing",
+    label: "Sales Listing",
+    icon: "₪",
+    children: [
+      { view: "dashboard", label: "Dashboard" },
+      { view: "invoices", label: "Invoices" },
+      { view: "costs", label: "Costs" },
+      { view: "installation", label: "Installation" },
+      { view: "scorecard", label: "Sales Scorecard" },
+      { view: "mission", label: "Mission" },
+      { view: "facebook", label: "Facebook Listing" },
+    ],
+  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, openLogin, logout } = useAuth();
   const pathname = usePathname();
+  // Collapsible parent menus (e.g. Sales Listing). Start open if you're already
+  // inside that section; toggling is then fully manual.
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => ({
+    "/admin/sales-listing": pathname.startsWith("/admin/sales-listing"),
+  }));
+  const toggleMenu = (href: string) =>
+    setOpenMenus((m) => ({ ...m, [href]: !(m[href] ?? false) }));
 
   // Gate states get the full-screen centred treatment, without the sidebar.
   if (loading || !user || !user.isAdmin) {
@@ -96,6 +121,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <nav>
             {NAV.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
+
+              // Parent with children → click toggles the sub-menu open/closed.
+              if (item.children) {
+                const open = openMenus[item.href] ?? false;
+                return (
+                  <div key={item.href}>
+                    <button
+                      type="button"
+                      onClick={() => toggleMenu(item.href)}
+                      className={`adm-nav-item adm-nav-toggle${active ? " is-active" : ""}`}
+                      aria-expanded={open}
+                    >
+                      <span className="adm-nav-icon" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      {item.label}
+                      <span
+                        className={`adm-nav-caret${open ? " is-open" : ""}`}
+                        aria-hidden="true"
+                      >
+                        ▸
+                      </span>
+                    </button>
+                    {open && (
+                      <div className="adm-subnav">
+                        {item.children.map((c) => (
+                          <Link
+                            key={c.view}
+                            href={`${item.href}?view=${c.view}`}
+                            className="adm-subnav-item"
+                          >
+                            {c.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
@@ -112,7 +177,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
         </aside>
 
-        <main className="adm-content">{children}</main>
+        <main
+          className={`adm-content${
+            pathname.startsWith("/admin/sales-listing") ? " adm-content-full" : ""
+          }`}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

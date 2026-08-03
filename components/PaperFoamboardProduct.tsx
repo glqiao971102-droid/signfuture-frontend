@@ -30,6 +30,7 @@ const THICK_MULT: Record<string, number> = {
 const RATE = 6; // RM per sq.ft. (placeholder base rate)
 
 const COLLECT = [
+  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
   { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
   { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
@@ -68,6 +69,18 @@ export default function PaperFoamboardProduct() {
   const [thickness, setThickness] = useState(THICKNESS[0]);
   const [sizeLabel, setSizeLabel] = useState("24in(H) x 24in(W)");
   const [collect, setCollect] = useState(COLLECT[0].key);
+  // 'Next Working Days' closes daily at 4pm; re-checked on a timer.
+  const [nowHour, setNowHour] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNowHour(new Date().getHours());
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, []);
+  const nextClosed = nowHour !== null && nowHour >= 16;
+  useEffect(() => {
+    if (nextClosed && collect === "next") setCollect(COLLECT[0].key);
+  }, [nextClosed, collect]);
   const [qty, setQty] = useState(1);
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
@@ -176,12 +189,13 @@ export default function PaperFoamboardProduct() {
               {COLLECT.map((c) => (
                 <label
                   key={c.key}
-                  className={`xprod-collect-opt${collect === c.key ? " is-selected" : ""}`}
+                  className={`xprod-collect-opt${collect === c.key ? " is-selected" : ""}${c.key === "next" && nextClosed ? " is-disabled" : ""}`}
                 >
                   <input
                     type="radio"
                     name="papercollect"
                     checked={collect === c.key}
+                    disabled={c.key === "next" && nextClosed}
                     onChange={() => setCollect(c.key)}
                   />
                   {/* eslint-disable-next-line @next/next/no-img-element */}

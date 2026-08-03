@@ -4,6 +4,22 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/components/CartProvider";
 import { isCategory, nodeHref, slugify, type ProductMenuItem } from "@/lib/products";
+import { PRODUCT_IMAGES } from "@/lib/productImages";
+
+/** Hero image for a node, keyed by its slug; a category borrows the first
+ *  descendant that has one (so grouping cards still get a picture). */
+function resolveImage(node: ProductMenuItem): string | undefined {
+  const slug = (node.href ?? "").split("/").filter(Boolean).pop() ?? slugify(node.label);
+  if (PRODUCT_IMAGES[slug]) return PRODUCT_IMAGES[slug];
+  if (PRODUCT_IMAGES[slugify(node.label)]) return PRODUCT_IMAGES[slugify(node.label)];
+  if (node.children) {
+    for (const child of node.children) {
+      const found = resolveImage(child);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
 
 export default function ProductCard({ node }: { node: ProductMenuItem }) {
   const { add } = useCart();
@@ -11,6 +27,7 @@ export default function ProductCard({ node }: { node: ProductMenuItem }) {
   const href = nodeHref(node);
   const category = isCategory(node);
   const available = node.available;
+  const image = resolveImage(node);
 
   const onAdd = () => {
     add({ label: node.label, href });
@@ -21,7 +38,12 @@ export default function ProductCard({ node }: { node: ProductMenuItem }) {
   return (
     <div className={`product-card-tile${category ? " is-category" : ""}`}>
       <Link href={href} className="tile-thumb" aria-label={node.label}>
-        <span className="tile-glyph">{category ? "⊞" : available ? "◆" : "▢"}</span>
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="tile-img" src={image} alt={node.label} loading="lazy" />
+        ) : (
+          <span className="tile-glyph">{category ? "⊞" : available ? "◆" : "▢"}</span>
+        )}
         {category && node.children && (
           <span className="tile-count">{node.children.length} items</span>
         )}

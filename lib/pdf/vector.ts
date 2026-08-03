@@ -140,6 +140,25 @@ export function dedupeBboxes(boxes: Bbox[], tolerance = 6): Bbox[] {
   }
   return unique;
 }
+// How many spatially-disjoint clusters a set of boxes forms. Overlapping boxes
+// (e.g. a letter outline + its counter/hole) collapse into one cluster; visually
+// separate boxes (e.g. the glyphs of an outlined word) each stay their own. Used
+// to tell a single-shape fill from a multi-piece compound path.
+export function disjointBoxCount(boxes: Bbox[]): number {
+  const valid = boxes.filter((b) => b && bboxArea(b) > 0);
+  const n = valid.length;
+  if (n <= 1) return n;
+  const parent = valid.map((_, i) => i);
+  const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (bboxIntersects(valid[i], valid[j])) { const a = find(i), b = find(j); if (a !== b) parent[b] = a; }
+    }
+  }
+  const roots = new Set<number>();
+  for (let i = 0; i < n; i++) roots.add(find(i));
+  return roots.size;
+}
 export function clusterStrokeBboxes(strokes: { bbox: Bbox }[], gap = POINTS_PER_INCH * 4): Bbox[] {
   const boxes = strokes.map((s) => s.bbox).filter((b) => b !== null && bboxArea(b) > 0);
   const clusters: Bbox[][] = [];
@@ -280,37 +299,15 @@ export function outlineLetterDimensions(paths: { bbox: Bbox }[], scale = 1.0, co
   }
   let glyphBoxes = clusters.map((c) => unionBboxes(c)).filter((b): b is Bbox => b !== null && bboxArea(b) > 0);
   if (glyphBoxes.length === 0) return [];
-  const rows: Bbox[][] = [];
-  const sorted = [...glyphBoxes].sort((a, b) => -((a[1] + a[3]) / 2) - -((b[1] + b[3]) / 2) || a[0] - b[0]);
-  for (const box of sorted) {
-    const cy = (box[1] + box[3]) / 2;
-    let placed = false;
-    for (const row of rows) {
-      const rowBox = unionBboxes(row)!;
-      const rowCy = (rowBox[1] + rowBox[3]) / 2;
-      const rowH = Math.max(1, rowBox[3] - rowBox[1]);
-      if (Math.abs(cy - rowCy) <= rowH * 0.55) { row.push(box); placed = true; break; }
-    }
-    if (!placed) rows.push([box]);
-  }
-  const wordBoxes: (Bbox | null)[] = [];
-  for (let row of rows) {
-    row = [...row].sort((a, b) => a[0] - b[0]);
-    const heights = row.map((b) => Math.max(1, b[3] - b[1]));
-    const medianHeight = [...heights].sort((a, b) => a - b)[Math.floor(heights.length / 2)];
-    let word: Bbox[] = [];
-    let last: Bbox | null = null;
-    for (const box of row) {
-      if (last !== null && box[0] - last[2] > medianHeight * 0.62) { wordBoxes.push(unionBboxes(word)); word = []; }
-      word.push(box);
-      last = box;
-    }
-    if (word.length) wordBoxes.push(unionBboxes(word));
-  }
+  // Each glyph cluster is one letter/logo record. We deliberately do NOT merge
+  // adjacent glyphs into "words" by proximity — that would fuse separate,
+  // ungrouped letters (e.g. "S"+"G" -> "SG"). Following the artwork's own
+  // separation keeps ungrouped letters apart; the customer can still group
+  // them manually in the UI when they want to.
   const entries: LetterEntry[] = [];
-  wordBoxes.forEach((box, idx) => {
+  glyphBoxes.forEach((box, idx) => {
     if (!box || bboxArea(box) <= 0) return;
-    const entry = letterDimensionEntry(`Word ${idx + 1}`, box, scale, "outline");
+    const entry = letterDimensionEntry(`Letter ${idx + 1}`, box, scale, "outline");
     if (entry) entries.push(entry);
   });
   return sortLetterDimensions(entries).slice(0, maxItems);
@@ -334,6 +331,7 @@ export class PdfPathAnalyzer {
   subpathStart: Pt | null = null;
   strokes: Stroke[] = [];
   fills: FillPath[] = [];
+  fillGroups: { page: number; bbox: Bbox; parts: number }[] = [];
   images: ImagePlacement[] = [];
   clips: ClipPath[] = [];
 
@@ -410,6 +408,16 @@ export class PdfPathAnalyzer {
     for (const bbox of boxes) {
       if (bbox === null || bboxArea(bbox) <= 0) continue;
       this.fills.push({ page: pageIndex + 1, bbox, segments: [...this.segments] });
+    }
+    // A single fill operation whose subpaths form several DISJOINT pieces is a
+    // compound path (Illustrator Ctrl+8 / Pathfinder-unite) — the artwork's own
+    // grouping. Record the group's overall bbox so raster letter detection can
+    // keep those pieces together as one record. Plain single-shape fills and
+    // letters-with-holes (whose pieces overlap) don't create a group.
+    const disjoint = disjointBoxCount(boxes);
+    if (disjoint > 1) {
+      const union = unionBboxes(boxes);
+      if (union !== null && bboxArea(union) > 0) this.fillGroups.push({ page: pageIndex + 1, bbox: union, parts: disjoint });
     }
     if (clear) this.clearPath();
   }

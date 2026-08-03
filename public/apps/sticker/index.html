@@ -874,7 +874,7 @@
 
     .collect-date-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       border: 1px solid rgba(63, 176, 255, 0.58);
       border-radius: 10px;
@@ -1470,20 +1470,12 @@
             <div class="field-label">Lamination</div>
             <div class="lamination-grid">
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="indoor_matt55" checked>
-                <span>Indoor Matt Lam 55micron</span>
+                <input type="radio" name="lamination" value="matt100" checked>
+                <span>Matt Lam 100micron</span>
               </label>
               <label class="lamination-option">
-                <input type="radio" name="lamination" value="indoor_gloss55">
-                <span>Indoor Gloss Lam 55micron</span>
-              </label>
-              <label class="lamination-option">
-                <input type="radio" name="lamination" value="outdoor_matt100">
-                <span>Outdoor Matt Lam 100micron</span>
-              </label>
-              <label class="lamination-option">
-                <input type="radio" name="lamination" value="outdoor_gloss100">
-                <span>Outdoor Gloss Lam 100micron</span>
+                <input type="radio" name="lamination" value="gloss100">
+                <span>Gloss Lam 100micron</span>
               </label>
               <label class="lamination-option">
                 <input type="radio" name="lamination" value="floor_matt200">
@@ -1513,7 +1505,13 @@
             <h3 class="collect-date-title">Collect Date</h3>
             <div class="collect-date-grid" id="collectChoices">
               <label class="collect-date-option is-selected">
-                <input type="radio" name="collect" value="normal" checked>
+                <input type="radio" name="collect" value="standard7" checked>
+                <img src="assets/collect-7-working-days.png" alt="7 Working Days (Standard)">
+                <span class="image-zoom-button"></span>
+                <strong>7 Working Days</strong>
+              </label>
+              <label class="collect-date-option">
+                <input type="radio" name="collect" value="normal">
                 <img src="assets/collect-4-working-days.png" alt="4 Working Days">
                 <span class="image-zoom-button"></span>
                 <strong>4 Working Days</strong>
@@ -1562,19 +1560,24 @@
           <h3 class="order-title">Order Summary</h3>
           <div class="agent-grid">
             <div class="agent-card">
-              <span>Normal Agent Price</span>
-              <strong id="agentA">RM 72.00</strong>
-              <em>RM 3 / sq.ft.</em>
+              <span>Agent Price</span>
+              <strong id="agentA">RM 0.00</strong>
+              <em id="rateA"></em>
+            </div>
+            <div class="agent-card">
+              <span>Silver Agent Price</span>
+              <strong id="agentSilver">RM 0.00</strong>
+              <em id="rateSilver"></em>
             </div>
             <div class="agent-card">
               <span>Gold Agent Price</span>
-              <strong id="agentB">RM 61.20</strong>
-              <em>15% margin</em>
+              <strong id="agentGold">RM 0.00</strong>
+              <em id="rateGold"></em>
             </div>
             <div class="agent-card">
-              <span>Platinum Agent Price</span>
-              <strong id="agentC">RM 57.60</strong>
-              <em>20% margin</em>
+              <span>Diamond Agent Price</span>
+              <strong id="agentDiamond">RM 0.00</strong>
+              <em id="rateDiamond"></em>
             </div>
           </div>
 
@@ -1643,14 +1646,13 @@
     const LAMINATION_PRINTING = ["solvent", "epson"];
 
     const laminationOptions = {
-      indoor_matt55: { label: "Indoor Matt Lam 55micron", rate: 0 },
-      indoor_gloss55: { label: "Indoor Gloss Lam 55micron", rate: 0 },
-      outdoor_matt100: { label: "Outdoor Matt Lam 100micron", rate: 0 },
-      outdoor_gloss100: { label: "Outdoor Gloss Lam 100micron", rate: 0 },
+      matt100: { label: "Matt Lam 100micron", rate: 0 },
+      gloss100: { label: "Gloss Lam 100micron", rate: 0 },
       floor_matt200: { label: "Floor Matt Lamination 200micron", rate: 0 }
     };
 
     const collectOptions = {
+      standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
       normal: { label: "4 Working Days", days: 4, multiplier: 1 },
       quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
       rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
@@ -1727,6 +1729,30 @@
       select.innerHTML = options.join("");
     };
 
+    // Per-sq.ft. price from the official price sheet (sticker price Excel).
+    //   RATE_TABLE[printing][material] = [Agent, Silver, Gold, Diamond]  (RM per sq.ft.)
+    const RATE_TABLE = {
+      uv: {
+        white80: [2.9, 1.5, 1.5, 1.5],
+        blockout_white120: [3.9, 2.0, 2.0, 2.0],
+        blockout_grey120: [4.2, 2.1, 2.1, 2.1]
+      },
+      solvent: {
+        white80: [4.2, 2.1, 2.1, 2.1],
+        blockout_white120: [4.4, 2.2, 2.2, 2.2],
+        blockout_grey120: [4.5, 2.3, 2.3, 2.3]
+      },
+      epson: {
+        white80: [5.7, 3.8, 3.8, 3.8],
+        blockout_white120: [6.6, 4.4, 4.4, 4.4],
+        blockout_grey120: [6.8, 4.5, 4.5, 4.5]
+      }
+    };
+    // Lamination add-on, RM per sq.ft. per tier [Agent, Silver, Gold, Diamond]. All 0 now.
+    const LAMINATION_RATE = {
+      matt100: [0, 0, 0, 0], gloss100: [0, 0, 0, 0], floor_matt200: [0, 0, 0, 0]
+    };
+
     const quote = () => {
       const height = Math.max(0, Number($("#height").value) || 0);
       const width = Math.max(0, Number($("#width").value) || 0);
@@ -1736,25 +1762,32 @@
       const widthIn = width * factor;
       const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
       const area = heightIn * widthIn / 144;
-      const printing = printingOptions[$("#printing").value];
-      const material = materialOptions[$("#material").value];
+      const printingKey = $("#printing").value;
+      const materialKey = $("#material").value;
+      const printing = printingOptions[printingKey];
+      const material = materialOptions[materialKey];
       const finishing = finishingOptions[selectedValue("finishing")];
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
-      const subtotal = area * 3 * quantity;
-      const total = Math.max(0, subtotal);
 
       const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
 
-      // Lamination only applies to Eco Solvent / Epson; treat it as absent
-      // otherwise so a stale choice can't leak into the quote or the cart.
-      const laminationAvailable = LAMINATION_PRINTING.includes($("#printing").value);
+      // Lamination only applies to Eco Solvent / Epson; treat it as absent otherwise.
+      const laminationAvailable = LAMINATION_PRINTING.includes(printingKey);
+      const laminationKey = laminationAvailable ? selectedValue("lamination") : "";
       const lamination = laminationAvailable
-        ? laminationOptions[selectedValue("lamination")] || laminationOptions.indoor_matt55
+        ? laminationOptions[laminationKey] || laminationOptions.matt100
         : null;
+
+      // Price = area x (material rate + lamination add-on), per agent tier.
+      const matRates = (RATE_TABLE[printingKey] && RATE_TABLE[printingKey][materialKey]) || [0, 0, 0, 0];
+      const lamRates = (laminationAvailable && LAMINATION_RATE[laminationKey]) || [0, 0, 0, 0];
+      const tierRates = matRates.map((rate, i) => rate + (lamRates[i] || 0));
+      const tierTotals = tierRates.map((rate) => Math.max(0, area * rate * quantity));
+      const total = tierTotals[0];
 
       return {
         height, width, unit, quantity, area, printing, material, finishing,
-        collect, artworkQty, laminationAvailable, lamination, total
+        collect, artworkQty, laminationAvailable, lamination, total, tierTotals, tierRates
       };
     };
 
@@ -1815,9 +1848,10 @@
       $("#selectedMaterialLabel").textContent = q.material.label;
       $("#selectedFinishingLabel").textContent = q.finishing.label;
       $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
-      $("#agentA").textContent = money(q.total);
-      $("#agentB").textContent = money(q.total * 0.85);
-      $("#agentC").textContent = money(q.total * 0.8);
+      const tierCardIds = ["agentA", "agentSilver", "agentGold", "agentDiamond"];
+      tierCardIds.forEach((id, i) => { const el = $("#" + id); if (el) el.textContent = money(q.tierTotals[i] || 0); });
+      const tierEmIds = ["rateA", "rateSilver", "rateGold", "rateDiamond"];
+      tierEmIds.forEach((id, i) => { const el = $("#" + id); if (el) el.textContent = "RM " + (q.tierRates[i] || 0).toFixed(2) + " / sq.ft."; });
 
       validate();
     };
@@ -2019,6 +2053,31 @@
 
     populateArtworkQty();
     update();
+  </script>
+  <style>
+    .collect-date-option.is-disabled { position: relative; opacity: 0.45; filter: grayscale(0.65); pointer-events: none; cursor: not-allowed; }
+    .collect-date-option.is-disabled::after { content: "Closed after 4:00pm"; position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 4px; border-radius: 5px; background: rgba(196,24,44,0.92); color: #fff; font-size: 10px; font-weight: 800; text-align: center; }
+  </style>
+  <script>
+    // "Next Working Days" collection closes each day at 4:00pm.
+    (function () {
+      var CUTOFF_HOUR = 16;
+      function apply() {
+        var nextInput = document.querySelector('input[name="collect"][value="next"]');
+        if (!nextInput) return;
+        var card = nextInput.closest(".collect-date-option");
+        var closed = new Date().getHours() >= CUTOFF_HOUR;
+        nextInput.disabled = closed;
+        if (card) card.classList.toggle("is-disabled", closed);
+        if (closed && nextInput.checked) {
+          var fb = document.querySelector('input[name="collect"][value="standard7"]') || document.querySelector('input[name="collect"]:not([value="next"])');
+          if (fb) { fb.checked = true; fb.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      }
+      function boot() { apply(); setInterval(apply, 30000); }
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+      else boot();
+    })();
   </script>
   <script src="/apps/_shared/single-option.js" defer></script>
 </body>

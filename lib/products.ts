@@ -216,6 +216,7 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
         children: [
           { label: "3D Stainless Steel Box Up (Frontlit)", href: "/catalog/stainless-steel-box-up-frontlit", available: true },
           { label: "3D Stainless Steel Box Up (Backlit)", href: "/catalog/stainless-steel-box-up-backlit", available: true },
+          { label: "3D Stainless Steel Box Up (Backlit with 10mm Clear Acrylic)", href: "/catalog/stainless-steel-box-up-backlit-acrylic", available: true },
         ],
       },
       { label: "Aluminum Channel Box Up", href: "/catalog/aluminum-channel-box-up", available: true },
