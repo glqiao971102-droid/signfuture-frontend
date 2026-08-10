@@ -789,6 +789,9 @@ export type NativeOrderDetail = {
   statusLabel: string;
   subtotal: number;
   shipping: number;
+  discount?: number;
+  minAdjustment: number;
+  voucherCode?: string | null;
   total: number;
   currency: string;
   paymentMethod: string;

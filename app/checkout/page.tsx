@@ -92,9 +92,22 @@ export default function CheckoutPage() {
     }
   }
 
+  const MIN_ORDER = 15; // RM — minimum spend per order
   const wallet = user?.wallet.balance ?? 0;
-  const total = Math.max(0, (order?.total ?? 0) - voucherDiscount);
+  const rawTotal = Math.max(0, (order?.total ?? 0) - voucherDiscount);
+  const belowMin = rawTotal > 0 && rawTotal < MIN_ORDER;
+  const minAdjustment = belowMin ? Math.round((MIN_ORDER - rawTotal) * 100) / 100 : 0;
+  const total = belowMin ? MIN_ORDER : rawTotal;
   const enough = wallet >= total;
+
+  // One-time popup letting the customer know their order was topped up to the
+  // RM15 minimum. Re-shows if they change the cart back below the minimum.
+  const [minNoticeOpen, setMinNoticeOpen] = useState(false);
+  const [minNoticeDismissed, setMinNoticeDismissed] = useState(false);
+  useEffect(() => {
+    if (belowMin && !minNoticeDismissed) setMinNoticeOpen(true);
+    if (!belowMin) { setMinNoticeOpen(false); setMinNoticeDismissed(false); }
+  }, [belowMin, minNoticeDismissed]);
 
   async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -166,6 +179,25 @@ export default function CheckoutPage() {
   return (
     <>
       <Nav />
+
+      {/* Minimum-spend notice popup */}
+      {minNoticeOpen && !placed && (
+        <div className="adm-modal-overlay" onClick={() => { setMinNoticeOpen(false); setMinNoticeDismissed(true); }}>
+          <div className="checkout-min-modal" onClick={(e) => e.stopPropagation()}>
+            <span className="checkout-min-glyph">🧾</span>
+            <h2>Minimum spend RM{MIN_ORDER.toFixed(2)}</h2>
+            <p>
+              Your order total is <strong>{formatRM(rawTotal)}</strong>, which is below our
+              minimum spend of <strong>RM{MIN_ORDER.toFixed(2)}</strong> per order.
+            </p>
+            <p>We&apos;ll adjust your total up to <strong>RM{MIN_ORDER.toFixed(2)}</strong> (+{formatRM(minAdjustment)}) so you can continue.</p>
+            <button type="button" className="hero-btn primary" onClick={() => { setMinNoticeOpen(false); setMinNoticeDismissed(true); }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="home-main">
         <section className="cart-head">
           <div>
@@ -277,7 +309,13 @@ export default function CheckoutPage() {
               {voucherDiscount > 0 && (
                 <div className="cart-sum-row discount"><span>Voucher <strong>{voucherCode}</strong></span><span>− {formatRM(voucherDiscount)}</span></div>
               )}
+              {minAdjustment > 0 && (
+                <div className="cart-sum-row"><span>Minimum charge <em>(below RM{MIN_ORDER})</em></span><span>+ {formatRM(minAdjustment)}</span></div>
+              )}
               <div className="cart-sum-row total"><span>Total</span><strong>{formatRM(total)}</strong></div>
+              {minAdjustment > 0 && (
+                <p className="checkout-hint">Minimum spend is RM{MIN_ORDER.toFixed(2)} per order — your total has been adjusted up to the minimum.</p>
+              )}
 
               {user && (
                 <div className="checkout-voucher">

@@ -258,6 +258,9 @@ export default function AdminOrders() {
             </div>
             <div className="adm-drawer-meta">
               <div><span className="adm-key-label">Placed</span>{formatDate(nativeDetail.date)}</div>
+              {nativeDetail.minAdjustment > 0 && (
+                <div><span className="adm-key-label">Min. charge</span>+RM {money(nativeDetail.minAdjustment)} (below RM15)</div>
+              )}
               <div><span className="adm-key-label">Total</span>RM {money(nativeDetail.total)}</div>
               <div><span className="adm-key-label">Payment</span>{nativeDetail.paymentMethod}{nativeDetail.paidAt ? " (paid)" : ""}</div>
               <div><span className="adm-key-label">Delivery</span>{nativeDetail.deliveryMethod ?? "—"}</div>
