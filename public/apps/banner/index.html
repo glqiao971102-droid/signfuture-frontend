@@ -1847,6 +1847,22 @@
               price: q.total,
               meta: details,
               image: "/apps/banner/assets/inkjet-banner-hero.png",
+              // 4-tier prices [Agent, Silver, Gold, Diamond] for the cart to
+              // charge the customer's tier + show the comparison.
+              tierPrices: q.tierTotals,
+              // Structured spec so the server recomputes the authoritative price
+              // from raw inputs (anti-tampering).
+              spec: {
+                pricer: "banner",
+                width: q.width,
+                height: q.height,
+                unit: q.unit,
+                quantity: q.quantity,
+                printing: $("#printing").value,
+                material: $("#material").value,
+                finishing: selectedValue("finishing"),
+                collect: selectedValue("collect"),
+              },
             },
           },
           window.location.origin

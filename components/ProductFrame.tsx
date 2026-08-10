@@ -31,6 +31,12 @@ export default function ProductFrame({
         price: typeof item.price === "number" ? item.price : 0,
         image: typeof item.image === "string" ? item.image : undefined,
         meta: typeof item.meta === "string" ? item.meta : undefined,
+        // Member pricing + server-recompute plumbing from iframe calculators.
+        tierPrices:
+          Array.isArray(item.tierPrices) && item.tierPrices.length === 4
+            ? item.tierPrices.map((n: unknown) => (typeof n === "number" ? n : 0))
+            : undefined,
+        spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
       });
     };
     window.addEventListener("message", onMessage);
