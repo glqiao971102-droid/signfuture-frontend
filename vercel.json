@@ -1,7 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "app/3d-box-up/app/route.ts": { "memory": 3009, "maxDuration": 120 },
-    "app/neon-line/app/route.ts": { "memory": 3009, "maxDuration": 120 }
-  }
-}
