@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { tierIndex } from "@/lib/tier";
 import { ACRYLIC_PRICE } from "@/lib/acrylicPrices";
 
 const PRODUCT_NAME = "Acrylic Sheet";
@@ -137,7 +138,7 @@ export default function AcrylicSheetProduct() {
   const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
   const baseTiers = ACRYLIC_PRICE[finishKey]?.[groupKey]?.[sizeKey] ?? [0, 0, 0, 0];
   const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -147,7 +148,7 @@ export default function AcrylicSheetProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sheet-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sheet-hero.png", tierPrices: tierTotals, spec: { pricer: "lookup", key: "acrylic-sheet", path: [finishKey, groupKey, sizeKey], collect, qty } });
     setAdded(true);
   };
 

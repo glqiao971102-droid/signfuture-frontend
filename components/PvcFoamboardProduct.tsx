@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { tierIndex } from "@/lib/tier";
 import { PVC_PRICE } from "@/lib/pvcFoamboardPrices";
 
 const PRODUCT_NAME = "PVC Foamboard";
@@ -109,7 +110,7 @@ export default function PvcFoamboardProduct() {
   const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
   const baseTiers = PVC_PRICE[finishKey]?.[thickKey]?.[sizeKey] ?? [0, 0, 0, 0];
   const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -120,7 +121,7 @@ export default function PvcFoamboardProduct() {
   const addToCart = () => {
     if (!agreed) return;
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/pvc-foamboard-hero.png", deliverable: true });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/pvc-foamboard-hero.png", deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pvc-foamboard", path: [finishKey, thickKey, sizeKey], collect, qty } });
     setAdded(true);
   };
 

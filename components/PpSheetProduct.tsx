@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { tierIndex } from "@/lib/tier";
 import { PP_PRICE } from "@/lib/ppSheetPrices";
 
 const PRODUCT_NAME = "PP Sheet";
@@ -58,6 +60,7 @@ const addWorkingDays = (days: number) => {
 };
 
 export default function PpSheetProduct() {
+  const { user } = useAuth();
   const { add } = useCart();
 
   const [finishing, setFinishing] = useState(FINISHING[0]);
@@ -110,7 +113,7 @@ export default function PpSheetProduct() {
   const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
   const baseTiers = PP_PRICE[finishKey]?.[thickKey]?.[sizeKey] ?? [0, 0, 0, 0];
   const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -121,7 +124,7 @@ export default function PpSheetProduct() {
   const addToCart = () => {
     if (!agreed) return;
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pp-sheet", path: [finishKey, thickKey, sizeKey], collect, qty } });
     setAdded(true);
   };
 
