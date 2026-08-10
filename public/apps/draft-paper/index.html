@@ -1713,6 +1713,16 @@
               price: q.total,
               meta: details,
               image: "/apps/draft-paper/assets/inkjet-draft-paper-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "draft-paper",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: {
+                  material: $("#material").value,
+                  finishing: (document.querySelector('input[name="finishing"]:checked') || {}).value,
+                },
+              },
             },
           },
           window.location.origin

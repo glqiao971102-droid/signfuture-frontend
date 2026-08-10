@@ -1820,7 +1820,8 @@
 
       return {
         height, width, unit, quantity, area, printing, material, finishing,
-        collect, artworkQty, laminationAvailable, lamination, total, tierTotals, tierRates
+        collect, artworkQty, laminationAvailable, lamination, total, tierTotals, tierRates,
+        printingKey, materialKey, laminationKey, collectKey: selectedValue("collect")
       };
     };
 
@@ -1915,6 +1916,13 @@
               price: q.total,
               meta: details,
               image: "/apps/poster/assets/inkjet-poster-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "poster",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: q.collectKey,
+                sel: { printing: q.printingKey, material: q.materialKey, lamination: q.laminationKey },
+              },
             },
           },
           window.location.origin

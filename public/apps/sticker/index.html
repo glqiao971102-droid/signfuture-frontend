@@ -1872,6 +1872,17 @@
               price: q.total,
               meta: details,
               image: "/apps/sticker/assets/inkjet-sticker-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "sticker",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: {
+                  printing: $("#printing").value,
+                  material: $("#material").value,
+                  lamination: (document.querySelector('input[name="lamination"]:checked') || {}).value,
+                },
+              },
             },
           },
           window.location.origin

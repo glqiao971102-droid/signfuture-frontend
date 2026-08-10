@@ -1834,6 +1834,18 @@
               price: q.total,
               meta: details,
               image: "/apps/car-sticker/assets/inkjet-car-sticker-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "car-sticker",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: {
+                  printing: $("#printing").value,
+                  material: $("#material").value,
+                  finishing: (document.querySelector('input[name="finishing"]:checked') || {}).value,
+                  lamination: (document.querySelector('input[name="lamination"]:checked') || {}).value,
+                },
+              },
             },
           },
           window.location.origin
