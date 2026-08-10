@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { usePricingConfig } from "@/lib/usePricingConfig";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -20,11 +21,11 @@ const COLLECT = [
 // Per-tier price [Agent, Silver, Gold, Diamond] from the X Stand price sheet.
 // UV Ink has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
 type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
-const PRICE: Record<string, FinPrice> = {
+const DEFAULT_PRICE: Record<string, FinPrice> = {
   "Printing with Stand": { uv: [55, 52, 52, 52], eco: { none: [50.4, 47.6, 47.6, 47.6], lam: [70.4, 66.5, 66.5, 66.5] } },
   "Printing Only": { uv: [30.2, 28.5, 28.5, 28.5], eco: { none: [25.6, 24.2, 24.2, 24.2], lam: [45.6, 43.1, 43.1, 43.1] } },
 };
-const STAND_ONLY_PRICE = [20.6, 20, 20, 20];
+const DEFAULT_STAND_ONLY = [20.6, 20, 20, 20];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -96,6 +97,11 @@ export default function XStandProduct() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Admin-editable prices (falls back to the built-in defaults).
+  const _pricing = usePricingConfig("x-stand", { PRICE: DEFAULT_PRICE, STAND_ONLY_PRICE: DEFAULT_STAND_ONLY });
+  const PRICE = _pricing.PRICE;
+  const STAND_ONLY_PRICE = _pricing.STAND_ONLY_PRICE;
 
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;

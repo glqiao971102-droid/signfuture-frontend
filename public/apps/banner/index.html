@@ -1673,7 +1673,7 @@
     //   RATE_TABLE[printing][material] = [Agent, Silver, Gold, Diamond]  (RM per sq.ft.)
     // UV Ink 1220dpi has no Tarpaulin 280gsm, so that combo is intentionally absent.
     const TIER_LABELS = ["Agent", "Silver Agent", "Gold Agent", "Diamond Agent"];
-    const RATE_TABLE = {
+    const RATE_TABLE_DEFAULT = {
       uv: {
         "380": [3.3, 2.2, 2.2, 2.2],
         "440": [3.5, 2.4, 2.4, 2.4],
@@ -1690,12 +1690,34 @@
     };
     // Finishing add-on, RM per sq.ft. per tier [Agent, Silver, Gold, Diamond].
     // All 0 for now — customer will set these later; then this is the only edit.
-    const FINISHING_RATE = {
+    const FINISHING_RATE_DEFAULT = {
       rope_eyelets: [0, 0, 0, 0],
       edge_eyelets: [0, 0, 0, 0],
       cut:          [0, 0, 0, 0],
       welded:       [0, 0, 0, 0]
     };
+
+    // Admin-editable prices: read the live config from the backend, falling back
+    // to the built-in defaults above if it's unreachable (so behaviour is
+    // identical until an admin saves an override). Re-quotes once loaded.
+    let __BANNER = { RATE_TABLE: RATE_TABLE_DEFAULT, FINISHING_RATE: FINISHING_RATE_DEFAULT };
+    (function () {
+      try {
+        const host = location.hostname;
+        const API = (host === "localhost" || host === "127.0.0.1")
+          ? "http://localhost:3333"
+          : "https://api.signfuturegroup.com";
+        fetch(API + "/api/v1/pricing/banner")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d && d.config && d.config.RATE_TABLE && d.config.FINISHING_RATE) {
+              __BANNER = d.config;
+              if (typeof quote === "function") quote();
+            }
+          })
+          .catch(() => {});
+      } catch (e) {}
+    })();
 
     const quote = () => {
       const height = Math.max(0, Number($("#height").value) || 0);
@@ -1715,8 +1737,8 @@
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
 
       // Per-sq.ft. rate for each agent tier (+ finishing add-on, 0 for now).
-      const rates = (RATE_TABLE[printingKey] && RATE_TABLE[printingKey][materialKey]) || [0, 0, 0, 0];
-      const finRates = FINISHING_RATE[finishingKey] || [0, 0, 0, 0];
+      const rates = (__BANNER.RATE_TABLE[printingKey] && __BANNER.RATE_TABLE[printingKey][materialKey]) || [0, 0, 0, 0];
+      const finRates = __BANNER.FINISHING_RATE[finishingKey] || [0, 0, 0, 0];
       const tierRates = rates.map((rate, i) => rate + (finRates[i] || 0));
       const tierTotals = tierRates.map((rate) => Math.max(0, area * rate * quantity * collect.multiplier));
       const total = tierTotals[0]; // Agent price is the headline total

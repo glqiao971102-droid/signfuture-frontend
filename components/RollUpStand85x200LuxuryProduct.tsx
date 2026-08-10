@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { usePricingConfig } from "@/lib/usePricingConfig";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -20,11 +21,11 @@ const COLLECT = [
 // Per-tier price [Agent, Silver, Gold, Diamond] from the Roll Up Stand price sheet.
 // UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
 type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
-const PRICE: Record<string, FinPrice> = {
+const DEFAULT_PRICE: Record<string, FinPrice> = {
   "Printing with Stand": { uv: [193.3, 180.4, 180.4, 180.4], eco: { none: [187, 174.5, 174.5, 174.5], lam: [208.9, 195, 195, 195] } },
   "Printing Only": { uv: [41.5, 38.7, 38.7, 38.7], eco: { none: [35.2, 32.9, 32.9, 32.9], lam: [57.1, 53.3, 53.3, 53.3] } },
 };
-const STAND_ONLY_PRICE: number[] = [141.9, 132.5, 132.5, 132.5];
+const DEFAULT_STAND_ONLY: number[] = [141.9, 132.5, 132.5, 132.5];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -96,6 +97,10 @@ export default function RollUpStand85x200LuxuryProduct() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const _pricing = usePricingConfig("roll-up-85x200-luxury", { PRICE: DEFAULT_PRICE, STAND_ONLY_PRICE: DEFAULT_STAND_ONLY });
+  const PRICE = _pricing.PRICE;
+  const STAND_ONLY_PRICE = _pricing.STAND_ONLY_PRICE;
 
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
