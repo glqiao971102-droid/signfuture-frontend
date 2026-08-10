@@ -42,19 +42,24 @@ export default function CartPage() {
   const { items, count, setQty, remove, clear } = useCart();
   const { user } = useAuth();
 
-  // The customer always pays their OWN tagged tier (Agent for guests). Cheaper
-  // tiers are only unlocked by topping up — never selectable here.
+  // The customer's entitled tier (Agent for guests) is the CHEAPEST price they
+  // qualify for. On the cart they may switch to a lower rank (Agent/Silver…),
+  // which is MORE expensive, so it's safe; cheaper tiers than their entitlement
+  // stay locked (unlock by topping up). Tier index: Agent 0 … Diamond 3, and a
+  // higher index is cheaper — so "allowed to pay" means index ≤ entitled.
   const myTier = tierIndex(user?.tier);
+  const [payTier, setPayTier] = useState<number | null>(null);
+  const effTier = payTier != null && payTier <= myTier ? payTier : myTier;
   const unitAt = (i: (typeof items)[number], t: number) =>
     i.tierPrices && i.tierPrices.length === 4 ? i.tierPrices[t] : i.price;
-  const unit = (i: (typeof items)[number]) => unitAt(i, myTier);
+  const unit = (i: (typeof items)[number]) => unitAt(i, effTier);
   const subtotal = items.reduce((n, i) => n + unit(i) * i.qty, 0);
   // Cart total at each tier (items without member pricing are constant).
   const tierCart = [0, 1, 2, 3].map((t) => items.reduce((n, i) => n + unitAt(i, t) * i.qty, 0));
   const hasTierItems = items.some((i) => i.tierPrices && i.tierPrices.length === 4);
-  const bestIdx = 3; // Diamond — cheapest
-  const bestSaving = Math.max(0, tierCart[myTier] - tierCart[bestIdx]);
-  const bestSavingPct = tierCart[myTier] > 0 ? Math.round((bestSaving / tierCart[myTier]) * 100) : 0;
+  // Upsell to the cheapest tier (Diamond) they don't yet have.
+  const bestSaving = Math.max(0, tierCart[effTier] - tierCart[3]);
+  const bestSavingPct = tierCart[effTier] > 0 ? Math.round((bestSaving / tierCart[effTier]) * 100) : 0;
 
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<Coupon | null>(null);
@@ -295,8 +300,8 @@ export default function CartPage() {
 
                   <div className="cart-cell" data-label="Price">
                     <span className="cart-unit">{formatRM(unit(item))}</span>
-                    {item.tierPrices && myTier > 0 && (
-                      <span className="cart-unit-tier">{tierLabel(myTier)} price</span>
+                    {item.tierPrices && (
+                      <span className="cart-unit-tier">{tierLabel(effTier)} price</span>
                     )}
                   </div>
 
@@ -421,37 +426,43 @@ export default function CartPage() {
 
               {hasTierItems && (
                 <div className="tier-compare">
-                  <span className="tier-compare-title">Member pricing — you pay <strong>{tierLabel(myTier)}</strong></span>
+                  <span className="tier-compare-title">Choose pricing tier — paying <strong>{tierLabel(effTier)}</strong></span>
                   <div className="tier-compare-rows">
                     {TIER_LABELS.map((label, t) => {
-                      const isMine = t === myTier;
-                      const cheaper = t > myTier; // higher index = cheaper tier
+                      const allowed = t <= myTier; // own tier + lower ranks (more expensive)
+                      const selected = t === effTier;
+                      const locked = t > myTier; // cheaper than entitlement → needs top-up
                       return (
-                        <div key={label} className={`tier-compare-row${isMine ? " is-mine" : ""}`}>
+                        <button
+                          key={label}
+                          type="button"
+                          className={`tier-compare-row${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
+                          disabled={!allowed}
+                          onClick={() => allowed && setPayTier(t)}
+                        >
                           <span className="tier-compare-name">
-                            {label}{isMine && " (you)"}
+                            {label}
+                            {t === myTier && " · your tier"}
                           </span>
                           <span className="tier-compare-price">{formatRM(tierCart[t])}</span>
                           <span className="tier-compare-note">
-                            {isMine
-                              ? "your price"
-                              : cheaper
-                              ? `save ${formatRM(tierCart[myTier] - tierCart[t])}`
-                              : `+${formatRM(tierCart[t] - tierCart[myTier])}`}
+                            {selected ? "✓ paying this" : locked ? "🔒 top up to unlock" : "tap to use"}
                           </span>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
                   {bestSaving > 0 && (
                     <p className="tier-compare-upsell">
-                      💎 Become <strong>Diamond</strong> and save <strong>{formatRM(bestSaving)}</strong> ({bestSavingPct}%) on this cart.{" "}
-                      <Link href="/package">Top up RM{TIER_THRESHOLD.Diamond.toLocaleString("en-MY")} in one top-up to unlock →</Link>
+                      💎 Reach <strong>Diamond</strong> to save <strong>{formatRM(bestSaving)}</strong> ({bestSavingPct}%) on this cart.{" "}
+                      <Link href="/package">Top up RM{TIER_THRESHOLD.Diamond.toLocaleString("en-MY")} in one top-up →</Link>
                     </p>
                   )}
-                  {myTier === 0 && (
-                    <p className="tier-compare-note-guest">Prices shown are standard (Agent). Sign in &amp; top up to unlock member prices.</p>
-                  )}
+                  <p className="tier-compare-note-guest">
+                    {myTier === 0
+                      ? "You're on standard (Agent) pricing. Sign in & top up to unlock cheaper member tiers."
+                      : "You can pay at a lower (more expensive) tier if you wish — cheaper tiers unlock by topping up."}
+                  </p>
                 </div>
               )}
 
