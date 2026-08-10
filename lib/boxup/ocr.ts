@@ -8,6 +8,7 @@
 // stylised signage fonts is imperfect by nature — occasional misreads are
 // expected and accepted; a standalone graphic that happens to look like a letter
 // may read as one, and vice-versa.
+import path from "node:path";
 import { PNG } from "pngjs";
 import type { PSM as PsmMode } from "tesseract.js";
 
@@ -32,6 +33,15 @@ function tesseract() {
   return tessPromise;
 }
 
+// On Vercel the function filesystem is read-only except /tmp, and the language
+// data isn't bundled by default — so tesseract.js falls back to downloading
+// eng.traineddata from a CDN on every cold start AND fails to write its cache,
+// which stalls the analysis past the function timeout (a 504). We ship the raw
+// eng.traineddata inside the deployment (see next.config outputFileTracingIncludes)
+// and load it straight off disk with caching disabled, so OCR does zero network
+// I/O at request time. The WASM core already resolves locally from node_modules.
+const TESSDATA_DIR = path.join(process.cwd(), "lib", "tessdata");
+
 // Two workers, one per page-seg mode. SINGLE_BLOCK and SINGLE_CHAR have
 // COMPLEMENTARY blind spots in tesseract's LSTM engine: SINGLE_BLOCK returns
 // empty for a bare "I" but reads R/B; SINGLE_CHAR reads "I" but drops R/B and
@@ -42,8 +52,12 @@ function getWorker(psm: PsmMode): Promise<Worker> {
   let w = workers.get(psm);
   if (!w) {
     w = (async () => {
-      const { createWorker } = await tesseract();
-      const worker = await createWorker("eng");
+      const { createWorker, OEM } = await tesseract();
+      const worker = await createWorker("eng", OEM.LSTM_ONLY, {
+        langPath: TESSDATA_DIR, // local dir holding eng.traineddata (bundled)
+        cacheMethod: "none", // never read/write the read-only-fs cache
+        gzip: false, // the bundled file is the raw .traineddata, not .gz
+      });
       await worker.setParameters({
         tessedit_pageseg_mode: psm,
         tessedit_char_whitelist: WHITELIST,
