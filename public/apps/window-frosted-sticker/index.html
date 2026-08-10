@@ -1777,6 +1777,13 @@
               price: q.total,
               meta: details,
               image: "/apps/window-frosted-sticker/assets/inkjet-window-frosted-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "window-frosted-sticker",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: { printFinish: $("#printFinish").value, finishing: selectedValue("finishing") },
+              },
             },
           },
           window.location.origin

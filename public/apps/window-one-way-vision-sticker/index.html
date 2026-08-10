@@ -1723,6 +1723,13 @@
               price: q.total,
               meta: details,
               image: "/apps/window-one-way-vision-sticker/assets/inkjet-window-oneway-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "window-one-way-vision-sticker",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: { printing: $("#printing").value, material: $("#material").value, finishing: selectedValue("finishing") },
+              },
             },
           },
           window.location.origin

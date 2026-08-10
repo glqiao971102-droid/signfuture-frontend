@@ -2163,7 +2163,8 @@
       return {
         height, width, quantity, area, printing, material, finishing,
         collect, artworkQty, laminationAvailable, lamination,
-        isClear, clearType, clearStick, total, tierTotals, tierUnit
+        isClear, clearType, clearStick, total, tierTotals, tierUnit,
+        printingKey, materialKey, clearTypeKey, sizeKey, collectKey: selectedValue("collect")
       };
     };
 
@@ -2287,6 +2288,11 @@
               price: q.total,
               meta: details,
               image: "/apps/diecut-sticker/assets/inkjet-diecut-sticker-hero.png",
+              tierPrices: q.tierTotals,
+              // Per-size lookup with a normal/clear branch (add-ons are all 0).
+              spec: q.isClear
+                ? { pricer: "lookup", key: "diecut-clear", path: [q.clearTypeKey, q.sizeKey], collect: q.collectKey, qty: q.quantity }
+                : { pricer: "lookup", key: "diecut", path: [q.printingKey, q.materialKey, q.sizeKey], collect: q.collectKey, qty: q.quantity },
             },
           },
           window.location.origin
