@@ -21,21 +21,88 @@ const SIZE = [
 ];
 const MM2_PER_SQFT = 92903.04;
 const areaOf = (s: { h: number; w: number }) => (s.h * s.w) / MM2_PER_SQFT;
-// Price scales with panel area, relative to the smallest sheet.
-const BASE_AREA = areaOf(SIZE[0]);
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+type Tier4 = number[];
+const PRICE_PWS: Record<string, Record<string, Tier4>> = {
+  "8 x 8 (2450mm (W) x 2330mm (H))": {
+    "1 Side Printing": [
+      1383.25,
+      829.95,
+      829.95,
+      829.95
+    ],
+    "2 Side Printing": [
+      1754.5,
+      1052.7,
+      1052.7,
+      1052.7
+    ]
+  },
+  "8 x 10 (3430mm (W) x 2330mm (H))": {
+    "1 Side Printing": [
+      1685.75,
+      1011.45,
+      1011.45,
+      1011.45
+    ],
+    "2 Side Printing": [
+      2194.5,
+      1316.7,
+      1316.7,
+      1316.7
+    ]
+  }
+};
+const PRICE_PO: Record<string, Record<string, Tier4>> = {
+  "8 x 8 (2450mm (W) x 2330mm (H))": {
+    "1 Side Printing": [
+      844.25,
+      506.55,
+      506.55,
+      506.55
+    ],
+    "2 Side Printing": [
+      1215.5,
+      729.3,
+      729.3,
+      729.3
+    ]
+  },
+  "8 x 10 (3430mm (W) x 2330mm (H))": {
+    "1 Side Printing": [
+      1078,
+      646.8,
+      646.8,
+      646.8
+    ],
+    "2 Side Printing": [
+      1586.75,
+      952.05,
+      952.05,
+      952.05
+    ]
+  }
+};
+const STAND_ONLY: Record<string, Tier4> = {
+  "8 x 8 (2450mm (W) x 2330mm (H))": [
+    539,
+    323.4,
+    323.4,
+    323.4
+  ],
+  "8 x 10 (3430mm (W) x 2330mm (H))": [
+    607.7,
+    364.6,
+    364.6,
+    364.6
+  ]
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -112,19 +179,23 @@ export default function CurveBackdropProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  const rush = standOnly ? 1 : collectOpt.mult;
-  // Double-sided means printing the fabric twice; a bare stand prints nothing,
-  // so the side choice must not reach the price there.
-  const sideMult = standOnly || side === "1 Side Printing" ? 1 : 1.8;
   const sizeOpt = SIZE.find((s) => s.label === size)!;
-  const sizeMult = areaOf(sizeOpt) / BASE_AREA;
-  const total = BASE[finishing] * rush * sideMult * sizeMult * qty;
+  // Per-tier live pricing from the price sheet: printing by Size + Print Side;
+  // Stand Only by Size.
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY[size] ?? [0, 0, 0, 0];
+  } else {
+    const table = finishing === "Printing Only" ? PRICE_PO : PRICE_PWS;
+    tierUnit = table[size]?.[side] ?? [0, 0, 0, 0];
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

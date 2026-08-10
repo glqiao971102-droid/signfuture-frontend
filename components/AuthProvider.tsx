@@ -46,9 +46,32 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// TEMP DEV PREVIEW — a fake Silver member so the logged-in /account pages render
+// without a real login. There is no stored token on a fresh browser, so the
+// restore effect below returns early and this mock persists. REMOVE this const
+// and restore `useState<Member | null>(null)` to return to normal auth.
+const PREVIEW_USER: Member = {
+  id: 1,
+  login: "john940827",
+  email: "john940827@gmail.com",
+  name: "John",
+  firstName: "John",
+  lastName: null,
+  tier: "Silver",
+  isAdmin: true,
+  memberNo: "SF-000123",
+  registeredAt: "2026-01-01T00:00:00Z",
+  roles: ["administrator", "silver_member"],
+  wallet: { balance: 1850.5, currency: "MYR" },
+  phone: "+60 12-345 6789",
+  billing: {},
+  shipping: {},
+  stats: { orderCount: 12, totalSpent: 8500 },
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<Member | null>(null);
+  const [user, setUser] = useState<Member | null>(PREVIEW_USER); // TEMP: was null
   const [loading, setLoading] = useState(true);
   // Referral code pulled from a ?ref=CODE link (e.g. a sales admin's QR code).
   const [pendingReferral, setPendingReferral] = useState<string | null>(null);

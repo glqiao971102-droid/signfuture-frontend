@@ -1,6 +1,7 @@
 import { boxUpRoutes } from "@/lib/boxup/variant";
 import {
   STAINLESS_COLOUR_OPTIONS,
+  STAINLESS_GRADE_FIELD,
   HIDE_SIDE_FINISHING_FIELD,
 } from "@/lib/boxup/stainless-fields";
 
@@ -22,7 +23,7 @@ const { GET, POST } = boxUpRoutes({
       options: `<option>10mm PVC Foam Board</option>`,
     },
   ],
-  extraFields: [HIDE_SIDE_FINISHING_FIELD],
+  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD],
 });
 
 export { GET, POST };

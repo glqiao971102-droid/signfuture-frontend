@@ -9,9 +9,8 @@ import { useCart } from "@/components/CartProvider";
 // side of the form (material, printing, size, artwork, collect date) is gone.
 const FINISHING = ["Stand Only"];
 
-const BASE: Record<string, number> = {
-  "Stand Only": 55,
-};
+// Per-tier price [Agent, Silver, Gold, Diamond] from the Poster Stand price sheet.
+const STAND_PRICE: number[] = [31.7, 26.4, 26.4, 26.4];
 
 const REMARK_MAX = 200;
 
@@ -27,12 +26,13 @@ export default function EaselStandProduct() {
   const [agreed, setAgreed] = useState(false);
   const [added, setAdded] = useState(false);
 
-  const unit = BASE[finishing];
-  const total = unit * qty;
+  const tierTotals = STAND_PRICE.map((v) => Math.max(0, v * qty));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

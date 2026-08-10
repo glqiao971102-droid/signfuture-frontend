@@ -17,18 +17,20 @@ const SIDE = [
 const CM2_PER_SQFT = 929.0304;
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+// Per-tier price [Agent, Silver, Gold, Diamond] from the price sheet.
+// Printing (with Stand / Only) depends on Choose Side; Stand Only is one price.
+type Tier4 = number[];
+const PRICE: Record<string, Record<string, Tier4>> = {
+  "Printing with Stand": { "(W)195cm x (H)95cm (1 Side)": [339.4, 282.8, 282.8, 282.8], "(W)195cm x (H)200cm (2 Side)": [423.7, 353.1, 353.1, 353.1] },
+  "Printing Only": { "(W)195cm x (H)95cm (1 Side)": [81.9, 68.3, 68.3, 68.3], "(W)195cm x (H)200cm (2 Side)": [166.3, 138.6, 138.6, 138.6] },
 };
+const STAND_ONLY_PRICE: Tier4 = [257.4, 214.5, 214.5, 214.5];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -103,16 +105,19 @@ export default function AluminiumAboardStand100x200Product() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
   const sideOpt = SIDE.find((s) => s.label === side)!;
-  let unit = BASE[finishing];
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: printing by Finishing + Side;
+  // Stand Only is a single price (side-independent).
+  const tierUnit: number[] = standOnly
+    ? STAND_ONLY_PRICE
+    : PRICE[finishing]?.[side] ?? [0, 0, 0, 0];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

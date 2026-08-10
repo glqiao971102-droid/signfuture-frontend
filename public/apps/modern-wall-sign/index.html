@@ -1398,22 +1398,22 @@
             <div class="agent-card">
               <span>Agent Price</span>
               <strong id="agentA">RM 0.00</strong>
-              <em></em>
+              <em id="rateA"></em>
             </div>
             <div class="agent-card">
               <span>Silver Agent Price</span>
               <strong id="agentSilver">RM 0.00</strong>
-              <em></em>
+              <em id="rateSilver"></em>
             </div>
             <div class="agent-card">
               <span>Gold Agent Price</span>
               <strong id="agentGold">RM 0.00</strong>
-              <em></em>
+              <em id="rateGold"></em>
             </div>
             <div class="agent-card">
               <span>Diamond Agent Price</span>
               <strong id="agentDiamond">RM 0.00</strong>
-              <em></em>
+              <em id="rateDiamond"></em>
             </div>
           </div>
 
@@ -1482,12 +1482,23 @@
       "10000": { label: "10000K" }
     };
 
+    // Flat price per preset Size [Agent, Silver, Gold, Diamond]. RM per 1 piece.
+    const PRICE_TABLE = {
+      "s24": [388, 368, 368, 368],
+      "s36": [488, 468, 468, 468],
+      "s48": [588, 568, 568, 568],
+      "s60": [658, 638, 638, 638],
+      "s72": [788, 768, 768, 768],
+      "s84": [888, 868, 868, 868],
+      "s96": [988, 968, 968, 968]
+    };
+
     const collectOptions = {
       standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
-      normal: { label: "4 Working Days", days: 4, multiplier: 1 },
-      quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
-      rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
-      next: { label: "Next Working Days", days: 1, multiplier: 1.5 }
+      normal: { label: "4 Working Days", days: 4, multiplier: 1.3 },
+      quick3: { label: "3 Working Days", days: 3, multiplier: 1.4 },
+      rush2: { label: "2 Working Days", days: 2, multiplier: 1.5 },
+      next: { label: "Next Working Days", days: 1, multiplier: 1.8 }
     };
 
     const money = (value) => `RM ${value.toFixed(2)}`;
@@ -1573,18 +1584,22 @@
       wallSizeOptions[$("#wallSize").value] || wallSizeOptions.s24;
 
     const quote = () => {
+      const sizeKey = $("#wallSize").value;
       const size = selectedSize();
       const quantity = Math.max(1, Math.floor(Number($("#quantity").value) || 1));
       const area = (size.h * size.w) / 144;
       const material = materialOptions[$("#material").value];
       const led = ledOptions[selectedValue("led")] || ledOptions["3000"];
       const collect = collectOptions[selectedValue("collect")] || collectOptions.normal;
-      const subtotal = area * 3 * quantity;
-      const total = Math.max(0, subtotal);
+
+      // Flat per-piece price by preset Size.
+      const baseTiers = PRICE_TABLE[sizeKey] || [0, 0, 0, 0];
+      const tierTotals = baseTiers.map((v) => Math.max(0, v * quantity * collect.multiplier));
+      const total = tierTotals[0];
 
       const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
 
-      return { size, quantity, area, material, led, collect, artworkQty, total };
+      return { size, quantity, area, material, led, collect, artworkQty, total, tierTotals, tierUnit: baseTiers };
     };
 
     const validate = () => {
@@ -1633,10 +1648,16 @@
       $("#remarkCount").textContent = `${remarkEl.value.length} / ${remarkEl.maxLength}`;
       $("#selectedLedLabel").textContent = q.led.label;
       $("#sumCollect").textContent = `${q.collect.label} / ${collectDate}`;
-      $("#agentA").textContent = money(q.total);
-      $("#agentSilver").textContent = money(q.total);
-      $("#agentGold").textContent = money(q.total);
-      $("#agentDiamond").textContent = money(q.total);
+      const tierCardIds = ["agentA", "agentSilver", "agentGold", "agentDiamond"];
+      tierCardIds.forEach((id, i) => {
+        const el = $("#" + id);
+        if (el) el.textContent = money(q.tierTotals[i] || 0);
+      });
+      const tierEmIds = ["rateA", "rateSilver", "rateGold", "rateDiamond"];
+      tierEmIds.forEach((id, i) => {
+        const el = $("#" + id);
+        if (el) el.textContent = "RM " + (q.tierUnit[i] || 0).toFixed(2) + " / pc";
+      });
 
       validate();
     };
@@ -1663,6 +1684,7 @@
               price: q.total,
               meta: details,
               image: "/apps/modern-wall-sign/assets/modern-wall-sign-hero.png",
+              status: q.collect.multiplier > 1 ? "Pending Confirmation" : undefined,
             },
           },
           window.location.origin
@@ -1847,5 +1869,61 @@
     })();
   </script>
   <script src="/apps/_shared/single-option.js" defer></script>
+  <!-- Express collect date = special request (Pending Confirmation), matching Neon Sign. -->
+  <style>
+    .order-pending-note{margin:8px 0;border:1px solid rgba(255,176,60,.55);border-radius:8px;padding:10px 12px;background:rgba(60,40,6,.72);color:#ffd79a;font-weight:700;font-size:12px;line-height:1.45;text-align:center}
+    .request-modal{display:none;position:fixed;inset:0;z-index:4000;align-items:center;justify-content:center}
+    .request-modal.is-open{display:flex}
+    .request-modal-backdrop{position:absolute;inset:0;background:rgba(2,8,20,.72)}
+    .request-modal-card{position:relative;z-index:1;width:min(460px,90vw);border:1px solid rgba(255,176,60,.5);border-radius:14px;padding:22px;background:#0b1220;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+    .request-modal-title{font-size:17px;font-weight:900;color:#ffcf7a;margin-bottom:10px}
+    .request-modal-body{font-size:13.5px;line-height:1.55;color:#d7e4f5}
+    .request-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+    .request-modal-actions button{padding:10px 18px;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;border:1px solid transparent}
+    .request-modal-cancel{background:transparent;border-color:rgba(255,255,255,.22);color:#cbd8ec}
+    .request-modal-confirm{background:linear-gradient(135deg,#ffb03c,#ff8a3c);color:#241200}
+  </style>
+  <script>
+  (function(){
+    var EXPRESS={standard7:false,normal:true,quick3:true,rush2:true,next:true};
+    function checked(){return document.querySelector('input[name="collect"]:checked');}
+    function collectValue(){var r=checked();return r?r.value:'standard7';}
+    function collectLabel(){var r=checked();var o=r&&r.closest('.collect-date-option');var s=o&&o.querySelector('strong');return s?s.textContent.trim():'';}
+    function isExpress(){return !!EXPRESS[collectValue()];}
+    var note=document.createElement('div');
+    note.className='order-pending-note';
+    note.style.display='none';
+    var actions=document.querySelector('.actions');
+    if(actions&&actions.parentNode)actions.parentNode.insertBefore(note,actions);
+    function syncNote(){
+      if(isExpress()){note.style.display='';note.textContent='Express '+collectLabel()+' is subject to company approval. Approved orders will proceed to Processing; otherwise, the order will be cancelled and notification will be provided.';}
+      else{note.style.display='none';}
+    }
+    document.addEventListener('change',function(e){if(e.target&&e.target.name==='collect')syncNote();});
+    var modal=document.createElement('div');
+    modal.className='request-modal';
+    modal.innerHTML='<div class="request-modal-backdrop"></div><div class="request-modal-card"><div class="request-modal-title">Special Request Order</div><div class="request-modal-body"></div><div class="request-modal-actions"><button type="button" class="request-modal-cancel">Cancel</button><button type="button" class="request-modal-confirm">Submit Request</button></div></div>';
+    document.body.appendChild(modal);
+    var addBtn=document.getElementById('addToCart');
+    if(addBtn){
+      addBtn.addEventListener('click',function(e){
+        if(isExpress()&&addBtn.dataset.reviewOk!=='1'){
+          e.stopImmediatePropagation();e.preventDefault();
+          modal.querySelector('.request-modal-body').textContent='You picked '+collectLabel()+'. This is a special request: our team will review whether we can make it in time. If we can, your order goes straight to Processing. If we cannot, it is cancelled and you are notified. Until then the status is Pending Confirmation.';
+          modal.classList.add('is-open');var dialog=modal.querySelector('.request-modal-card');var rect=addBtn.getBoundingClientRect();if(dialog){var dh=dialog.offsetHeight||220;dialog.style.position='fixed';dialog.style.left='50%';dialog.style.transform='translateX(-50%)';dialog.style.top=Math.max(16, rect.top+rect.height/2-dh/2)+'px';}
+        }
+      },true);
+    }
+    modal.addEventListener('click',function(e){
+      if(e.target.closest('.request-modal-confirm')){
+        modal.classList.remove('is-open');
+        if(addBtn){addBtn.dataset.reviewOk='1';addBtn.click();addBtn.dataset.reviewOk='';}
+      }else if(e.target.closest('.request-modal-cancel')||e.target.closest('.request-modal-backdrop')){
+        modal.classList.remove('is-open');
+      }
+    });
+    syncNote();
+  })();
+  </script>
 </body>
 </html>

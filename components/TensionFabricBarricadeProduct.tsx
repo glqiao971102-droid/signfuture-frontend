@@ -21,21 +21,88 @@ const SIZE = [
 ];
 const MM2_PER_SQFT = 92903.04;
 const areaOf = (s: { h: number; w: number }) => (s.h * s.w) / MM2_PER_SQFT;
-// Price scales with panel area, relative to the smallest sheet.
-const BASE_AREA = areaOf(SIZE[0]);
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+type Tier4 = number[];
+const PRICE_PWS: Record<string, Record<string, Tier4>> = {
+  "90cm x 150cm": {
+    "1 Side Printing": [
+      475.75,
+      285.45,
+      285.45,
+      285.45
+    ],
+    "2 Side Printing": [
+      558.25,
+      334.95,
+      334.95,
+      334.95
+    ]
+  },
+  "90cm x 200cm": {
+    "1 Side Printing": [
+      583,
+      349.8,
+      349.8,
+      349.8
+    ],
+    "2 Side Printing": [
+      687.5,
+      412.5,
+      412.5,
+      412.5
+    ]
+  }
+};
+const PRICE_PO: Record<string, Record<string, Tier4>> = {
+  "90cm x 150cm": {
+    "1 Side Printing": [
+      206.25,
+      123.75,
+      123.75,
+      123.75
+    ],
+    "2 Side Printing": [
+      288.75,
+      173.25,
+      173.25,
+      173.25
+    ]
+  },
+  "90cm x 200cm": {
+    "1 Side Printing": [
+      272.25,
+      163.35,
+      163.35,
+      163.35
+    ],
+    "2 Side Printing": [
+      375.38,
+      225.23,
+      225.23,
+      225.23
+    ]
+  }
+};
+const STAND_ONLY: Record<string, Tier4> = {
+  "90cm x 150cm": [
+    269.5,
+    161.7,
+    161.7,
+    161.7
+  ],
+  "90cm x 200cm": [
+    310.7,
+    186.4,
+    186.4,
+    186.4
+  ]
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -112,19 +179,23 @@ export default function TensionFabricBarricadeProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  const rush = standOnly ? 1 : collectOpt.mult;
-  // Double-sided means printing the fabric twice; a bare stand prints nothing,
-  // so the side choice must not reach the price there.
-  const sideMult = standOnly || side === "1 Side Printing" ? 1 : 1.8;
   const sizeOpt = SIZE.find((s) => s.label === size)!;
-  const sizeMult = areaOf(sizeOpt) / BASE_AREA;
-  const total = BASE[finishing] * rush * sideMult * sizeMult * qty;
+  // Per-tier live pricing from the price sheet: printing by Size + Print Side;
+  // Stand Only by Size.
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY[size] ?? [0, 0, 0, 0];
+  } else {
+    const table = finishing === "Printing Only" ? PRICE_PO : PRICE_PWS;
+    tierUnit = table[size]?.[side] ?? [0, 0, 0, 0];
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

@@ -34,7 +34,7 @@ export default function Footer() {
             <li><Link href="/user-guide">User Guide</Link></li>
             <li><Link href="/faq">FAQ</Link></li>
             <li><Link href="/contact-us">Contact Us</Link></li>
-            <li><Link href="/company-profile">Company Profile</Link></li>
+            <li><Link href="/sign-future-company-profile.pdf" target="_blank" rel="noopener noreferrer">Company Profile</Link></li>
           </ul>
         </div>
 

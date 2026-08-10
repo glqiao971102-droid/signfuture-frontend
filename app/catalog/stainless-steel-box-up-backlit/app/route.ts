@@ -2,6 +2,7 @@ import { boxUpRoutes } from "@/lib/boxup/variant";
 import { BACKLIT_PRESET } from "@/lib/boxup/backlit-preset";
 import {
   STAINLESS_COLOUR_OPTIONS,
+  STAINLESS_GRADE_FIELD,
   HIDE_SIDE_FINISHING_FIELD,
 } from "@/lib/boxup/stainless-fields";
 
@@ -32,7 +33,7 @@ const { GET, POST } = boxUpRoutes({
     STAINLESS_COLOUR_OPTIONS,
   ],
   // No paint picker: the returns take their colour from the stainless finish.
-  extraFields: [HIDE_SIDE_FINISHING_FIELD],
+  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD],
 });
 
 export { GET, POST };

@@ -27,21 +27,326 @@ const SIZE = [
 ];
 const MM2_PER_SQFT = 92903.04;
 const areaOf = (s: { h: number; w: number }) => (s.h * s.w) / MM2_PER_SQFT;
-// Price scales with panel area, relative to the smallest sheet.
-const BASE_AREA = areaOf(SIZE[0]);
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+type Tier4 = number[];
+const PRICE_PWS: Record<string, Record<string, Tier4>> = {
+  "8 x 8 (2330mm (H) x 2330mm (W))": {
+    "1 Side Printing": [
+      1168.7,
+      701.25,
+      701.25,
+      701.25
+    ],
+    "2 Side Printing": [
+      1526.2,
+      915.75,
+      915.75,
+      915.75
+    ]
+  },
+  "8 x 10 (2330mm (H) x 3030mm (W))": {
+    "1 Side Printing": [
+      1386,
+      831.6,
+      831.6,
+      831.6
+    ],
+    "2 Side Printing": [
+      1826,
+      1095.6,
+      1095.6,
+      1095.6
+    ]
+  },
+  "8 x 12 (2330mm (H) x 3630mm (W))": {
+    "1 Side Printing": [
+      1636.25,
+      981.75,
+      981.75,
+      981.75
+    ],
+    "2 Side Printing": [
+      2158.75,
+      1295.25,
+      1295.25,
+      1295.25
+    ]
+  },
+  "8 x 16 (2330mm (H) x 4930mm (W))": {
+    "1 Side Printing": [
+      2112,
+      1267.2,
+      1267.2,
+      1267.2
+    ],
+    "2 Side Printing": [
+      2827,
+      1696.2,
+      1696.2,
+      1696.2
+    ]
+  },
+  "8 x 20 (2330mm (H) x 6040mm (W))": {
+    "1 Side Printing": [
+      2576.75,
+      1546.05,
+      1546.05,
+      1546.05
+    ],
+    "2 Side Printing": [
+      3456.75,
+      2074.05,
+      2074.05,
+      2074.05
+    ]
+  },
+  "10 x 10 (3030mm (H) x 3030mm (W))": {
+    "1 Side Printing": [
+      1661,
+      996.6,
+      996.6,
+      996.6
+    ],
+    "2 Side Printing": [
+      2211,
+      1326.6,
+      1326.6,
+      1326.6
+    ]
+  },
+  "10 x 12 (3030mm (H) x 3630mm (W))": {
+    "1 Side Printing": [
+      1944.25,
+      1166.55,
+      1166.55,
+      1166.55
+    ],
+    "2 Side Printing": [
+      2604.25,
+      1562.55,
+      1562.55,
+      1562.55
+    ]
+  },
+  "10 x 16 (3030mm (H) x 4930mm (W))": {
+    "1 Side Printing": [
+      2521.75,
+      1513.05,
+      1513.05,
+      1513.05
+    ],
+    "2 Side Printing": [
+      3401.75,
+      2041.05,
+      2041.05,
+      2041.05
+    ]
+  },
+  "10 x 20 (3030mm (H) x 6030mm (W))": {
+    "1 Side Printing": [
+      3038.75,
+      1823.25,
+      1823.25,
+      1823.25
+    ],
+    "2 Side Printing": [
+      4138.75,
+      2483.25,
+      2483.25,
+      2483.25
+    ]
+  }
+};
+const PRICE_PO: Record<string, Record<string, Tier4>> = {
+  "8 x 8 (2330mm (H) x 2330mm (W))": {
+    "1 Side Printing": [
+      748,
+      448.8,
+      448.8,
+      448.8
+    ],
+    "2 Side Printing": [
+      1105.5,
+      663.3,
+      663.3,
+      663.3
+    ]
+  },
+  "8 x 10 (2330mm (H) x 3030mm (W))": {
+    "1 Side Printing": [
+      926.75,
+      556.05,
+      556.05,
+      556.05
+    ],
+    "2 Side Printing": [
+      1366.75,
+      820.05,
+      820.05,
+      820.05
+    ]
+  },
+  "8 x 12 (2330mm (H) x 3630mm (W))": {
+    "1 Side Printing": [
+      1091.75,
+      655.05,
+      655.05,
+      655.05
+    ],
+    "2 Side Printing": [
+      1614.25,
+      968.55,
+      968.55,
+      968.55
+    ]
+  },
+  "8 x 16 (2330mm (H) x 4930mm (W))": {
+    "1 Side Printing": [
+      1421.75,
+      853.05,
+      853.05,
+      853.05
+    ],
+    "2 Side Printing": [
+      2136.75,
+      1282.05,
+      1282.05,
+      1282.05
+    ]
+  },
+  "8 x 20 (2330mm (H) x 6040mm (W))": {
+    "1 Side Printing": [
+      1765.5,
+      1059.3,
+      1059.3,
+      1059.3
+    ],
+    "2 Side Printing": [
+      2645.5,
+      1587.3,
+      1587.3,
+      1587.3
+    ]
+  },
+  "10 x 10 (3030mm (H) x 3030mm (W))": {
+    "1 Side Printing": [
+      1119.25,
+      671.55,
+      671.55,
+      671.55
+    ],
+    "2 Side Printing": [
+      1669.25,
+      1001.55,
+      1001.55,
+      1001.55
+    ]
+  },
+  "10 x 12 (3030mm (H) x 3630mm (W))": {
+    "1 Side Printing": [
+      1325.5,
+      795.3,
+      795.3,
+      795.3
+    ],
+    "2 Side Printing": [
+      1985.5,
+      1191.3,
+      1191.3,
+      1191.3
+    ]
+  },
+  "10 x 16 (3030mm (H) x 4930mm (W))": {
+    "1 Side Printing": [
+      1738,
+      1042.8,
+      1042.8,
+      1042.8
+    ],
+    "2 Side Printing": [
+      2618,
+      1570.8,
+      1570.8,
+      1570.8
+    ]
+  },
+  "10 x 20 (3030mm (H) x 6030mm (W))": {
+    "1 Side Printing": [
+      2136.75,
+      1282.05,
+      1282.05,
+      1282.05
+    ],
+    "2 Side Printing": [
+      3236.75,
+      1942.05,
+      1942.05,
+      1942.05
+    ]
+  }
+};
+const STAND_ONLY: Record<string, Tier4> = {
+  "8 x 8 (2330mm (H) x 2330mm (W))": [
+    420.75,
+    252.4,
+    252.4,
+    252.4
+  ],
+  "8 x 10 (2330mm (H) x 3030mm (W))": [
+    459.2,
+    275.5,
+    275.5,
+    275.5
+  ],
+  "8 x 12 (2330mm (H) x 3630mm (W))": [
+    544.5,
+    326.7,
+    326.7,
+    326.7
+  ],
+  "8 x 16 (2330mm (H) x 4930mm (W))": [
+    690.2,
+    414.1,
+    414.1,
+    414.1
+  ],
+  "8 x 20 (2330mm (H) x 6040mm (W))": [
+    811.2,
+    486.7,
+    486.7,
+    486.7
+  ],
+  "10 x 10 (3030mm (H) x 3030mm (W))": [
+    541.7,
+    325,
+    325,
+    325
+  ],
+  "10 x 12 (3030mm (H) x 3630mm (W))": [
+    618.7,
+    371.2,
+    371.2,
+    371.2
+  ],
+  "10 x 16 (3030mm (H) x 4930mm (W))": [
+    783.7,
+    470.2,
+    470.2,
+    470.2
+  ],
+  "10 x 20 (3030mm (H) x 6030mm (W))": [
+    902,
+    541.2,
+    541.2,
+    541.2
+  ]
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -117,19 +422,23 @@ export default function StraightBackdropProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  const rush = standOnly ? 1 : collectOpt.mult;
-  // Double-sided means printing the fabric twice; a bare stand prints nothing,
-  // so the side choice must not reach the price there.
-  const sideMult = standOnly || side === "1 Side Printing" ? 1 : 1.8;
   const sizeOpt = SIZE.find((s) => s.label === size)!;
-  const sizeMult = areaOf(sizeOpt) / BASE_AREA;
-  const total = BASE[finishing] * rush * sideMult * sizeMult * qty;
+  // Per-tier live pricing from the price sheet: printing by Size + Print Side;
+  // Stand Only by Size.
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY[size] ?? [0, 0, 0, 0];
+  } else {
+    const table = finishing === "Printing Only" ? PRICE_PO : PRICE_PWS;
+    tierUnit = table[size]?.[side] ?? [0, 0, 0, 0];
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

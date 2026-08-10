@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import { BEVEL_PRICE } from "@/lib/acrylicBevelPrices";
 
 const PRODUCT_NAME = "Acrylic Bevel Edge Frame (with Boltnut)";
 const PRODUCT_HREF = "/catalog/acrylic-bevel-edge-frame-boltnut";
@@ -15,7 +16,7 @@ const FINISHING = [
   "BACK PRINT (REVERSE) (CMYK + SPOT WHITE)",
   "BACK PRINT (REVERSE) (CMYK)",
 ];
-const THICKNESS = ["4mm", "5mm", "6mm", "8mm", "10mm", "12mm", "15mm", "18mm"];
+const THICKNESS = ["5mm", "10mm", "15mm"];
 
 // Acrylic sizes, taken verbatim from the printed size chart. Hole count and
 // bolt-nut size vary with the panel, so each entry carries its own suffix.
@@ -74,22 +75,14 @@ const SIZE_OPTIONS = SIZE_ROWS.map(([h, w, suffix]) => ({
   w,
 }));
 
-const THICK_MULT: Record<string, number> = {
-  "4mm": 1, "5mm": 1.1, "6mm": 1.2, "8mm": 1.3, "10mm": 1.4, "12mm": 1.55, "15mm": 1.7, "18mm": 1.9,
-};
-// Spot white is an extra pass, so it carries a surcharge over plain CMYK.
-const FINISH_MULT: Record<string, number> = {
-  "BACK PRINT (REVERSE) (CMYK + SPOT WHITE)": 1.4,
-  "BACK PRINT (REVERSE) (CMYK)": 1,
-};
-const RATE = 6; // RM per sq.ft. (placeholder base rate)
+// Finishing -> price-table key: sw = CMYK + Spot White, cmyk = plain CMYK.
+const finishKeyFor = (fin: string) => (fin.includes("SPOT WHITE") ? "sw" : "cmyk");
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -169,13 +162,19 @@ export default function AcrylicBevelEdgeFrameProduct() {
   const sizeOpt = SIZE_OPTIONS.find((o) => o.label === sizeLabel) || SIZE_OPTIONS[0];
   const areaSqft = (sizeOpt.h * sizeOpt.w) / 144;
 
-  // simple live pricing (placeholder; banner-style agent tiers)
-  const total =
-    areaSqft * RATE * (THICK_MULT[thickness] || 1) * (FINISH_MULT[finishing] || 1) * collectOpt.mult * qty;
+  // Per-size price from the bevel-frame price table (RM per piece), chosen by
+  // finishing (CMYK + Spot White / CMYK) x thickness x size, then x qty.
+  const finishKey = finishKeyFor(finishing);
+  const thickKey = thickness.replace("mm", "");
+  const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
+  const baseTiers = BEVEL_PRICE[finishKey]?.[thickKey]?.[sizeKey] ?? [0, 0, 0, 0];
+  const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

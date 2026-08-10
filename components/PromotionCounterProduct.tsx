@@ -7,27 +7,27 @@ import { useCart } from "@/components/CartProvider";
 
 const FINISHING = ["Printing with Stand", "Stand Only"];
 const MATERIAL = "White Sticker Matt 80 Micron";
-// Matt options first, then gloss - the order the printed chart lists them in.
 const LAMINATION = [
-  "No Lamination",
-  "Indoor Matt Lam 60micron",
-  "Outdoor Matt Lam 100micron",
-  "Indoor Gloss Lam 60micron",
-  "Outdoor Gloss Lam 100micron",
+  "No Laminate",
+  "Matt Lam 100micron",
+  "Gloss Lam 100micron",
 ];
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Stand Only": 55,
+// Per-tier price [Agent, Silver, Gold, Diamond] from the Promotion Counter price sheet.
+// Printing with Stand price depends on Lamination; Stand Only is a single price.
+const PRICE: Record<string, number[]> = {
+  "No Laminate": [251.1, 209.2, 209.2, 209.2],
+  "Matt Lam 100micron": [284.3, 236.9, 236.9, 236.9],
+  "Gloss Lam 100micron": [284.3, 236.9, 236.9, 236.9],
 };
+const STAND_ONLY_PRICE: number[] = [170.3, 141.9, 141.9, 141.9];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -101,18 +101,18 @@ export default function PromotionCounterProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // Outdoor laminate is the thicker 100micron film, hence the higher add-on.
-  const lamAdd = lam === "No Lamination" ? 0 : lam.startsWith("Outdoor") ? 8 : 5;
-  let unit = BASE[finishing];
-  if (!standOnly) unit = unit + lamAdd;
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: Printing with Stand depends on
+  // the chosen Lamination; Stand Only is a single price.
+  const tierUnit: number[] = standOnly
+    ? STAND_ONLY_PRICE
+    : PRICE[lam] ?? PRICE["No Laminate"];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

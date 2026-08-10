@@ -874,7 +874,7 @@
 
     .collect-date-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px;
       border: 1px solid rgba(63, 176, 255, 0.58);
       border-radius: 10px;
@@ -922,10 +922,10 @@
 
     .collect-date-option strong {
       display: block;
-      padding: 5px 5px 7px;
+      padding: 4px 3px 6px;
       color: #f7fbff;
-      font-size: 15px;
-      line-height: 1;
+      font-size: 11px;
+      line-height: 1.15;
       text-align: center;
       text-transform: uppercase;
       text-shadow: 0 0 10px rgba(218, 235, 255, 0.42);
@@ -1477,13 +1477,7 @@
             <h3 class="collect-date-title">Collect Date</h3>
             <div class="collect-date-grid" id="collectChoices">
               <label class="collect-date-option is-selected">
-                <input type="radio" name="collect" value="standard7" checked>
-                <img src="assets/collect-7-working-days.png" alt="7 Working Days (Standard)">
-                <span class="image-zoom-button"></span>
-                <strong>7 Working Days</strong>
-              </label>
-              <label class="collect-date-option">
-                <input type="radio" name="collect" value="normal">
+                <input type="radio" name="collect" value="normal" checked>
                 <img src="assets/collect-4-working-days.png" alt="4 Working Days">
                 <span class="image-zoom-button"></span>
                 <strong>4 Working Days</strong>
@@ -1621,11 +1615,10 @@
     };
 
     const collectOptions = {
-      standard7: { label: "7 Working Days", days: 7, multiplier: 1 },
       normal: { label: "4 Working Days", days: 4, multiplier: 1 },
-      quick3: { label: "3 Working Days", days: 3, multiplier: 1.12 },
-      rush2: { label: "2 Working Days", days: 2, multiplier: 1.25 },
-      next: { label: "Next Working Days", days: 1, multiplier: 1.5 }
+      quick3: { label: "3 Working Days", days: 3, multiplier: 1.45 },
+      rush2: { label: "2 Working Days", days: 2, multiplier: 1.55 },
+      next: { label: "Next Working Days", days: 1, multiplier: 1.65 }
     };
 
     const money = (value) => `RM ${value.toFixed(2)}`;
@@ -1740,7 +1733,7 @@
       const rates = (RATE_TABLE[printingKey] && RATE_TABLE[printingKey][materialKey]) || [0, 0, 0, 0];
       const finRates = FINISHING_RATE[finishingKey] || [0, 0, 0, 0];
       const tierRates = rates.map((rate, i) => rate + (finRates[i] || 0));
-      const tierTotals = tierRates.map((rate) => Math.max(0, area * rate * quantity));
+      const tierTotals = tierRates.map((rate) => Math.max(0, area * rate * quantity * collect.multiplier));
       const total = tierTotals[0];
 
       const artworkQty = ($("#artworkQty") && $("#artworkQty").value) || "";
@@ -2021,7 +2014,7 @@
         nextInput.disabled = closed;
         if (card) card.classList.toggle("is-disabled", closed);
         if (closed && nextInput.checked) {
-          var fb = document.querySelector('input[name="collect"][value="standard7"]') || document.querySelector('input[name="collect"]:not([value="next"])');
+          var fb = document.querySelector('input[name="collect"][value="normal"]') || document.querySelector('input[name="collect"]:not([value="next"])');
           if (fb) { fb.checked = true; fb.dispatchEvent(new Event("change", { bubbles: true })); }
         }
       }

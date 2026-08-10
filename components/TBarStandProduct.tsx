@@ -20,18 +20,30 @@ const SIZE = [
 ];
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+// Per-size, per-tier price [Agent, Silver, Gold, Diamond] from the T Bar Stand price sheet.
+// UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
+// Rows follow the SIZE array order. Stand Only is size-independent.
+type SizePrice = {
+  pwUv: number[]; pwEcoNone: number[]; pwEcoLam: number[];
+  poUv: number[]; poEcoNone: number[]; poEcoLam: number[];
 };
+const PRICE: SizePrice[] = [
+  { pwUv:[75.95,66.63,66.63,66.63], pwEcoNone:[71.4,62.83,62.83,62.83], pwEcoLam:[94.21,81.84,81.84,81.84], poUv:[31.2,26,26,26], poEcoNone:[26.65,22.21,22.21,22.21], poEcoLam:[49.46,41.22,41.22,41.22] },
+  { pwUv:[70.93,62.44,62.44,62.44], pwEcoNone:[67.12,59.27,59.27,59.27], pwEcoLam:[86.13,75.11,75.11,75.11], poUv:[26.18,21.81,21.81,21.81], poEcoNone:[22.37,18.65,18.65,18.65], poEcoLam:[41.38,34.49,34.49,34.49] },
+  { pwUv:[83.52,72.93,72.93,72.93], pwEcoNone:[77.82,68.18,68.18,68.18], pwEcoLam:[106.33,91.94,91.94,91.94], poUv:[38.77,32.31,32.31,32.31], poEcoNone:[33.07,27.56,27.56,27.56], poEcoLam:[61.58,51.32,51.32,51.32] },
+  { pwUv:[77.22,67.69,67.69,67.69], pwEcoNone:[72.47,63.73,63.73,63.73], pwEcoLam:[96.23,83.53,83.53,83.53], poUv:[32.47,27.06,27.06,27.06], poEcoNone:[27.72,23.1,23.1,23.1], poEcoLam:[51.48,42.9,42.9,42.9] },
+  { pwUv:[91.08,79.24,79.24,79.24], pwEcoNone:[84.23,73.53,73.53,73.53], pwEcoLam:[118.45,102.04,102.04,102.04], poUv:[46.33,38.61,38.61,38.61], poEcoNone:[39.48,32.9,32.9,32.9], poEcoLam:[73.7,61.41,61.41,61.41] },
+  { pwUv:[83.52,72.93,72.93,72.93], pwEcoNone:[77.82,68.18,68.18,68.18], pwEcoLam:[106.33,91.94,91.94,91.94], poUv:[38.77,32.31,32.31,32.31], poEcoNone:[33.07,27.56,27.56,27.56], poEcoLam:[61.58,51.32,51.32,51.32] },
+  { pwUv:[106.19,91.82,91.82,91.82], pwEcoNone:[97.06,84.22,84.22,84.22], pwEcoLam:[142.68,122.23,122.23,122.23], poUv:[61.44,51.2,51.2,51.2], poEcoNone:[52.31,43.59,43.59,43.59], poEcoLam:[97.93,81.61,81.61,81.61] },
+  { pwUv:[115.91,99.93,99.93,99.93], pwEcoNone:[88.51,77.09,77.09,77.09], pwEcoLam:[146.32,125.27,125.27,125.27], poUv:[71.16,59.3,59.3,59.3], poEcoNone:[63.56,52.97,52.97,52.97], poEcoLam:[101.57,84.65,84.65,84.65] },
+];
+const STAND_ONLY: number[] = [38.8, 36.2, 36.2, 36.2];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -105,20 +117,36 @@ export default function TBarStandProduct() {
   }, []);
 
   const standOnly = finishing === "Stand Only";
+  const printingOnly = finishing === "Printing Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  const printMult = tech === "UV Ink 1200dpi" ? 1.1 : 1.0;
-  const lamAdd = lam.includes("Matt") ? 5 : lam.includes("Gloss") ? 6 : 0;
-  let unit = BASE[finishing];
-  if (!standOnly) unit = unit * printMult + lamAdd;
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: pick the row for the chosen
+  // Size, then the column set for Finishing + Print Tech + Lamination.
+  const sizeIdx = Math.max(0, SIZE.indexOf(size));
+  const sizeDims = size.match(/(\d+)"\(W\) X (\d+)"\(H\)/);
+  const sizeW = sizeDims ? Number(sizeDims[1]) : 24;
+  const sizeH = sizeDims ? Number(sizeDims[2]) : 72;
+  const sizeArea = (sizeW * sizeH) / 144;
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY;
+  } else {
+    const rec = PRICE[sizeIdx] || PRICE[0];
+    const isUv = tech === "UV Ink 1200dpi";
+    const hasLam = lam !== "No Laminate"; // Matt & Gloss share the Laminate price
+    if (printingOnly) {
+      tierUnit = isUv ? rec.poUv : hasLam ? rec.poEcoLam : rec.poEcoNone;
+    } else {
+      tierUnit = isUv ? rec.pwUv : hasLam ? rec.pwEcoLam : rec.pwEcoNone;
+    }
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {
@@ -262,8 +290,8 @@ export default function TBarStandProduct() {
             <div className="xprod-summary-list">
               <div className="xprod-sline"><span data-icon="◈">Printing</span><strong>{standOnly ? "—" : tech}</strong></div>
               <div className="xprod-sline"><span data-icon="▤">Material</span><strong>{standOnly ? "Stand only" : "Synthetic Paper 180 Micron"}</strong></div>
-              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>24 x 72 in</strong></div>
-              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>12.00 sq.ft.</strong></div>
+              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>{standOnly ? "—" : `${sizeW} x ${sizeH} in`}</strong></div>
+              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>{standOnly ? "—" : `${sizeArea.toFixed(2)} sq.ft.`}</strong></div>
               <div className="xprod-sline is-wide"><span data-icon="✎">Finishing</span><strong>{finishing}</strong></div>
               {!standOnly && (
               <div className="xprod-sline is-wide">

@@ -66,5 +66,6 @@ export const PRODUCT_IMAGES: Record<string, string> = {
   "3d-box-up": "/3d-box-up/hero.png",
   "3d-printer-box-up": "/3d-box-up/hero.png",
   "stainless-steel-box-up": "/3d-box-up/hero.png",
+  "eg-box-up": "/3d-box-up/hero.png",
   "aluminum-channel-box-up": "/3d-box-up/hero.png",
 };

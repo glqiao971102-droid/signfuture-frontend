@@ -256,7 +256,15 @@ export type LetterEntry = {
   image_data_url?: string;
   highlight_pct?: { left: number; top: number; width: number; height: number } | null;
   led_clearance?: null;
+  // Contour length of this letter's outline, in metres (the path a 3D-printed
+  // return traces once per layer). Populated by the Box Up analyzer.
+  outline_length_m?: number;
 };
+
+// One connected outline contour (a single subpath) of a filled/stroked shape,
+// carrying its own length. Used to measure the total "line" that follows each
+// letter — the perimeter a 3D-printed channel-letter wall traces per layer.
+export type Contour = { page: number; bbox: Bbox; lengthPt: number };
 export function letterDimensionEntry(label: string, bbox: Bbox, scale = 1.0, source = "outline"): LetterEntry | null {
   const size = bboxToInches(normalizeBbox(bbox), scale);
   if (!size) return null;
@@ -331,6 +339,7 @@ export class PdfPathAnalyzer {
   subpathStart: Pt | null = null;
   strokes: Stroke[] = [];
   fills: FillPath[] = [];
+  contours: Contour[] = [];
   fillGroups: { page: number; bbox: Bbox; parts: number }[] = [];
   images: ImagePlacement[] = [];
   clips: ClipPath[] = [];
@@ -388,6 +397,41 @@ export class PdfPathAnalyzer {
     }
     return boxes;
   }
+  // Split the current path into connected contours (one per subpath) and return
+  // each contour's bbox plus its true geometric length. Mirrors the component
+  // splitting of fillComponentBboxes (break where a segment start jumps away from
+  // the previous end) so a letter with a counter/hole reports each edge loop
+  // separately — exactly the loops a 3D-printed return traces per layer.
+  fillContours(): { bbox: Bbox; lengthPt: number }[] {
+    const components: Pt[][] = [];
+    let current: Pt[] = [];
+    let lastEnd: Pt | null = null;
+    for (const seg of this.segments) {
+      let start: Pt, end: Pt, points: Pt[];
+      if (seg[0] === "line") { start = seg[1]; end = seg[2]; points = [start, end]; }
+      else { start = seg[1]; end = seg[4]; points = []; for (let i = 0; i <= 24; i++) points.push(cubicPoint(seg[1], seg[2], seg[3], seg[4], i / 24)); }
+      if (lastEnd !== null && dist(start, lastEnd) > 0.5 && current.length) { components.push(current); current = []; }
+      current.push(...points);
+      lastEnd = end;
+    }
+    if (current.length) components.push(current);
+    const out: { bbox: Bbox; lengthPt: number }[] = [];
+    for (const points of components) {
+      if (points.length < 2) continue;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, len = 0;
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        if (p[0] < minX) minX = p[0];
+        if (p[1] < minY) minY = p[1];
+        if (p[0] > maxX) maxX = p[0];
+        if (p[1] > maxY) maxY = p[1];
+        if (i > 0) len += dist(points[i - 1], p);
+      }
+      const box: Bbox = [minX, minY, maxX, maxY];
+      if (bboxArea(box) > 0 && len > 0) out.push({ bbox: box, lengthPt: len });
+    }
+    return out;
+  }
   imageBbox(): Bbox {
     const points = [this.transform(0, 0), this.transform(1, 0), this.transform(0, 1), this.transform(1, 1)];
     const xs = points.map((p) => p[0]);
@@ -408,6 +452,11 @@ export class PdfPathAnalyzer {
     for (const bbox of boxes) {
       if (bbox === null || bboxArea(bbox) <= 0) continue;
       this.fills.push({ page: pageIndex + 1, bbox, segments: [...this.segments] });
+    }
+    // Record each subpath's outline length ONCE (fills above are duplicated per
+    // component bbox, so length must not be summed from them).
+    for (const c of this.fillContours()) {
+      this.contours.push({ page: pageIndex + 1, bbox: c.bbox, lengthPt: c.lengthPt });
     }
     // A single fill operation whose subpaths form several DISJOINT pieces is a
     // compound path (Illustrator Ctrl+8 / Pathfinder-unite) — the artwork's own
