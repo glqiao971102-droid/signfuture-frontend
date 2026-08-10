@@ -1823,6 +1823,13 @@
               price: q.total,
               meta: details,
               image: "/apps/billboard-backdrop/assets/inkjet-billboard-hero.png",
+              tierPrices: q.tierTotals,
+              spec: {
+                pricer: "area", key: "billboard-backdrop",
+                width: q.width, height: q.height, unit: q.unit, quantity: q.quantity,
+                collect: selectedValue("collect"),
+                sel: { printing: $("#printing").value, material: $("#material").value, finishing: selectedValue("finishing") },
+              },
             },
           },
           window.location.origin
