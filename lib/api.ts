@@ -712,6 +712,14 @@ export const api = {
     );
   },
 
+  /** Re-send the voucher email to a picked set of already-granted users. */
+  adminResendVoucher(id: number, userIds: number[]) {
+    return request<{ success: boolean; requested: number; emailed: number }>(
+      `/api/v1/admin/vouchers/${id}/resend`,
+      { method: "POST", body: JSON.stringify({ userIds }) },
+    );
+  },
+
   /** The signed-in member's available vouchers. */
   myVouchers() {
     return request<{ data: MemberVoucher[] }>("/api/v1/vouchers/mine");

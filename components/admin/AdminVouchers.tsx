@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type VoucherRow } from "@/lib/api";
+import { api, type VoucherRow, type AdminUserRow } from "@/lib/api";
 
 const money = (n: number) =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -13,6 +13,8 @@ function scopeLabel(v: VoucherRow) {
   if (v.scopeType === "all") return "Any product";
   return `${v.scopeType}: ${v.scopeValues.join(", ")}`;
 }
+
+type GrantRow = { userId: number; login: string; email: string; status: string; usedAt: string | null };
 
 export default function AdminVouchers() {
   const [rows, setRows] = useState<VoucherRow[]>([]);
@@ -35,13 +37,26 @@ export default function AdminVouchers() {
   const [creating, setCreating] = useState(false);
   const [formMsg, setFormMsg] = useState<string | null>(null);
 
-  // Grant
+  // Send / grant
   const [grantFor, setGrantFor] = useState<VoucherRow | null>(null);
   const [grantFrom, setGrantFrom] = useState("");
   const [grantTo, setGrantTo] = useState("");
-  const [grantUserIds, setGrantUserIds] = useState("");
   const [granting, setGranting] = useState(false);
   const [grantMsg, setGrantMsg] = useState<string | null>(null);
+
+  // Recipient picker
+  const [custSearch, setCustSearch] = useState("");
+  const [custResults, setCustResults] = useState<AdminUserRow[]>([]);
+  const [custLoading, setCustLoading] = useState(false);
+  const [picked, setPicked] = useState<AdminUserRow[]>([]);
+
+  // Re-send modal (per voucher "Sent" list)
+  const [grantsFor, setGrantsFor] = useState<VoucherRow | null>(null);
+  const [grantRows, setGrantRows] = useState<GrantRow[]>([]);
+  const [grantsLoading, setGrantsLoading] = useState(false);
+  const [reSelected, setReSelected] = useState<Set<number>>(new Set());
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +75,25 @@ export default function AdminVouchers() {
     api.adminCategories().then((r) => setCategories(r.data.map((c) => c.name))).catch(() => {});
     api.adminProducts().then((r) => setProducts(r.data.map((p) => p.name))).catch(() => {});
   }, [load]);
+
+  // Debounced customer search for the recipient picker.
+  useEffect(() => {
+    const term = custSearch.trim();
+    if (term.length < 2) { setCustResults([]); return; }
+    let cancelled = false;
+    setCustLoading(true);
+    const t = setTimeout(() => {
+      api.adminUsers({ search: term, perPage: 15 })
+        .then((r) => { if (!cancelled) setCustResults(r.data); })
+        .catch(() => { if (!cancelled) setCustResults([]); })
+        .finally(() => { if (!cancelled) setCustLoading(false); });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [custSearch]);
+
+  function togglePick(u: AdminUserRow) {
+    setPicked((prev) => (prev.some((p) => p.id === u.id) ? prev.filter((p) => p.id !== u.id) : [...prev, u]));
+  }
 
   function toggleScope(v: string) {
     setScopeValues((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
@@ -106,18 +140,63 @@ export default function AdminVouchers() {
       let target: { userIds?: number[]; registeredFrom?: string; registeredTo?: string };
       if (grantFrom) {
         target = { registeredFrom: grantFrom, registeredTo: grantTo || grantFrom };
+      } else if (picked.length) {
+        target = { userIds: picked.map((p) => p.id) };
       } else {
-        const ids = grantUserIds.split(",").map((s) => Number(s.trim())).filter((n) => n > 0);
-        if (!ids.length) { setGrantMsg("Enter a date range or user IDs."); setGranting(false); return; }
-        target = { userIds: ids };
+        setGrantMsg("Pick recipients, or set a registration date range.");
+        setGranting(false);
+        return;
       }
       const r = await api.adminGrantVoucher(grantFor.id, target);
       setGrantMsg(`✓ Granted ${r.granted}${r.matched !== undefined ? ` of ${r.matched} matched` : ""}, emailed ${r.emailed}${r.skipped ? `, ${r.skipped} already had it` : ""}.`);
+      setPicked([]); setCustSearch(""); setCustResults([]);
       await load();
     } catch (err) {
       setGrantMsg(err instanceof Error ? err.message : "Could not grant voucher");
     } finally {
       setGranting(false);
+    }
+  }
+
+  async function openGrants(v: VoucherRow) {
+    setGrantsFor(v);
+    setGrantRows([]);
+    setReSelected(new Set());
+    setResendMsg(null);
+    setGrantsLoading(true);
+    try {
+      const r = await api.adminVoucherGrants(v.id);
+      setGrantRows(r.data);
+    } catch {
+      setResendMsg("Could not load recipients.");
+    } finally {
+      setGrantsLoading(false);
+    }
+  }
+
+  function toggleRe(userId: number) {
+    setReSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  }
+  function toggleReAll() {
+    setReSelected((prev) => (prev.size === grantRows.length ? new Set() : new Set(grantRows.map((g) => g.userId))));
+  }
+
+  async function resend() {
+    if (!grantsFor || reSelected.size === 0) return;
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const r = await api.adminResendVoucher(grantsFor.id, [...reSelected]);
+      setResendMsg(`✓ Re-sent to ${r.emailed} of ${r.requested} selected.`);
+      await load();
+    } catch (err) {
+      setResendMsg(err instanceof Error ? err.message : "Could not re-send.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -173,30 +252,66 @@ export default function AdminVouchers() {
           </form>
         </div>
 
-        {/* Grant */}
+        {/* Send */}
         <div className="adm-card">
           <div className="adm-card-head-row"><h2>Send a voucher</h2></div>
-          <p className="adm-card-sub">Pick a voucher, then send it to everyone who registered within a date range (leave "To" blank for a single day), or to specific user IDs (from Customers).</p>
+          <p className="adm-card-sub">Pick a voucher, then choose recipients — search &amp; select customers, or send to everyone who registered within a date range. Each recipient gets an email with the code &amp; discount.</p>
           <div className="adm-adjust-form">
             <label className="adm-modal-field"><span>Voucher</span>
               <select className="adm-select" value={grantFor?.id ?? ""} onChange={(e) => setGrantFor(rows.find((r) => r.id === Number(e.target.value)) ?? null)}>
                 <option value="">Select…</option>
-                {rows.map((v) => <option key={v.id} value={v.id}>{v.code} — {v.title}</option>)}
+                {rows.map((v) => <option key={v.id} value={v.id}>{v.code} — {v.title} ({discountLabel(v)})</option>)}
               </select>
             </label>
-            <div className="adm-modal-field"><span>Send to everyone registered between</span>
+
+            {/* Recipient picker */}
+            <div className="adm-modal-field"><span>Recipients — search customers</span>
+              <input
+                value={custSearch}
+                onChange={(e) => { setCustSearch(e.target.value); if (e.target.value) { setGrantFrom(""); setGrantTo(""); } }}
+                placeholder="Type a name or email…"
+                disabled={!!grantFrom}
+              />
+              {picked.length > 0 && (
+                <div className="reg-chips" style={{ marginTop: 6 }}>
+                  {picked.map((p) => (
+                    <button key={p.id} type="button" className="reg-chip is-active" onClick={() => togglePick(p)} title="Remove">
+                      {p.email || p.login} ✕
+                    </button>
+                  ))}
+                </div>
+              )}
+              {custLoading && <em className="adm-card-sub">Searching…</em>}
+              {!custLoading && custSearch.trim().length >= 2 && (
+                <div className="adm-picker-results">
+                  {custResults.length === 0 && <em className="adm-card-sub">No customers match.</em>}
+                  {custResults.map((u) => {
+                    const on = picked.some((p) => p.id === u.id);
+                    return (
+                      <button key={u.id} type="button" className={`adm-picker-row${on ? " is-on" : ""}`} onClick={() => togglePick(u)}>
+                        <span>{on ? "☑" : "☐"}</span>
+                        <span className="adm-picker-name">{u.email || u.login}</span>
+                        <span className="adm-picker-sub">#{u.id}{u.isAdmin ? " · admin" : u.tier ? ` · ${u.tier}` : ""}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="adm-modal-field"><span>…or send to everyone registered between</span>
               <div className="adm-radio-row">
-                <input type="date" value={grantFrom} onChange={(e) => { setGrantFrom(e.target.value); if (e.target.value) setGrantUserIds(""); }} />
+                <input type="date" value={grantFrom} onChange={(e) => { setGrantFrom(e.target.value); if (e.target.value) { setPicked([]); setCustSearch(""); } }} />
                 <span style={{ alignSelf: "center", color: "var(--muted)" }}>to</span>
                 <input type="date" value={grantTo} min={grantFrom || undefined} onChange={(e) => setGrantTo(e.target.value)} />
               </div>
               <em className="adm-card-sub">Leave “to” blank to target just the “from” day.</em>
             </div>
-            <label className="adm-modal-field"><span>…or specific user IDs (comma-separated)</span>
-              <input value={grantUserIds} onChange={(e) => { setGrantUserIds(e.target.value); if (e.target.value) { setGrantFrom(""); setGrantTo(""); } }} placeholder="12, 407, 410" />
-            </label>
+
             {grantMsg && <div className={grantMsg.startsWith("✓") ? "adm-save-ok" : "adm-save-err"}>{grantMsg}</div>}
-            <button type="button" className="hero-btn primary" disabled={granting || !grantFor} onClick={grant}>{granting ? "Sending…" : "Send voucher"}</button>
+            <button type="button" className="hero-btn primary" disabled={granting || !grantFor} onClick={grant}>
+              {granting ? "Sending…" : grantFrom ? "Send to date range" : `Send to ${picked.length || 0} selected`}
+            </button>
           </div>
         </div>
       </div>
@@ -207,11 +322,11 @@ export default function AdminVouchers() {
         <div className="adm-table-scroll">
           <table className="adm-table">
             <thead>
-              <tr><th>Code</th><th>Title</th><th>Discount</th><th>Applies to</th><th className="adm-num">Sent</th><th className="adm-num">Used</th><th>Expires</th></tr>
+              <tr><th>Code</th><th>Title</th><th>Discount</th><th>Applies to</th><th className="adm-num">Sent</th><th className="adm-num">Used</th><th>Expires</th><th></th></tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={7} className="adm-empty">Loading…</td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan={7} className="adm-empty">No vouchers yet.</td></tr>}
+              {loading && <tr><td colSpan={8} className="adm-empty">Loading…</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={8} className="adm-empty">No vouchers yet.</td></tr>}
               {rows.map((v) => (
                 <tr key={v.id}>
                   <td className="adm-login">{v.code}</td>
@@ -221,12 +336,65 @@ export default function AdminVouchers() {
                   <td className="adm-num">{v.granted}</td>
                   <td className="adm-num">{v.used}</td>
                   <td className="adm-date">{v.expiresAt ? v.expiresAt.slice(0, 10) : "—"}</td>
+                  <td>
+                    <button type="button" className="adm-filter" disabled={v.granted === 0} onClick={() => openGrants(v)}>
+                      Recipients ▸
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Recipients / re-send modal */}
+      {grantsFor && (
+        <div className="adm-modal-overlay" onClick={() => setGrantsFor(null)}>
+          <div className="adm-modal" style={{ maxWidth: 640, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+            <div className="adm-card-head-row">
+              <h2>{grantsFor.code} — recipients</h2>
+              <button type="button" className="adm-filter" onClick={() => setGrantsFor(null)}>✕</button>
+            </div>
+            <p className="adm-card-sub">Everyone this voucher was sent to. Tick people and re-send the email (e.g. a reminder to those who haven’t used it).</p>
+            {grantsLoading ? (
+              <p className="adm-card-sub">Loading…</p>
+            ) : grantRows.length === 0 ? (
+              <p className="adm-empty">No recipients yet.</p>
+            ) : (
+              <>
+                <div className="adm-table-scroll" style={{ maxHeight: 360, overflowY: "auto" }}>
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th><input type="checkbox" checked={reSelected.size === grantRows.length && grantRows.length > 0} onChange={toggleReAll} /></th>
+                        <th>Customer</th><th>Status</th><th>Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {grantRows.map((g) => (
+                        <tr key={g.userId} onClick={() => toggleRe(g.userId)} style={{ cursor: "pointer" }}>
+                          <td><input type="checkbox" checked={reSelected.has(g.userId)} onChange={() => toggleRe(g.userId)} onClick={(e) => e.stopPropagation()} /></td>
+                          <td className="adm-email">{g.email || g.login}</td>
+                          <td><span className={`adm-chip ${g.status === "used" ? "adm-chip-admin" : "adm-chip-member"}`}>{g.status}</span></td>
+                          <td className="adm-date">{g.usedAt ? g.usedAt.slice(0, 10) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {resendMsg && <div className={resendMsg.startsWith("✓") ? "adm-save-ok" : "adm-save-err"}>{resendMsg}</div>}
+                <div className="adm-modal-actions">
+                  <button type="button" className="hero-btn ghost" onClick={() => setGrantsFor(null)}>Close</button>
+                  <button type="button" className="hero-btn primary" disabled={resending || reSelected.size === 0} onClick={resend}>
+                    {resending ? "Re-sending…" : `Re-send email to ${reSelected.size} selected`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
