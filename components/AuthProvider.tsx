@@ -222,9 +222,18 @@ function LoginModal({
 
     setBusy(true);
     try {
+      // Verify the referral code EXISTS before we email an OTP — a bogus code
+      // should fail immediately, not after the whole form + verification.
+      const check = await api.checkReferral(regReferral.trim());
+      if (!check.valid) {
+        setBusy(false);
+        return setError("That referral code is invalid. Please check it and try again.");
+      }
       await api.sendRegisterOtp(regEmail.trim());
       setOtpSent(true);
-      setNotice(`We've sent a 6-digit code to ${regEmail.trim()}.`);
+      setNotice(
+        `Referral verified${check.referrer ? ` — you'll join under ${check.referrer}` : ""}. We've sent a 6-digit code to ${regEmail.trim()}.`,
+      );
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Could not send the verification code.",

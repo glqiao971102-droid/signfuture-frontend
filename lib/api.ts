@@ -301,6 +301,17 @@ export const api = {
     return res.user;
   },
 
+  /**
+   * Checks a referral code exists and belongs to an admin, before the OTP step.
+   * Returns { valid, referrer } — referrer is the admin's display name.
+   */
+  checkReferral(referralCode: string) {
+    return request<{ valid: boolean; referrer?: string | null }>(
+      "/api/v1/auth/referral/check",
+      { method: "POST", body: JSON.stringify({ referralCode }) },
+    );
+  },
+
   /** Sets the password on a first-time login and signs the member straight in. */
   async firstTimeReset(identifier: string, password: string) {
     const res = await request<SessionResponse>("/api/v1/auth/first-time-reset", {
