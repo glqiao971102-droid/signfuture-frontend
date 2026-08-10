@@ -365,6 +365,25 @@ export const api = {
     );
   },
 
+  // ----- Product pricing config (admin-editable calculator numbers) -----
+  adminGetPricing(key: string) {
+    return request<{ key: string; config: Record<string, unknown>; isOverride: boolean; defaults: Record<string, unknown> }>(
+      `/api/v1/admin/pricing/${key}`,
+    );
+  },
+  adminSavePricing(key: string, config: Record<string, unknown>) {
+    return request<{ success: boolean; key: string; config: Record<string, unknown> }>(
+      `/api/v1/admin/pricing/${key}`,
+      { method: "PUT", body: JSON.stringify({ config }) },
+    );
+  },
+  adminResetPricing(key: string) {
+    return request<{ success: boolean; key: string; config: Record<string, unknown> }>(
+      `/api/v1/admin/pricing/${key}`,
+      { method: "DELETE" },
+    );
+  },
+
   /** Admin: the agent-login audit trail. */
   adminAgentLogins(page = 1) {
     return request<{

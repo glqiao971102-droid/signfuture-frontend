@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { href: "/admin/tiers", label: "Membership", icon: "★", section: "tiers" },
   { href: "/admin/agent-logins", label: "Agent Logins", icon: "🔐", section: "agent-logins" },
   { href: "/admin/products", label: "Products", icon: "▦", section: "products" },
+  { href: "/admin/product-pricing", label: "Product Pricing", icon: "＄", section: "products" },
   {
     href: "/admin/sales-listing",
     label: "Sales Listing",

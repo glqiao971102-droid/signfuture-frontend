@@ -11,6 +11,8 @@ import { api, type OrderStage, type OrderSummary, type OrderDetail } from "@/lib
  * worth showing a customer.
  */
 const STAGE_META: Record<OrderStage, { label: string; cls: string; pct: number }> = {
+  pending_confirmation: { label: "Pending Confirmation", cls: "rs-pending", pct: 5 },
+  on_hold: { label: "On Hold", cls: "rs-pending", pct: 15 },
   pending: { label: "Waiting Payment", cls: "rs-pending", pct: 10 },
   processing: { label: "Processing", cls: "rs-progress", pct: 35 },
   production: { label: "In Production", cls: "rs-progress", pct: 55 },

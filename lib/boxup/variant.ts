@@ -108,19 +108,59 @@ const brand = (html: string, v: BoxUpVariant) => {
   return out;
 };
 
+/**
+ * Fetches the admin-editable box-up price tables from the backend and returns a
+ * <script> that exposes them as window.__BOXUP_PRICES__ (the calculator reads
+ * this, falling back to its built-in literals). Best-effort: on any error /
+ * timeout it returns "" so the calculator uses its defaults and behaves exactly
+ * as before. Injected into <head> so it runs before the calculator script.
+ */
+async function boxUpPricesScript(): Promise<string> {
+  try {
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:3333";
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2500);
+    const res = await fetch(`${base}/api/v1/pricing/boxup`, {
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timer);
+    if (!res.ok) return "";
+    const body = await res.json();
+    if (!body?.config || typeof body.config !== "object") return "";
+    // JSON.stringify output is safe inside a <script> except for "</" sequences.
+    const json = JSON.stringify(body.config).replace(/<\//g, "<\\/");
+    return `<script>window.__BOXUP_PRICES__=${json};</script>`;
+  } catch {
+    return "";
+  }
+}
+
+function injectPrices(html: string, script: string): string {
+  if (!script) return html;
+  return html.includes("</head>")
+    ? html.replace("</head>", `${script}</head>`)
+    : script + html;
+}
+
 export function boxUpRoutes(v: BoxUpVariant) {
   return {
     async GET() {
-      return new Response(brand(await renderGet(v.appRoute), v), {
-        headers: htmlHeaders,
-      });
+      const [html, script] = await Promise.all([
+        renderGet(v.appRoute).then((h) => brand(h, v)),
+        boxUpPricesScript(),
+      ]);
+      return new Response(injectPrices(html, script), { headers: htmlHeaders });
     },
     async POST(req: Request) {
       const buf = Buffer.from(await req.arrayBuffer());
       const contentType = req.headers.get("content-type") || "";
-      return new Response(brand(await renderPost(buf, contentType, v.appRoute), v), {
-        headers: htmlHeaders,
-      });
+      const [html, script] = await Promise.all([
+        renderPost(buf, contentType, v.appRoute).then((h) => brand(h, v)),
+        boxUpPricesScript(),
+      ]);
+      return new Response(injectPrices(html, script), { headers: htmlHeaders });
     },
   };
 }
