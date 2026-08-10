@@ -15,7 +15,7 @@ const PRODUCTS: { key: string; label: string }[] = [
   { key: "x-stand", label: "X Stand" },
   { key: "roll-up-85x200-economy", label: "Roll Up 85×200 (Economy)" },
   { key: "roll-up-85x200-luxury", label: "Roll Up 85×200 (Luxury)" },
-  { key: "boxup", label: "3D Box Up (advanced / JSON)" },
+  { key: "boxup", label: "3D Box Up" },
 ];
 
 export default function ProductPricingPage() {
@@ -29,6 +29,7 @@ export default function ProductPricingPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useState(false); // JSON escape hatch
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null); setMsg(null);
@@ -55,10 +56,21 @@ export default function ProductPricingPage() {
     setConfig(setPath(config, path, next));
   }
 
+  function setBracket(path: (string | number)[], bi: number, field: "max" | number, raw: string) {
+    const num = raw === "" ? 0 : Number(raw);
+    if (Number.isNaN(num)) return;
+    const arr = (getPath(config, path) as any[]) ?? [];
+    const next = arr.map((b) => [b[0], Array.isArray(b[1]) ? [...b[1]] : [0, 0, 0, 0]]);
+    if (!next[bi]) return;
+    if (field === "max") next[bi][0] = num;
+    else (next[bi][1] as number[])[field] = num;
+    setConfig(setPath(config, path, next));
+  }
+
   async function save() {
     setErr(null); setMsg(null);
     let payload = config;
-    if (!schema) {
+    if (!schema || advanced) {
       try { payload = JSON.parse(text); }
       catch (e) { setErr("Invalid JSON: " + (e instanceof Error ? e.message : "")); return; }
     }
@@ -111,9 +123,9 @@ export default function ProductPricingPage() {
 
           {loading ? (
             <p className="adm-card-sub">Loading…</p>
-          ) : schema && config ? (
+          ) : !advanced && schema && config ? (
             <>
-              <p className="adm-card-sub">Each row is <strong>[{schema.tierLabels.join(", ")}]</strong> in RM.</p>
+              <p className="adm-card-sub">Columns are <strong>[{schema.tierLabels.join(", ")}]</strong> in RM. Changes go live on Save.</p>
               {schema.sections.map((sec) => (
                 <div key={sec.title} className="pp-section">
                   <h3 className="pp-section-title">{sec.title}</h3>
@@ -122,13 +134,53 @@ export default function ProductPricingPage() {
                     <table className="adm-table pp-table">
                       <thead>
                         <tr>
-                          <th></th>
+                          <th className="pp-first-col">{sec.rows.some((r) => r.kind === "brackets") ? "Up to (cm)" : ""}</th>
                           {schema.tierLabels.map((t) => <th key={t} className="adm-num">{t}</th>)}
                         </tr>
                       </thead>
                       <tbody>
                         {sec.rows.map((row) => {
-                          const arr = (getPath(config, row.path) as number[]) ?? [0, 0, 0, 0];
+                          if (row.kind === "brackets") {
+                            const brackets = (getPath(config, row.path) as any[]) ?? [];
+                            return brackets.map((b, bi) => (
+                              <tr key={`${row.label}-${bi}`}>
+                                <td className="pp-row-label">
+                                  ≤{" "}
+                                  <input
+                                    className="pp-num pp-num-cm"
+                                    type="number"
+                                    step="1"
+                                    value={b[0] ?? 0}
+                                    onChange={(e) => setBracket(row.path, bi, "max", e.target.value)}
+                                  />{" "}
+                                  cm
+                                </td>
+                                {schema.tierLabels.map((_, i) => (
+                                  <td key={i} className="adm-num">
+                                    <input
+                                      className="pp-num"
+                                      type="number"
+                                      step="0.01"
+                                      value={(b[1]?.[i]) ?? 0}
+                                      onChange={(e) => setBracket(row.path, bi, i, e.target.value)}
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            ));
+                          }
+                          const val = getPath(config, row.path);
+                          if (val == null) {
+                            return (
+                              <tr key={row.label}>
+                                <td className="pp-row-label">{row.label}</td>
+                                <td className="adm-num" colSpan={schema.tierLabels.length}>
+                                  <em className="adm-card-sub">Quote only (no fixed price)</em>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          const arr = val as number[];
                           return (
                             <tr key={row.label}>
                               <td className="pp-row-label">{row.label}</td>
@@ -169,6 +221,29 @@ export default function ProductPricingPage() {
               Revert to defaults
             </button>
             <button type="button" className="adm-filter" disabled={saving} onClick={load}>Reload</button>
+            {schema && (
+              <button
+                type="button"
+                className="adm-filter"
+                disabled={saving}
+                onClick={() => {
+                  setErr(null);
+                  if (!advanced) {
+                    setText(JSON.stringify(config, null, 2));
+                    setAdvanced(true);
+                  } else {
+                    try {
+                      setConfig(JSON.parse(text));
+                      setAdvanced(false);
+                    } catch (e) {
+                      setErr("Invalid JSON: " + (e instanceof Error ? e.message : ""));
+                    }
+                  }
+                }}
+              >
+                {advanced ? "◀ Back to table" : "Advanced (JSON)"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -185,6 +260,8 @@ export default function ProductPricingPage() {
           background: rgba(3,10,22,0.85); color: #d6e3f3; font-size: 13px;
         }
         .pp-num:focus { outline: none; border-color: var(--cyan); }
+        .pp-num-cm { width: 60px; text-align: center; }
+        .pp-first-col { text-align: left; font-size: 12px; color: var(--muted); }
         .pp-editor {
           width: 100%; min-height: 460px;
           font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
