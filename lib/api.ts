@@ -324,6 +324,28 @@ export const api = {
     return res.user;
   },
 
+  /**
+   * Forgot / first-time password: e-mails a 6-digit code to the account owner.
+   * Returns a masked address so the UI can say where it went. Works whether the
+   * member is setting a password for the first time or has genuinely forgotten.
+   */
+  forgotPassword(identifier: string) {
+    return request<{ success: boolean; email?: string }>(
+      "/api/v1/auth/password/forgot",
+      { method: "POST", body: JSON.stringify({ identifier }) },
+    );
+  },
+
+  /** Verifies the emailed code, sets the new password, and signs the member in. */
+  async resetPassword(identifier: string, otp: string, password: string) {
+    const res = await request<SessionResponse>("/api/v1/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify({ identifier, otp, password }),
+    });
+    setToken(res.token.value);
+    return res.user;
+  },
+
   me() {
     return request<MemberProfile>("/api/v1/auth/me");
   },

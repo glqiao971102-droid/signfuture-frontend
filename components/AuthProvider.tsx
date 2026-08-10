@@ -186,6 +186,10 @@ function LoginModal({
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Reset step is OTP-verified: a code is e-mailed to the account owner before
+  // they can choose a new password (covers first-time AND forgotten passwords).
+  const [resetOtp, setResetOtp] = useState("");
+  const [resetSending, setResetSending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -275,6 +279,36 @@ function LoginModal({
     }
   }
 
+  /**
+   * E-mails a reset code to the account owner and moves to the reset step. Used
+   * both for a first-time sign-in and for the "Forgot password?" link.
+   */
+  async function sendResetCode(who: string, firstTime: boolean) {
+    const id = who.trim();
+    if (!id) {
+      setError("Enter your email or username first, then tap “Forgot password?”.");
+      return;
+    }
+    setError(null);
+    setResetSending(true);
+    setStep("reset");
+    try {
+      const res = await api.forgotPassword(id);
+      setNotice(
+        `${firstTime ? "Welcome! To set your password, we've" : "We've"} emailed a 6-digit code${
+          res.email ? ` to ${res.email}` : ""
+        }. Enter it below to ${firstTime ? "set" : "reset"} your password.`,
+      );
+    } catch (err) {
+      setNotice(null);
+      setError(
+        err instanceof ApiError ? err.message : "Could not send the code. Please try again.",
+      );
+    } finally {
+      setResetSending(false);
+    }
+  }
+
   async function submitSignIn(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -284,11 +318,11 @@ function LoginModal({
       onAuthenticated(await api.login(identifier.trim(), password));
     } catch (err) {
       if (err instanceof ApiError && err.code === PASSWORD_RESET_REQUIRED) {
-        // First sign-in since the migration — send them to the reset step
-        // instead of showing a password error they could never get right.
-        setNotice(err.message);
-        setStep("reset");
+        // First sign-in since the migration — e-mail a verification code and
+        // send them to the reset step instead of a password error they could
+        // never get right.
         setPassword("");
+        void sendResetCode(identifier, true);
       } else {
         setError(
           err instanceof ApiError ? err.message : "Something went wrong. Please try again.",
@@ -304,6 +338,10 @@ function LoginModal({
     if (busy) return;
     setError(null);
 
+    if (resetOtp.trim().length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
     if (newPassword.length < MIN_PASSWORD) {
       setError(`Password must be at least ${MIN_PASSWORD} characters.`);
       return;
@@ -315,7 +353,9 @@ function LoginModal({
 
     setBusy(true);
     try {
-      onAuthenticated(await api.firstTimeReset(identifier.trim(), newPassword));
+      onAuthenticated(
+        await api.resetPassword(identifier.trim(), resetOtp.trim(), newPassword),
+      );
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Something went wrong. Please try again.",
@@ -371,7 +411,13 @@ function LoginModal({
                 <label className="remember">
                   <input type="checkbox" defaultChecked /> Remember me
                 </label>
-                <a href="#" onClick={(e) => e.preventDefault()}>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void sendResetCode(identifier, false);
+                  }}
+                >
                   Forgot password?
                 </a>
               </div>
@@ -565,9 +611,9 @@ function LoginModal({
 
         {step === "reset" && (
           <>
-            <h2>Set your new password</h2>
+            <h2>Set your password</h2>
             <p className="login-sub">
-              This is your first sign-in on the new Sign Future site.
+              Enter the code we emailed you, then choose a new password.
             </p>
 
             {notice && (
@@ -582,6 +628,20 @@ function LoginModal({
                 <input type="text" value={identifier} readOnly className="login-readonly" />
               </label>
               <label>
+                Verification code
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  maxLength={6}
+                  value={resetOtp}
+                  onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label>
                 New password
                 <input
                   type="password"
@@ -590,7 +650,6 @@ function LoginModal({
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  autoFocus
                 />
               </label>
               <label>
@@ -611,10 +670,21 @@ function LoginModal({
                 </p>
               )}
 
-              <button type="submit" className="login-submit" disabled={busy}>
+              <button type="submit" className="login-submit" disabled={busy || resetSending}>
                 {busy ? "Saving…" : "Set password & sign in"}
               </button>
             </form>
+            <p className="login-foot">
+              Didn’t get a code?{" "}
+              <button
+                type="button"
+                className="login-link"
+                disabled={resetSending}
+                onClick={() => void sendResetCode(identifier, false)}
+              >
+                {resetSending ? "Sending…" : "Resend code"}
+              </button>
+            </p>
             <button
               type="button"
               className="login-back"
@@ -622,6 +692,7 @@ function LoginModal({
                 setStep("signin");
                 setError(null);
                 setNotice(null);
+                setResetOtp("");
               }}
             >
               ← Back to sign in
