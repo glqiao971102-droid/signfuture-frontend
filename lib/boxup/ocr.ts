@@ -144,6 +144,11 @@ function padAndUpscale(src: PNG): PNG {
  */
 export async function ocrRelabel<T extends Labelled>(records: T[]): Promise<T[]> {
   if (!records.length) return records;
+  // Diagnostic escape hatch: when the analyze route is called with __diag=nocr
+  // it sets this flag so we can measure the pipeline WITHOUT tesseract, to tell
+  // whether an OCR (worker/WASM) stall — not pdfium — is what times out on
+  // Vercel. Never set in normal use.
+  if ((globalThis as { __SF_SKIP_OCR?: boolean }).__SF_SKIP_OCR) return records;
   const { PSM } = await tesseract();
   // Start the primary worker up-front: a hard failure here (engine can't init)
   // propagates so the caller falls back to the geometric heuristic. Per-glyph
