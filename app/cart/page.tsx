@@ -240,6 +240,8 @@ export default function CartPage() {
       // Request Delivery carries the chosen saved shipping address.
       address: shipId !== "pickup" ? selectedAddr : null,
       total,
+      // Chosen pricing tier index — server re-checks entitlement at order time.
+      tier: effTier,
       at: Date.now(),
     };
     try {

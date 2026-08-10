@@ -465,6 +465,8 @@ export const api = {
     notes?: string;
     paymentMethod: "wallet" | "pending";
     voucherCode?: string;
+    tier?: number;
+    artworks?: { url: string; name?: string }[];
   }) {
     return request<{ id: number; ref: string; status: string; statusLabel: string; total: number }>(
       "/api/v1/orders",
@@ -813,6 +815,7 @@ export type NativeOrderDetail = {
   discount?: number;
   minAdjustment: number;
   voucherCode?: string | null;
+  artworks?: { url: string; name?: string }[];
   total: number;
   currency: string;
   paymentMethod: string;

@@ -281,6 +281,19 @@ export default function AdminOrders() {
               {savingStatus && <em className="adm-card-sub">Saving…</em>}
             </label>
 
+            {nativeDetail.artworks && nativeDetail.artworks.length > 0 && (
+              <>
+                <h3 className="adm-drawer-sub">Artwork ({nativeDetail.artworks.length}) — for review</h3>
+                <div className="adm-artwork-list">
+                  {nativeDetail.artworks.map((a, i) => (
+                    <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="adm-artwork-chip">
+                      ↓ {a.name || `File ${i + 1}`}
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+
             <h3 className="adm-drawer-sub">Line items</h3>
             <div className="adm-table-scroll">
               <table className="adm-table">

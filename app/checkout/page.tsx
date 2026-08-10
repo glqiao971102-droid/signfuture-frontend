@@ -28,6 +28,7 @@ type Order = {
   shipping: { id: string; label: string; cost: number };
   address: Address | null;
   total: number;
+  tier?: number;
 };
 
 export default function CheckoutPage() {
@@ -42,8 +43,8 @@ export default function CheckoutPage() {
   const [collectDate, setCollectDate] = useState(COLLECT_OPTIONS[0]);
   const [notes, setNotes] = useState("");
   const [agree, setAgree] = useState(false);
-  const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
-  const [artworkName, setArtworkName] = useState<string | null>(null);
+  // All uploaded artwork files (saved to server for staff review).
+  const [artworks, setArtworks] = useState<{ url: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,19 +111,24 @@ export default function CheckoutPage() {
   }, [belowMin, minNoticeDismissed]);
 
   async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
     setUploading(true);
     setError(null);
     try {
-      const res = await api.uploadArtwork(file);
-      setArtworkUrl(res.url);
-      setArtworkName(file.name);
+      for (const file of files) {
+        const res = await api.uploadArtwork(file);
+        setArtworks((prev) => [...prev, { url: res.url, name: file.name }]);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Artwork upload failed.");
     } finally {
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
+  }
+  function removeArtwork(url: string) {
+    setArtworks((prev) => prev.filter((a) => a.url !== url));
   }
 
   async function submit(paymentMethod: "wallet" | "pending") {
@@ -139,8 +145,9 @@ export default function CheckoutPage() {
         qty: it.qty,
         unitPrice: it.price,
         options: it.meta ? [{ label: "Specification", value: it.meta }] : [],
-        // Attach the uploaded artwork to the first line item.
-        artworkUrl: i === 0 && artworkUrl ? artworkUrl : undefined,
+        // Also attach the first artwork to the first line for back-compat; the
+        // full set is saved order-level below for staff review.
+        artworkUrl: i === 0 && artworks[0] ? artworks[0].url : undefined,
       }));
       const a = order.address;
       const res = await api.createOrder({
@@ -163,6 +170,8 @@ export default function CheckoutPage() {
         notes: notes.trim() || undefined,
         paymentMethod,
         voucherCode: voucherCode || undefined,
+        tier: order.tier,
+        artworks: artworks.length ? artworks : undefined,
       });
       // Real balance changed on the server when paid by wallet.
       if (paymentMethod === "wallet") void refresh();
@@ -283,10 +292,20 @@ export default function CheckoutPage() {
                   </select>
                 </label>
                 <label className="checkout-field">
-                  <span>Upload artwork <em>(optional — JPG/PNG/PDF/AI/EPS/ZIP)</em></span>
-                  <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip" onChange={handleArtwork} />
+                  <span>Upload artwork <em>(you can add several — JPG/PNG/PDF/AI/EPS/ZIP)</em></span>
+                  <input ref={fileRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip" onChange={handleArtwork} />
                   {uploading && <em className="checkout-hint">Uploading…</em>}
-                  {artworkName && !uploading && <em className="checkout-hint ok">✓ {artworkName}</em>}
+                  {artworks.length > 0 && (
+                    <ul className="checkout-artworks">
+                      {artworks.map((a) => (
+                        <li key={a.url}>
+                          <a href={a.url} target="_blank" rel="noreferrer">✓ {a.name}</a>
+                          <button type="button" onClick={() => removeArtwork(a.url)} aria-label={`Remove ${a.name}`}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <em className="checkout-hint">All uploaded files are saved for our team to review your order.</em>
                 </label>
                 <label className="checkout-field">
                   <span>Order notes <em>(optional)</em></span>

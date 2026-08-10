@@ -4773,6 +4773,20 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-modal-field select:focus { outline: none; border-color: var(--cyan); }
 .adm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
+/* Checkout multi-artwork list */
+.checkout-artworks { list-style: none; margin: 8px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.checkout-artworks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.checkout-artworks a { color: var(--cyan); }
+.checkout-artworks button { border: 0; background: transparent; color: #ff8aa3; cursor: pointer; font-size: 14px; }
+
+/* Admin order artwork chips */
+.adm-artwork-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.adm-artwork-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border: 1px solid rgba(53,216,255,0.35); border-radius: 8px;
+  font-size: 12.5px; color: var(--cyan); background: rgba(53,216,255,0.06);
+}
+
 /* Cart tier comparison + upsell */
 .cart-unit-tier { display: block; font-size: 11px; color: var(--cyan); font-weight: 600; }
 .tier-compare {
