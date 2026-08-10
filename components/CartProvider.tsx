@@ -19,9 +19,11 @@ export type CartItem = {
    * stays the fallback for items without it.
    */
   tierPrices?: number[];
+  /** Structured pricing spec so the server can recompute (anti-tampering). */
+  spec?: Record<string, unknown>;
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[] };
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown> };
 
 type CartContextValue = {
   items: CartItem[];
@@ -61,6 +63,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               meta: i.meta,
               deliverable: i.deliverable,
               tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
+              spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
             };
             return { id: i.id ?? signatureOf(base), ...base };
           })
@@ -99,6 +102,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           meta: item.meta,
           deliverable: item.deliverable,
           tierPrices: Array.isArray(item.tierPrices) ? item.tierPrices : undefined,
+          spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
         },
       ];
     });

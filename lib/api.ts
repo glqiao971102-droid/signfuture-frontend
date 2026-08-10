@@ -454,6 +454,7 @@ export const api = {
       unitPrice: number;
       options?: { label: string; value: string }[];
       artworkUrl?: string;
+      spec?: Record<string, unknown>;
     }[];
     billing?: Record<string, string>;
     shipping?: Record<string, string>;

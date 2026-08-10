@@ -13,8 +13,12 @@ import { PRICING_SCHEMAS, getPath, setPath, type PricingSchema } from "@/lib/pri
 const PRODUCTS: { key: string; label: string }[] = [
   { key: "banner", label: "Banner (Inkjet)" },
   { key: "x-stand", label: "X Stand" },
+  { key: "roll-up-76x200-economy", label: "Roll Up 76×200 (Economy)" },
   { key: "roll-up-85x200-economy", label: "Roll Up 85×200 (Economy)" },
   { key: "roll-up-85x200-luxury", label: "Roll Up 85×200 (Luxury)" },
+  { key: "roll-up-85x200-luxury-2side", label: "Roll Up 85×200 (Luxury 2-Side)" },
+  { key: "roll-up-120x200-luxury", label: "Roll Up 120×200 (Luxury)" },
+  { key: "door-bunting-stand", label: "Door Bunting Stand" },
   { key: "boxup", label: "3D Box Up" },
 ];
 

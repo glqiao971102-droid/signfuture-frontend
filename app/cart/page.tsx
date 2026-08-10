@@ -233,7 +233,7 @@ export default function CartPage() {
   const proceed = () => {
     if (items.length === 0) return;
     const order = {
-      items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image, href: i.href, deliverable: isDeliverable(i) })),
+      items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image, href: i.href, deliverable: isDeliverable(i), spec: i.spec })),
       subtotal,
       coupon: coupon ? { code: coupon.code, discount } : null,
       shipping: { id: shipId, label: shipMethod?.label ?? "", cost: shipping },

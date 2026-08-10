@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { usePricingConfig } from "@/lib/usePricingConfig";
+import { tierIndex } from "@/lib/tier";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -20,11 +22,11 @@ const COLLECT = [
 // Per-tier price [Agent, Silver, Gold, Diamond] from the Roll Up Stand price sheet.
 // UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
 type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
-const PRICE: Record<string, FinPrice> = {
+const DEFAULT_PRICE: Record<string, FinPrice> = {
   "Printing with Stand": { uv: [83.4, 77.9, 77.9, 77.9], eco: { none: [78.2, 73, 73, 73], lam: [96.4, 90, 90, 90] } },
   "Printing Only": { uv: [34.5, 32.3, 32.3, 32.3], eco: { none: [29.3, 27.4, 27.4, 27.4], lam: [47.6, 44.5, 44.5, 44.5] } },
 };
-const STAND_ONLY_PRICE: number[] = [42.9, 40.1, 40.1, 40.1];
+const DEFAULT_STAND_ONLY: number[] = [42.9, 40.1, 40.1, 40.1];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -98,6 +100,9 @@ export default function RollUpStand76x200EconomyProduct() {
   }, []);
 
   const standOnly = finishing === "Stand Only";
+  const _pricing = usePricingConfig("roll-up-76x200-economy", { PRICE: DEFAULT_PRICE, STAND_ONLY_PRICE: DEFAULT_STAND_ONLY });
+  const PRICE = _pricing.PRICE;
+  const STAND_ONLY_PRICE = _pricing.STAND_ONLY_PRICE;
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
   // Per-tier live pricing from the price sheet: UV has no laminate; Eco has
@@ -110,7 +115,7 @@ export default function RollUpStand76x200EconomyProduct() {
     tierUnit = tech === "UV Ink 1200dpi" ? fp.uv : fp.eco[lam === "No Laminate" ? "none" : "lam"];
   }
   const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -120,7 +125,7 @@ export default function RollUpStand76x200EconomyProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Roll Up Stand 76cm x 200cm (Economy)", href: "/catalog/roll-up-stand-76x200-economy", price: total, image: "/products/roll-up-stand-76x200-economy-hero.png" });
+    add({ label: "Roll Up Stand 76cm x 200cm (Economy)", href: "/catalog/roll-up-stand-76x200-economy", price: total, image: "/products/roll-up-stand-76x200-economy-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-76x200-economy", finishing, tech, lam, collect, qty } });
     setAdded(true);
   };
 

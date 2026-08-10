@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { usePricingConfig } from "@/lib/usePricingConfig";
+import { tierIndex } from "@/lib/tier";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -20,11 +22,11 @@ const COLLECT = [
 // Per-tier price [Agent, Silver, Gold, Diamond] from the Door Bunting Stand price sheet.
 // UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
 type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
-const PRICE: Record<string, FinPrice> = {
+const DEFAULT_PRICE: Record<string, FinPrice> = {
   "Printing with Stand": { uv: [91.2, 76, 76, 76], eco: { none: [85.5, 71.3, 71.3, 71.3], lam: [110.5, 92.1, 92.1, 92.1] } },
   "Printing Only": { uv: [37.8, 31.5, 31.5, 31.5], eco: { none: [32, 26.7, 26.7, 26.7], lam: [57, 47.5, 47.5, 47.5] } },
 };
-const STAND_ONLY_PRICE: number[] = [53.5, 44.6, 44.6, 44.6];
+const DEFAULT_STAND_ONLY: number[] = [53.5, 44.6, 44.6, 44.6];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -98,6 +100,9 @@ export default function DoorBuntingStandProduct() {
   }, []);
 
   const standOnly = finishing === "Stand Only";
+  const _pricing = usePricingConfig("door-bunting-stand", { PRICE: DEFAULT_PRICE, STAND_ONLY_PRICE: DEFAULT_STAND_ONLY });
+  const PRICE = _pricing.PRICE;
+  const STAND_ONLY_PRICE = _pricing.STAND_ONLY_PRICE;
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
   // Per-tier live pricing from the price sheet: UV has no laminate; Eco has
@@ -110,7 +115,7 @@ export default function DoorBuntingStandProduct() {
     tierUnit = tech === "UV Ink 1200dpi" ? fp.uv : fp.eco[lam === "No Laminate" ? "none" : "lam"];
   }
   const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -120,7 +125,7 @@ export default function DoorBuntingStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Door Bunting Stand", href: "/catalog/door-bunting-stand", price: total, image: "/products/door-bunting-stand-hero.png" });
+    add({ label: "Door Bunting Stand", href: "/catalog/door-bunting-stand", price: total, image: "/products/door-bunting-stand-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "door-bunting-stand", finishing, tech, lam, collect, qty } });
     setAdded(true);
   };
 

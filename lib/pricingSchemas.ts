@@ -201,8 +201,12 @@ export const PRICING_SCHEMAS: Record<string, PricingSchema> = {
     ],
   },
   "x-stand": standSchema("x-stand", "X Stand"),
+  "roll-up-76x200-economy": standSchema("roll-up-76x200-economy", "Roll Up 76×200 (Economy)"),
   "roll-up-85x200-economy": standSchema("roll-up-85x200-economy", "Roll Up Stand 85×200 (Economy)"),
   "roll-up-85x200-luxury": standSchema("roll-up-85x200-luxury", "Roll Up Stand 85×200 (Luxury)"),
+  "roll-up-85x200-luxury-2side": standSchema("roll-up-85x200-luxury-2side", "Roll Up 85×200 (Luxury, 2-Side)"),
+  "roll-up-120x200-luxury": standSchema("roll-up-120x200-luxury", "Roll Up 120×200 (Luxury)"),
+  "door-bunting-stand": standSchema("door-bunting-stand", "Door Bunting Stand"),
 };
 
 /** Read a value at an array path. */

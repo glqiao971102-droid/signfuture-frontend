@@ -16,7 +16,7 @@ const COLLECT_OPTIONS = [
   "Urgent (Next Working Day)",
 ];
 
-type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string };
+type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown> };
 type Address = {
   profile?: string; receiver?: string; mobile?: string; tel?: string;
   address1?: string; address2?: string; postcode?: string; city?: string; state?: string;
@@ -145,6 +145,8 @@ export default function CheckoutPage() {
         qty: it.qty,
         unitPrice: it.price,
         options: it.meta ? [{ label: "Specification", value: it.meta }] : [],
+        // Structured spec → server recomputes the authoritative price.
+        spec: it.spec as Record<string, unknown> | undefined,
         // Also attach the first artwork to the first line for back-compat; the
         // full set is saved order-level below for staff review.
         artworkUrl: i === 0 && artworks[0] ? artworks[0].url : undefined,

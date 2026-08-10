@@ -129,7 +129,7 @@ export default function XStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "X Stand", href: "/catalog/x-stand", price: total, image: "/products/x-stand-hero.png", tierPrices: tierTotals });
+    add({ label: "X Stand", href: "/catalog/x-stand", price: total, image: "/products/x-stand-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "x-stand", finishing, tech, lam, collect, qty } });
     setAdded(true);
   };
 

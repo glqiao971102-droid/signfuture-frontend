@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { usePricingConfig } from "@/lib/usePricingConfig";
+import { tierIndex } from "@/lib/tier";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -20,11 +22,11 @@ const COLLECT = [
 // Per-tier price [Agent, Silver, Gold, Diamond] from the Roll Up Stand price sheet.
 // UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
 type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
-const PRICE: Record<string, FinPrice> = {
+const DEFAULT_PRICE: Record<string, FinPrice> = {
   "Printing with Stand": { uv: [300.7, 280.7, 280.7, 280.7], eco: { none: [288.2, 269, 269, 269], lam: [310.1, 289.4, 289.4, 289.4] } },
   "Printing Only": { uv: [82.9, 77.4, 77.4, 77.4], eco: { none: [70.4, 65.7, 65.7, 65.7], lam: [92.3, 86.1, 86.1, 86.1] } },
 };
-const STAND_ONLY_PRICE: number[] = [198, 184.8, 184.8, 184.8];
+const DEFAULT_STAND_ONLY: number[] = [198, 184.8, 184.8, 184.8];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -98,6 +100,9 @@ export default function RollUpStand85x200Luxury2SideProduct() {
   }, []);
 
   const standOnly = finishing === "Stand Only";
+  const _pricing = usePricingConfig("roll-up-85x200-luxury-2side", { PRICE: DEFAULT_PRICE, STAND_ONLY_PRICE: DEFAULT_STAND_ONLY });
+  const PRICE = _pricing.PRICE;
+  const STAND_ONLY_PRICE = _pricing.STAND_ONLY_PRICE;
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
   // Per-tier live pricing from the price sheet: UV has no laminate; Eco has
@@ -110,7 +115,7 @@ export default function RollUpStand85x200Luxury2SideProduct() {
     tierUnit = tech === "UV Ink 1200dpi" ? fp.uv : fp.eco[lam === "No Laminate" ? "none" : "lam"];
   }
   const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -120,7 +125,7 @@ export default function RollUpStand85x200Luxury2SideProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Roll Up Stand 85cm x 200cm (Luxury) (2 Side)", href: "/catalog/roll-up-stand-85x200-luxury-2side", price: total, image: "/products/roll-up-stand-85x200-luxury-2side-hero.png" });
+    add({ label: "Roll Up Stand 85cm x 200cm (Luxury) (2 Side)", href: "/catalog/roll-up-stand-85x200-luxury-2side", price: total, image: "/products/roll-up-stand-85x200-luxury-2side-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-85x200-luxury-2side", finishing, tech, lam, collect, qty } });
     setAdded(true);
   };
 
