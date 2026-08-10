@@ -18,9 +18,11 @@ const COUPONS: Record<string, { type: "percent" | "fixed"; value: number }> = {
   WELCOME20: { type: "fixed", value: 20 },
 };
 
+// Nothing includes delivery. Delivery is arranged on request via the consultant
+// (WhatsApp) — no fee is added at checkout; the consultant confirms it separately.
 const SHIPPING = [
-  { id: "pickup", label: "Self Collect", note: "Pick up at our outlet", cost: 0 },
-  { id: "west", label: "Delivery", note: "West Malaysia", cost: 10 },
+  { id: "pickup", label: "Self Collect", note: "Pick up at our outlet", cost: 0, request: false },
+  { id: "west", label: "Request Delivery", note: "+Extra Working Day", cost: 0, request: true },
 ];
 
 const WEST_STATES = [
@@ -132,11 +134,8 @@ export default function CartPage() {
   };
 
   const selectShip = (id: string) => {
+    // Request Delivery is arranged via the consultant — no address collected here.
     setShipId(id);
-    if (id !== "pickup") {
-      if (addresses.length === 0) openAddNew();
-      else if (!selectedAddrId) setSelectedAddrId(addresses[0].id);
-    }
   };
   const openAddNew = () => {
     setEditingId(null);
@@ -209,20 +208,14 @@ export default function CartPage() {
   const shipping = shipMethod?.cost ?? 0;
   const total = Math.max(0, subtotal - discount) + shipping;
 
-  // Materials are self-collect only — flag when the cart mixes in such items.
-  const hasNonDeliverable = items.some((i) => !isDeliverable(i));
-
   const proceed = () => {
     if (items.length === 0) return;
-    if (shipId !== "pickup" && !selectedAddr) {
-      openAddNew();
-      return;
-    }
     const order = {
       items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: i.price, image: i.image, href: i.href, deliverable: isDeliverable(i) })),
       subtotal,
       coupon: coupon ? { code: coupon.code, discount } : null,
       shipping: { id: shipId, label: shipMethod?.label ?? "", cost: shipping },
+      // Request Delivery carries the chosen saved shipping address.
       address: shipId !== "pickup" ? selectedAddr : null,
       total,
       at: Date.now(),
@@ -280,11 +273,6 @@ export default function CartPage() {
                     <div className="cart-prod-info">
                       <Link href={item.href} className="cart-prod-title">{item.label}</Link>
                       {item.meta && <span className="cart-prod-meta">{item.meta}</span>}
-                      {isDeliverable(item) ? (
-                        <span className="cart-prod-deliver yes">🚚 Delivery available</span>
-                      ) : (
-                        <span className="cart-prod-deliver no">⛔ Self collect only</span>
-                      )}
                     </div>
                   </div>
 
@@ -366,32 +354,48 @@ export default function CartPage() {
                       <span className="cart-ship-label">{s.label}</span>
                       <span className="cart-ship-note">{s.note}</span>
                     </span>
-                    <span className="cart-ship-cost">{s.cost === 0 ? "Free" : formatRM(s.cost)}</span>
+                    <span className="cart-ship-cost">{s.request ? "Request" : s.cost === 0 ? "Free" : formatRM(s.cost)}</span>
                   </label>
                 ))}
 
-                {hasNonDeliverable && shipId !== "pickup" && (
-                  <p className="cart-ship-warn">
-                    ⛔ Some items (materials) are <strong>self-collect only</strong> and won&apos;t be delivered. Please collect them at our outlet.
-                  </p>
-                )}
-
-                {shipId !== "pickup" && selectedAddr && (
-                  <div className="cart-addr-saved">
-                    <div className="cart-addr-saved-head">
-                      <span className="cart-addr-title">Ship to</span>
-                      <button type="button" className="cart-addr-edit" onClick={openBook}>Change</button>
+                {shipId !== "pickup" && (
+                  <>
+                    <div className="cart-ship-request">
+                      <p className="cart-ship-request-title">Need Delivery Service? (+Extra Working Day)</p>
+                      <p>Please contact your consultant via WhatsApp.</p>
+                      <p>After checking your order, your consultant will confirm the delivery fee.</p>
+                      <p>Please make payment and send the receipt via WhatsApp.</p>
                     </div>
-                    <p className="cart-addr-name">{selectedAddr.receiver || selectedAddr.profile}</p>
-                    {selectedAddr.mobile && <p>{selectedAddr.mobile}{selectedAddr.tel ? " / " + selectedAddr.tel : ""}</p>}
-                    <p>{[selectedAddr.address1, selectedAddr.address2].filter(Boolean).join(", ")}</p>
-                    <p>{[selectedAddr.postcode, selectedAddr.city].filter(Boolean).join(" ")}{selectedAddr.state ? ", " + selectedAddr.state : ""}</p>
-                  </div>
-                )}
-                {shipId !== "pickup" && !selectedAddr && (
-                  <button type="button" className="cart-addr-add-btn" onClick={openAddNew}>
-                    + Add shipping address
-                  </button>
+                    <div className="cart-ship-addr">
+                      <span className="cart-ship-addr-title">Shipping Address</span>
+                      <div className="cart-ship-addr-actions">
+                        <button type="button" className="cart-ship-opt cart-addr-choice" onClick={openAddNew}>
+                          <span className="cart-ship-info">
+                            <span className="cart-ship-label">+ Add New Address</span>
+                            <span className="cart-ship-note">Save a new delivery address</span>
+                          </span>
+                        </button>
+                        <button type="button" className="cart-ship-opt cart-addr-choice" onClick={openBook} disabled={addresses.length === 0}>
+                          <span className="cart-ship-info">
+                            <span className="cart-ship-label">My Addresses</span>
+                            <span className="cart-ship-note">{addresses.length > 0 ? `${addresses.length} saved · pick by profile` : "No saved address yet"}</span>
+                          </span>
+                        </button>
+                      </div>
+                      {selectedAddr && (
+                        <div className="cart-addr-saved">
+                          <div className="cart-addr-saved-head">
+                            <span className="cart-addr-title">Ship to{selectedAddr.profile ? " · " + selectedAddr.profile : ""}</span>
+                            <button type="button" className="cart-addr-edit" onClick={() => openEdit(selectedAddr.id)}>Edit</button>
+                          </div>
+                          <p className="cart-addr-name">{selectedAddr.receiver || selectedAddr.profile}</p>
+                          {selectedAddr.mobile && <p>{selectedAddr.mobile}{selectedAddr.tel ? " / " + selectedAddr.tel : ""}</p>}
+                          <p>{[selectedAddr.address1, selectedAddr.address2].filter(Boolean).join(", ")}</p>
+                          <p>{[selectedAddr.postcode, selectedAddr.city].filter(Boolean).join(" ")}{selectedAddr.state ? ", " + selectedAddr.state : ""}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
 

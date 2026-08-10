@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { PVC_PRICE } from "@/lib/pvcFoamboardPrices";
 
 const PRODUCT_NAME = "PVC Foamboard";
 const PRODUCT_HREF = "/catalog/pvc-foamboard";
@@ -21,17 +22,12 @@ HEIGHTS.forEach((h) =>
   }),
 );
 
-const THICK_MULT: Record<string, number> = {
-  "3mm": 1, "5mm": 1.15, "10mm": 1.4, "15mm": 1.7, "18mm": 1.9, "25mm": 2.3, "30mm": 2.6,
-};
-const RATE = 6; // RM per sq.ft. (placeholder base rate)
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -106,15 +102,19 @@ export default function PvcFoamboardProduct() {
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
   const sizeOpt = SIZE_OPTIONS.find((o) => o.label === sizeLabel) || SIZE_OPTIONS[0];
   const areaSqft = (sizeOpt.h * sizeOpt.w) / 144;
-  const uvPrinting = finishing.includes("UV Printing");
-
-  // simple live pricing (placeholder; banner-style agent tiers)
-  const total =
-    areaSqft * RATE * (THICK_MULT[thickness] || 1) * (uvPrinting ? 1.4 : 1) * collectOpt.mult * qty;
+  // Per-size price from the PVC foamboard price table (RM per piece), chosen by
+  // finishing (Diecut Only / Diecut + UV Printing) x thickness x size, then x qty.
+  const finishKey = finishing.includes("UV Printing") ? "uv" : "die";
+  const thickKey = thickness.replace("mm", "");
+  const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
+  const baseTiers = PVC_PRICE[finishKey]?.[thickKey]?.[sizeKey] ?? [0, 0, 0, 0];
+  const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

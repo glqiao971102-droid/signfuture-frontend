@@ -219,6 +219,14 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
           { label: "3D Stainless Steel Box Up (Backlit with 10mm Clear Acrylic)", href: "/catalog/stainless-steel-box-up-backlit-acrylic", available: true },
         ],
       },
+      {
+        label: "EG Box Up",
+        children: [
+          { label: "EG Box Up (Frontlit)", href: "/catalog/eg-box-up-frontlit", available: true },
+          { label: "EG Box Up (Backlit)", href: "/catalog/eg-box-up-backlit", available: true },
+          { label: "EG Box Up (Backlit with 10mm Clear Acrylic)", href: "/catalog/eg-box-up-backlit-acrylic", available: true },
+        ],
+      },
       { label: "Aluminum Channel Box Up", href: "/catalog/aluminum-channel-box-up", available: true },
     ],
   },
@@ -343,7 +351,7 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
       {
         label: "Mounting Boards",
         children: [
-          { label: "Paper Foamboard", href: "/catalog/paper-foamboard", available: true },
+          { label: "Paper Foamboard", href: "/catalog/paper-foamboard", available: false },
           { label: "PP Sheet Board", href: "/catalog/pp-sheet-board", available: false },
           { label: "PVC Foamboard", href: "/catalog/pvc-foamboard", available: false },
           { label: "Transparent Board", href: "/catalog/transparent-board", available: false },
@@ -432,12 +440,13 @@ export const CATEGORY_GLYPH: Record<string, string> = {
 };
 
 /** Top-level site links shown after the Product dropdown in the navigation. */
-export type SiteNavItem = { label: string; href: string };
+export type SiteNavItem = { label: string; href: string; newTab?: boolean };
 
 export const SITE_NAV: SiteNavItem[] = [
   { label: "User Guide", href: "/user-guide" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact Us", href: "/contact-us" },
   { label: "Package", href: "/package" },
-  { label: "Company Profile", href: "/company-profile" },
+  // Opens the company profile PDF in a new browser tab.
+  { label: "Company Profile", href: "/sign-future-company-profile.pdf", newTab: true },
 ];

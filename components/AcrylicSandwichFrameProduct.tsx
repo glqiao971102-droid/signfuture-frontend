@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import { SANDWICH_PRICE } from "@/lib/acrylicSandwichPrices";
 
 const PRODUCT_NAME = "Acrylic Sandwich Frame (with Boltnut)";
 const PRODUCT_HREF = "/catalog/acrylic-sandwich-frame-boltnut";
@@ -11,7 +12,7 @@ const PRODUCT_HREF = "/catalog/acrylic-sandwich-frame-boltnut";
 const MATERIAL = [
   { label: "Synthetic Paper 180micron", img: "/products/acrylic/clear.svg" },
 ];
-const THICKNESS = ["2mm", "3mm", "4mm", "5mm", "6mm", "8mm"];
+const THICKNESS = ["3mm", "5mm"];
 
 // Acrylic sizes, taken verbatim from the printed size chart. Hole count and
 // bolt-nut size vary with the panel, so each entry carries its own suffix.
@@ -70,17 +71,12 @@ const SIZE_OPTIONS = SIZE_ROWS.map(([h, w, suffix]) => ({
   w,
 }));
 
-const THICK_MULT: Record<string, number> = {
-  "2mm": 0.9, "3mm": 1, "4mm": 1.1, "5mm": 1.2, "6mm": 1.3, "8mm": 1.45,
-};
-const RATE = 6; // RM per sq.ft. (placeholder base rate)
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -158,13 +154,18 @@ export default function AcrylicSandwichFrameProduct() {
   const sizeOpt = SIZE_OPTIONS.find((o) => o.label === sizeLabel) || SIZE_OPTIONS[0];
   const areaSqft = (sizeOpt.h * sizeOpt.w) / 144;
 
-  // simple live pricing (placeholder; banner-style agent tiers)
-  const total =
-    areaSqft * RATE * (THICK_MULT[thickness] || 1) * collectOpt.mult * qty;
+  // Per-size price from the sandwich-frame price table (RM per piece), chosen by
+  // thickness x size, then x qty. Material is fixed (Synthetic Paper 180micron).
+  const thickKey = thickness.replace("mm", "");
+  const sizeKey = `${sizeOpt.h}x${sizeOpt.w}`;
+  const baseTiers = SANDWICH_PRICE[thickKey]?.[sizeKey] ?? [0, 0, 0, 0];
+  const tierTotals = baseTiers.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

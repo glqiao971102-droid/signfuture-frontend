@@ -18,6 +18,21 @@ export const STAINLESS_COLOUR_OPTIONS = {
 } as const;
 
 /**
+ * Stainless steel grade selector, shown ABOVE Box Up Size. The frame/returns are
+ * stainless; the grade (201 vs 304) is a material choice. 304 is the higher,
+ * more corrosion-resistant grade.
+ */
+export const STAINLESS_GRADE_FIELD = {
+  beforeFieldClass: "box-up-size",
+  html:
+    `<div class="stainless-grade"><span>Stainless Steel</span>` +
+    `<select class="mounting-select stainless-grade-select">` +
+    `<option value="201">201 Stainless Steel</option>` +
+    `<option value="304">304 Stainless Steel</option>` +
+    `</select></div>`,
+} as const;
+
+/**
  * The returns are stainless, so the filament / side-finishing controls do not
  * apply. Hidden rather than removed: the renderer still reads those nodes when
  * it builds the mesh, and deleting them would break that lookup.

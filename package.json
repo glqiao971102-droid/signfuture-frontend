@@ -4,6 +4,7 @@
   "private": true,
   "description": "Unified calculator suite: Inkjet Banner, Neon Line, and 3D Box Up.",
   "scripts": {
+    "predev": "node scripts/start-sales-server.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -16,7 +17,8 @@
     "pdf-lib": "1.17.1",
     "pngjs": "^7.0.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "20.17.12",

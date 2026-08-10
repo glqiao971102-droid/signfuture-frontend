@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type AdminOrderRow, type OrderDetail } from "@/lib/api";
+import {
+  getLocalOrders,
+  subscribeLocalOrders,
+  updateLocalJobStatus,
+  LOCAL_STAGE_LABEL,
+  LOCAL_STAGE_ORDER,
+  type LocalOrder,
+  type LocalOrderStage,
+} from "@/lib/localOrders";
 
 const PER_PAGE = 25;
 
@@ -35,6 +44,14 @@ export default function AdminOrders() {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Orders placed from the front-end checkout (this demo). Admin advances them.
+  const [localOrders, setLocalOrders] = useState<LocalOrder[]>([]);
+  useEffect(() => {
+    const sync = () => setLocalOrders(getLocalOrders());
+    sync();
+    return subscribeLocalOrders(sync);
+  }, []);
 
   const load = useCallback(async (p: number, searchTerm: string, statusFilter: string) => {
     setLoading(true);
@@ -107,6 +124,52 @@ export default function AdminOrders() {
 
   return (
     <div className="adm-wrap">
+      {localOrders.length > 0 && (
+        <div className="adm-local-orders">
+          <div className="adm-count">
+            <strong>Live orders ({localOrders.length})</strong> · placed from checkout — each JOB has its own status (different working days); change it below and the customer sees it in Order Status
+          </div>
+          <div className="adm-table-scroll">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Job No</th>
+                  <th>Order · Customer</th>
+                  <th>Item</th>
+                  <th className="adm-num">Amount (RM)</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {localOrders.flatMap((o) =>
+                  o.lines.map((l, i) => (
+                    <tr key={o.id + "-" + i}>
+                      <td className="adm-mono">{l.jobNo}</td>
+                      <td>#{o.orderNo} · {o.customerName}{o.customerRef ? ` · ${o.customerRef}` : ""}</td>
+                      <td>{l.name}{l.meta ? ` — ${l.meta}` : ""}</td>
+                      <td className="adm-num adm-mono">{money(l.total)}</td>
+                      <td className="adm-date">{formatDate(o.date)}</td>
+                      <td>
+                        <select
+                          className="adm-select"
+                          value={l.stage}
+                          onChange={(e) => updateLocalJobStatus(o.id, i, e.target.value as LocalOrderStage)}
+                        >
+                          {LOCAL_STAGE_ORDER.map((s) => (
+                            <option key={s} value={s}>{LOCAL_STAGE_LABEL[s]}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="adm-toolbar">
         <input
           className="adm-search"

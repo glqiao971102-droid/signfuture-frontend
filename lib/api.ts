@@ -64,6 +64,8 @@ export type PagedMeta = {
 
 /** Customer-facing stage, collapsed from the raw WooCommerce status. */
 export type OrderStage =
+  | "pending_confirmation"
+  | "on_hold"
   | "pending"
   | "processing"
   | "production"

@@ -83,10 +83,22 @@ const applyOptionOverrides = (html: string, overrides: OptionOverride[]) => {
 
 const brand = (html: string, v: BoxUpVariant) => {
   let out = html.split("3D Box Up").join(v.name).replace(SLUG_ONLY, v.href);
+  // The 3D-print filament estimate only applies to 3D-printed letters. The base
+  // renderer emits it (it IS the frontlit 3D printer); strip it from the other
+  // box-up products (stainless steel, aluminium channel), whose returns are not
+  // printed layer-by-layer. Every 3D-printer variant is named "3D Printer (...)".
+  if (!v.name.startsWith("3D Printer")) {
+    out = out.replace(/<!--FILAMENT-START-->[\s\S]*?<!--FILAMENT-END-->/g, "");
+  }
   if (v.litMode) {
-    // The 3D preview reads this off <body> when it builds the scene.
+    // The 3D preview reads this off the body when it builds the scene.
     out = out.replace("<body>", `<body data-lit-mode="${v.litMode}">`);
   }
+  // Tag the body with the product name so the client price logic can scope
+  // per-product rules reliably (e.g. Aluminum Channel vs Stainless, which share
+  // Mirror/Hairline colour options and can't be told apart from option text).
+  const nameAttr = v.name.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  out = out.replace(/<body/, `<body data-boxup-name="${nameAttr}"`);
   if (v.optionOverrides?.length) {
     out = applyOptionOverrides(out, v.optionOverrides);
   }

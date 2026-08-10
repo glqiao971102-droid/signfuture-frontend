@@ -5,35 +5,33 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
 
-const MATERIAL = ["Tarpaulin 380gsm", "Tarpaulin 440gsm", "Tarpaulin 510gsm"];
+const MATERIAL = ["Tarpaulin 380gsm"];
+
+// Per-tier price [Agent, Silver, Gold, Diamond] by Size (single material).
+const PRICE: Record<string, number[]> = {
+  "48in x 48in": [278.8, 232.3, 232.3, 232.3],
+  "60in x 60in": [299.7, 249.8, 249.8, 249.8],
+  "72in x 72in": [325.4, 271.1, 271.1, 271.1],
+  "84in x 84in": [355.6, 296.3, 296.3, 296.3],
+  "94in x 94in": [390.6, 325.5, 325.5, 325.5],
+};
 const PRINT_TECH = ["UV Ink 1200dpi"];
 const FINISHING = ["Welded 3inch pocket (top & bottom)"];
 
-// Free-entry size, same unit set the Inkjet pages offer.
-const UNITS = [
-  { key: "in", label: "Inch" },
-  { key: "cm", label: "cm" },
-  { key: "mm", label: "mm" },
-  { key: "m", label: "Meter" },
-  { key: "ft", label: "Feet" },
+// Fixed size options (square banners). No free-entry sizing.
+const SIZE = [
+  "48in x 48in",
+  "60in x 60in",
+  "72in x 72in",
+  "84in x 84in",
+  "94in x 94in",
 ];
-const UNIT_TO_INCH: Record<string, number> = {
-  in: 1,
-  cm: 1 / 2.54,
-  mm: 1 / 25.4,
-  m: 39.3700787,
-  ft: 12,
-};
-
-// Placeholder rate - matches the Inkjet pages at RM 3 per sq.ft.
-const RATE_PER_SQFT = 3;
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -68,9 +66,7 @@ export default function JumboBannerProduct() {
   const [material, setMaterial] = useState(MATERIAL[0]);
   const [tech, setTech] = useState(PRINT_TECH[0]);
   const [finishing, setFinishing] = useState(FINISHING[0]);
-  const [height, setHeight] = useState("48");
-  const [width, setWidth] = useState("96");
-  const [unit, setUnit] = useState(UNITS[0].key);
+  const [size, setSize] = useState(SIZE[0]);
   const [collect, setCollect] = useState(COLLECT[0].key);
   // 'Next Working Days' closes daily at 4pm; re-checked on a timer.
   const [nowHour, setNowHour] = useState<number | null>(null);
@@ -111,20 +107,24 @@ export default function JumboBannerProduct() {
 
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  const factor = UNIT_TO_INCH[unit] ?? 1;
-  const heightIn = Math.max(0, Number(height) || 0) * factor;
-  const widthIn = Math.max(0, Number(width) || 0) * factor;
-  const area = (heightIn * widthIn) / 144;
+  const sizeDims = size.match(/(\d+)in x (\d+)in/);
+  const sizeW = sizeDims ? Number(sizeDims[1]) : 0;
+  const sizeH = sizeDims ? Number(sizeDims[2]) : 0;
+  const area = (sizeW * sizeH) / 144;
 
-  const total = area * RATE_PER_SQFT * collectOpt.mult * qty;
+  // Per-tier live pricing from the price sheet, by Size.
+  const tierUnit: number[] = PRICE[size] ?? [0, 0, 0, 0];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   // A blank or zero dimension quotes RM 0.00, so hold the order until both are set.
-  const hasSize = heightIn > 0 && widthIn > 0;
+  const hasSize = area > 0;
   const canOrder = agreed && hasSize;
 
   const addToCart = () => {
@@ -181,43 +181,11 @@ export default function JumboBannerProduct() {
             </select>
           </div>
 
-          <div className="xprod-field">
+          <div className="xprod-field" data-icon="⤢">
             <label>Size</label>
-            <div className="xprod-size-row">
-              <label className="xprod-subfield">
-                <span>Height</span>
-                <div className="xprod-input-icon">
-                  <span aria-hidden="true">↕</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.1}
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                  />
-                </div>
-              </label>
-              <div className="xprod-size-x" aria-hidden="true">X</div>
-              <label className="xprod-subfield">
-                <span>Width</span>
-                <div className="xprod-input-icon">
-                  <span aria-hidden="true">↔</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.1}
-                    value={width}
-                    onChange={(e) => setWidth(e.target.value)}
-                  />
-                </div>
-              </label>
-              <label className="xprod-subfield">
-                <span>Unit</span>
-                <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-                  {UNITS.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
-                </select>
-              </label>
-            </div>
+            <select value={size} onChange={(e) => setSize(e.target.value)} disabled={SIZE.length === 1}>
+              {SIZE.map((o) => <option key={o}>{o}</option>)}
+            </select>
           </div>
 
           <div className="xprod-field" data-icon="✎">
@@ -286,7 +254,7 @@ export default function JumboBannerProduct() {
             <div className="xprod-summary-list">
               <div className="xprod-sline"><span data-icon="◈">Printing</span><strong>{tech}</strong></div>
               <div className="xprod-sline"><span data-icon="▤">Material</span><strong>{material}</strong></div>
-              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>{height || 0} x {width || 0} {unit}</strong></div>
+              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>{size}</strong></div>
               <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>{area.toFixed(2)} sq.ft.</strong></div>
               <div className="xprod-sline is-wide"><span data-icon="✎">Finishing</span><strong>{finishing}</strong></div>
               <div className="xprod-sline is-wide">

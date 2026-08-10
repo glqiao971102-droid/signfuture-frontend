@@ -1410,7 +1410,7 @@ a { color: inherit; text-decoration: none; }
 }
 .xprod-collectp h3, .xprod-order h3 { margin: 0 0 9px; color: #dce8fb; font-size: 14px; font-weight: 900; text-transform: uppercase; }
 .xprod-collect-grid {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
   border: 1px solid rgba(63, 176, 255, 0.58); border-radius: 10px; background: #020712; padding: 7px;
   box-shadow: inset 0 0 18px rgba(53, 216, 255, 0.08);
 }
@@ -1456,7 +1456,7 @@ a { color: inherit; text-decoration: none; }
 .xprod-collect-opt input { position: absolute; opacity: 0; pointer-events: none; }
 .xprod-collect-opt.is-selected { border-color: #35d8ff; box-shadow: 0 0 16px rgba(53, 216, 255, 0.78), inset 0 0 12px rgba(53, 216, 255, 0.14); background: rgba(53, 216, 255, 0.08); }
 .xprod-collect-opt img { display: block; width: 100%; height: 92px; object-fit: contain; background: #020712; padding: 5px 8px 0; }
-.xprod-collect-opt strong { display: block; padding: 5px 5px 7px; color: #f7fbff; font-size: 14px; line-height: 1; text-align: center; text-transform: uppercase; background: rgba(2, 7, 18, 0.76); }
+.xprod-collect-opt strong { display: block; padding: 4px 3px 6px; color: #f7fbff; font-size: 11px; line-height: 1.15; text-align: center; text-transform: uppercase; background: rgba(2, 7, 18, 0.76); }
 
 .xprod-artwork { display: grid; gap: 8px; color: #dbe8ff; font-size: 13px; font-weight: 900; text-transform: uppercase; }
 .xprod-artwork input[type="file"] {
@@ -2036,8 +2036,17 @@ a { color: inherit; text-decoration: none; }
 .rs-done { color: #9fe6ff; border-color: rgba(95, 200, 239, 0.5); background: rgba(95, 200, 239, 0.12); }
 .rs-hold { color: #ff9f43; border-color: rgba(255, 159, 67, 0.5); background: rgba(255, 159, 67, 0.12); }
 .rs-ready { color: #b08bff; border-color: rgba(176, 139, 255, 0.5); background: rgba(176, 139, 255, 0.12); }
+.rs-pending-confirm { color: #ffb03c; border-color: rgba(255, 176, 60, 0.55); background: rgba(255, 176, 60, 0.12); }
 
 /* progress bar */
+/* Per-job status list inside an order card (each job progresses on its own). */
+.job-status-list { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.job-status-row { padding: 10px 12px; border: 1px solid var(--line-soft, rgba(255,255,255,0.08)); border-radius: 10px; background: rgba(255, 255, 255, 0.02); }
+.job-status-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.job-status-head .job-no { font-family: ui-monospace, monospace; font-size: 13px; color: var(--cyan); }
+.job-status-head .job-amount { margin-left: auto; font-weight: 800; font-size: 13.5px; }
+.job-status-row .job-name { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.job-status-row .rec-progress { margin-top: 8px; max-width: none; }
 .rec-progress {
   margin-top: 13px;
   height: 7px;
@@ -3172,6 +3181,29 @@ a { color: inherit; text-decoration: none; }
 }
 .cart-ship-warn strong { color: #ffdca6; }
 .cart-ship-cost { font-size: 13.5px; font-weight: 700; color: var(--cyan); white-space: nowrap; }
+/* Request Delivery — WhatsApp-arranged note shown when delivery is requested. */
+.cart-ship-request {
+  margin: 10px 2px 0; padding: 14px 16px; border-radius: 10px;
+  background: rgba(6, 40, 24, 0.55); border: 1px solid rgba(37, 211, 102, 0.5);
+  color: #d7f5e4; font-size: 13px; line-height: 1.55;
+}
+.cart-ship-request-title { font-weight: 900; color: #42ef7d; font-size: 14px; margin-bottom: 6px; }
+.cart-ship-request p { margin: 2px 0; }
+/* Shipping Address form (shown under Request Delivery). Postcode auto-fills City/State. */
+.cart-ship-addr { margin: 10px 2px 0; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line); background: rgba(6, 20, 40, 0.5); }
+.cart-ship-addr-title { display: block; font-weight: 800; font-size: 13px; color: var(--text); margin-bottom: 10px; }
+.cart-ship-addr-actions { display: flex; flex-direction: column; }
+/* Address buttons reuse the .cart-ship-opt frame — same look as Self Collect / Request Delivery. */
+button.cart-addr-choice { width: 100%; background: transparent; color: #d7ecff; font: inherit; text-align: left; }
+button.cart-addr-choice:hover:not(:disabled) { border-color: rgba(53, 216, 255, 0.45); }
+button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
+.cart-ship-addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cart-ship-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cart-ship-field.full { grid-column: 1 / -1; }
+.cart-ship-field > span { font-size: 11px; font-weight: 700; color: #9fb4d0; }
+.cart-ship-field input, .cart-ship-field textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(120, 150, 190, 0.4); background: rgba(3, 15, 31, 0.6); color: #eaf2ff; font-size: 13px; font-family: inherit; }
+.cart-ship-field input:focus, .cart-ship-field textarea:focus { outline: none; border-color: var(--cyan); }
+.cart-ship-field textarea { resize: vertical; }
 
 /* saved shipping address summary + add button */
 .cart-addr-title { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -3990,6 +4022,8 @@ a { color: inherit; text-decoration: none; }
   color: #03101f;
 }
 .adm-count { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.adm-local-orders { margin-bottom: 22px; padding: 14px 16px; border: 1px solid rgba(255, 176, 60, 0.4); border-radius: 12px; background: rgba(40, 28, 6, 0.35); }
+.adm-local-orders .adm-count strong { color: #ffcf7a; }
 
 /* ---------- table ---------- */
 .adm-table-scroll { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; }

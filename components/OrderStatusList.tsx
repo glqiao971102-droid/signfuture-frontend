@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type OrderStage, type OrderSummary, type OrderDetail } from "@/lib/api";
+import { getLocalOrders, subscribeLocalOrders, LOCAL_STAGE_LABEL, LOCAL_STAGE_PCT, type LocalOrder } from "@/lib/localOrders";
 
 /**
  * The member's real orders, from the legacy WooCommerce data.
@@ -11,6 +12,8 @@ import { api, type OrderStage, type OrderSummary, type OrderDetail } from "@/lib
  * worth showing a customer.
  */
 const STAGE_META: Record<OrderStage, { label: string; cls: string; pct: number }> = {
+  pending_confirmation: { label: "Pending Confirmation", cls: "rs-pending-confirm", pct: 5 },
+  on_hold: { label: "On Hold", cls: "rs-hold", pct: 5 },
   pending: { label: "Waiting Payment", cls: "rs-pending", pct: 10 },
   processing: { label: "Processing", cls: "rs-progress", pct: 35 },
   production: { label: "In Production", cls: "rs-progress", pct: 55 },
@@ -21,6 +24,8 @@ const STAGE_META: Record<OrderStage, { label: string; cls: string; pct: number }
 };
 
 const STAGE_ORDER: OrderStage[] = [
+  "pending_confirmation",
+  "on_hold",
   "pending",
   "processing",
   "production",
@@ -50,6 +55,14 @@ export default function OrderStatusList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  // Locally-placed orders (this front-end demo) live alongside any backend ones.
+  const [localOrders, setLocalOrders] = useState<LocalOrder[]>([]);
+  useEffect(() => {
+    const sync = () => setLocalOrders(getLocalOrders());
+    sync();
+    return subscribeLocalOrders(sync);
+  }, []);
+  const localRows = localOrders.filter((o) => stage === "All" || o.lines.some((l) => l.stage === stage));
 
   const load = useCallback(async (p: number, s: OrderStage | "All") => {
     setLoading(true);
@@ -83,9 +96,9 @@ export default function OrderStatusList() {
         <div className="acct-card-head">
           <h2>Order Statuses</h2>
           <span>
-            {loading
+            {loading && localOrders.length === 0
               ? "Loading your orders…"
-              : `${total.toLocaleString()} order${total === 1 ? "" : "s"} · click a status to filter`}
+              : `${(total + localOrders.length).toLocaleString()} order${total + localOrders.length === 1 ? "" : "s"} · click a status to filter`}
           </span>
         </div>
         <div className="flow-chips">
@@ -109,9 +122,66 @@ export default function OrderStatusList() {
         </div>
       </section>
 
-      {error && <div className="quote-empty">{error}</div>}
-      {loading && !error && <div className="quote-empty">Loading orders…</div>}
-      {!loading && !error && orders.length === 0 && (
+      {/* Locally-placed orders — each job has its own status (working days differ). */}
+      {localRows.length > 0 && (
+        <div className="rec-list">
+          {localRows.map((o) => {
+            const open = openId === o.id;
+            return (
+              <article key={o.id} className="rec-card">
+                <div className="rec-main">
+                  <div className="rec-top">
+                    <strong className="rec-ref">#{o.orderNo} · {o.ref}</strong>
+                    <span className="rec-date">{formatDate(o.date)}</span>
+                  </div>
+                  <p className="rec-desc">
+                    {o.itemCount} job{o.itemCount === 1 ? "" : "s"}
+                    {o.shipping.label ? ` · ${o.shipping.label}` : ""}
+                  </p>
+                  <div className="job-status-list">
+                    {o.lines.map((l, i) => {
+                      const jm = STAGE_META[l.stage] ?? STAGE_META.pending_confirmation;
+                      return (
+                        <div key={i} className="job-status-row">
+                          <div className="job-status-head">
+                            <strong className="job-no">{l.jobNo}</strong>
+                            <span className={`rec-status ${jm.cls}`}>{LOCAL_STAGE_LABEL[l.stage]}</span>
+                            <span className="job-amount">RM {money(l.total)}</span>
+                          </div>
+                          <span className="job-name">{l.name}{l.meta ? ` — ${l.meta}` : ""} ×{l.quantity}</span>
+                          {l.stage === "cancelled" ? (
+                            <p className="rec-need" style={{ color: "#ff6f8b", margin: "4px 0 0" }}>This job was cancelled.</p>
+                          ) : (
+                            <div className="rec-progress">
+                              <div className={`rec-progress-fill${LOCAL_STAGE_PCT[l.stage] === 100 ? " full" : ""}`} style={{ width: `${LOCAL_STAGE_PCT[l.stage]}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {open && o.address && (o.address.receiver || o.address.address1) && (
+                    <p className="order-ship-to">
+                      <strong>Ship to:</strong>{" "}
+                      {[o.address.receiver, o.address.address1, o.address.postcode, o.address.city, o.address.state].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                </div>
+                <div className="rec-side">
+                  <span className="rec-amount">RM {money(o.total)}</span>
+                  <button type="button" className="hero-btn ghost rec-btn" onClick={() => setOpenId(open ? null : o.id)}>
+                    {open ? "Hide address" : "Details"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {error && localRows.length === 0 && <div className="quote-empty">{error}</div>}
+      {loading && !error && localRows.length === 0 && <div className="quote-empty">Loading orders…</div>}
+      {!loading && !error && orders.length === 0 && localRows.length === 0 && (
         <div className="quote-empty">
           {stage === "All" ? "You have no orders yet." : "No orders with this status."}
         </div>

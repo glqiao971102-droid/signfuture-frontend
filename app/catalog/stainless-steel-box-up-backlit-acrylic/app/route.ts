@@ -2,6 +2,7 @@ import { boxUpRoutes } from "@/lib/boxup/variant";
 import { BACKLIT_PRESET } from "@/lib/boxup/backlit-preset";
 import {
   STAINLESS_COLOUR_OPTIONS,
+  STAINLESS_GRADE_FIELD,
   HIDE_SIDE_FINISHING_FIELD,
 } from "@/lib/boxup/stainless-fields";
 import { BASE_ACRYLIC_FIELD } from "@/lib/boxup/base-acrylic-field";
@@ -34,7 +35,7 @@ const { GET, POST } = boxUpRoutes({
   ],
   // No paint picker (returns take their colour from the stainless finish), plus
   // the 1cm clear-acrylic backing plate that lights with the LED.
-  extraFields: [HIDE_SIDE_FINISHING_FIELD, BASE_ACRYLIC_FIELD],
+  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD, BASE_ACRYLIC_FIELD],
 });
 
 export { GET, POST };

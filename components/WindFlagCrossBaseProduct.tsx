@@ -23,20 +23,264 @@ const MATERIAL = [
   { label: "Satin Fabric 110gsm", img: "/products/wind-flag/fabric-satin.svg" },
 ];
 const SIZE = ["3.4 meter", "5 meter"];
-const SIZE_MULT: Record<string, number> = { "3.4 meter": 1, "5 meter": 1.45 };
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+type Tier4 = number[];
+const PRICE_PWS: Record<string, Record<string, Record<string, Tier4>>> = {
+  "3.4 meter": {
+    "Mesh Fabric 110gsm": {
+      "Single Side Printing": [
+        199.58,
+        166.32,
+        166.32,
+        166.32
+      ],
+      "Double Side Printing": [
+        221.76,
+        184.8,
+        184.8,
+        184.8
+      ]
+    },
+    "Mesh Hole Fabric 120gsm": {
+      "Single Side Printing": [
+        211.46,
+        176.22,
+        176.22,
+        176.22
+      ],
+      "Double Side Printing": [
+        233.64,
+        194.7,
+        194.7,
+        194.7
+      ]
+    },
+    "Flag Fabric 80gsm": {
+      "Single Side Printing": [
+        191.66,
+        159.72,
+        159.72,
+        159.72
+      ],
+      "Double Side Printing": [
+        213.84,
+        178.2,
+        178.2,
+        178.2
+      ]
+    },
+    "Satin Fabric 110gsm": {
+      "Single Side Printing": [
+        207.5,
+        172.92,
+        172.92,
+        172.92
+      ],
+      "Double Side Printing": [
+        229.68,
+        191.4,
+        191.4,
+        191.4
+      ]
+    }
+  },
+  "5 meter": {
+    "Mesh Fabric 110gsm": {
+      "Single Side Printing": [
+        287.1,
+        239.25,
+        239.25,
+        239.25
+      ],
+      "Double Side Printing": [
+        337.59,
+        281.33,
+        281.33,
+        281.33
+      ]
+    },
+    "Mesh Hole Fabric 120gsm": {
+      "Single Side Printing": [
+        312.84,
+        260.7,
+        260.7,
+        260.7
+      ],
+      "Double Side Printing": [
+        363.33,
+        302.78,
+        302.78,
+        302.78
+      ]
+    },
+    "Flag Fabric 80gsm": {
+      "Single Side Printing": [
+        269.28,
+        224.4,
+        224.4,
+        224.4
+      ],
+      "Double Side Printing": [
+        319.77,
+        266.48,
+        266.48,
+        266.48
+      ]
+    },
+    "Satin Fabric 110gsm": {
+      "Single Side Printing": [
+        304.92,
+        254.1,
+        254.1,
+        254.1
+      ],
+      "Double Side Printing": [
+        355.41,
+        296.18,
+        296.18,
+        296.18
+      ]
+    }
+  }
+};
+const PRICE_PO: Record<string, Record<string, Record<string, Tier4>>> = {
+  "3.4 meter": {
+    "Mesh Fabric 110gsm": {
+      "Single Side Printing": [
+        81.77,
+        68.15,
+        68.15,
+        68.15
+      ],
+      "Double Side Printing": [
+        103.95,
+        86.63,
+        86.63,
+        86.63
+      ]
+    },
+    "Mesh Hole Fabric 120gsm": {
+      "Single Side Printing": [
+        93.65,
+        78.05,
+        78.05,
+        78.05
+      ],
+      "Double Side Printing": [
+        115.83,
+        96.53,
+        96.53,
+        96.53
+      ]
+    },
+    "Flag Fabric 80gsm": {
+      "Single Side Printing": [
+        73.85,
+        61.55,
+        61.55,
+        61.55
+      ],
+      "Double Side Printing": [
+        96.03,
+        80.03,
+        80.03,
+        80.03
+      ]
+    },
+    "Satin Fabric 110gsm": {
+      "Single Side Printing": [
+        89.69,
+        74.75,
+        74.75,
+        74.75
+      ],
+      "Double Side Printing": [
+        111.87,
+        93.23,
+        93.23,
+        93.23
+      ]
+    }
+  },
+  "5 meter": {
+    "Mesh Fabric 110gsm": {
+      "Single Side Printing": [
+        151.47,
+        126.23,
+        126.23,
+        126.23
+      ],
+      "Double Side Printing": [
+        201.96,
+        168.3,
+        168.3,
+        168.3
+      ]
+    },
+    "Mesh Hole Fabric 120gsm": {
+      "Single Side Printing": [
+        177.21,
+        147.68,
+        147.68,
+        147.68
+      ],
+      "Double Side Printing": [
+        227.7,
+        189.75,
+        189.75,
+        189.75
+      ]
+    },
+    "Flag Fabric 80gsm": {
+      "Single Side Printing": [
+        133.65,
+        111.38,
+        111.38,
+        111.38
+      ],
+      "Double Side Printing": [
+        184.14,
+        153.45,
+        153.45,
+        153.45
+      ]
+    },
+    "Satin Fabric 110gsm": {
+      "Single Side Printing": [
+        169.29,
+        141.08,
+        141.08,
+        141.08
+      ],
+      "Double Side Printing": [
+        219.78,
+        183.15,
+        183.15,
+        183.15
+      ]
+    }
+  }
+};
+const STAND_ONLY: Record<string, Tier4> = {
+  "3.4 meter": [
+    117.81,
+    98.18,
+    98.18,
+    98.18
+  ],
+  "5 meter": [
+    135.63,
+    113.03,
+    113.03,
+    113.03
+  ]
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -117,17 +361,22 @@ export default function WindFlagCrossBaseProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  const rush = standOnly ? 1 : collectOpt.mult;
-  // Double-sided means printing the fabric twice; a bare stand prints nothing,
-  // so the side choice must not reach the price there.
-  const sideMult = standOnly || side === "Single Side Printing" ? 1 : 1.8;
-  const total = BASE[finishing] * rush * sideMult * (SIZE_MULT[size] || 1) * qty;
+  // Per-tier live pricing from the price sheet: printing by Size + Material +
+  // Print Side; Stand Only by Size.
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY[size] ?? [0, 0, 0, 0];
+  } else {
+    const table = finishing === "Printing Only" ? PRICE_PO : PRICE_PWS;
+    tierUnit = table[size]?.[material]?.[side] ?? [0, 0, 0, 0];
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

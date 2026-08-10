@@ -129,6 +129,9 @@ export type RasterEntry = {
   highlight_pct: { left: number; top: number; width: number; height: number } | null;
   led_clearance: { too_small: boolean; min_clearance_cm: number } | null;
   source: "raster-outline" | "spec";
+  // Contour length of this record's outline, in metres (the path a 3D-printed
+  // return traces once per layer). Populated by the Box Up analyzer.
+  outline_length_m?: number;
 };
 
 // The bbox of all non-white artwork on the page, in pixels (y-down from top). Used

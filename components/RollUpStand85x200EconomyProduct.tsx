@@ -11,18 +11,20 @@ const LAMINATION = ["No Laminate", "Matt Laminate", "Gloss Laminate"];
 const SIZE = ['85cm(W) x 200cm(H)'];
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+// Per-tier price [Agent, Silver, Gold, Diamond] from the Roll Up Stand price sheet.
+// UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
+type FinPrice = { uv: number[]; eco: { none: number[]; lam: number[] } };
+const PRICE: Record<string, FinPrice> = {
+  "Printing with Stand": { uv: [94.5, 88.2, 88.2, 88.2], eco: { none: [88.2, 82.3, 82.3, 82.3], lam: [110.1, 102.7, 102.7, 102.7] } },
+  "Printing Only": { uv: [41.5, 38.7, 38.7, 38.7], eco: { none: [35.2, 32.8, 32.8, 32.8], lam: [57.2, 53.3, 53.3, 53.3] } },
 };
+const STAND_ONLY_PRICE: number[] = [47.1, 43.9, 43.9, 43.9];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -98,18 +100,22 @@ export default function RollUpStand85x200EconomyProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  const printMult = tech === "UV Ink 1200dpi" ? 1.1 : 1.0;
-  const lamAdd = lam.includes("Matt") ? 5 : lam.includes("Gloss") ? 6 : 0;
-  let unit = BASE[finishing];
-  if (!standOnly) unit = unit * printMult + lamAdd;
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: UV has no laminate; Eco has
+  // No Laminate vs Laminate (Matt & Gloss share the Laminate price).
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY_PRICE;
+  } else {
+    const fp = PRICE[finishing] || PRICE["Printing with Stand"];
+    tierUnit = tech === "UV Ink 1200dpi" ? fp.uv : fp.eco[lam === "No Laminate" ? "none" : "lam"];
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

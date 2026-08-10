@@ -4,6 +4,7 @@
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb, type RenderedPage } from "@/lib/pdf/pdfium";
 import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
+import { ocrRelabel } from "@/lib/boxup/ocr";
 import {
   PdfPathAnalyzer,
   POINTS_PER_INCH,
@@ -22,6 +23,7 @@ import {
   type LetterEntry,
   type Stroke,
   type FillPath,
+  type Contour,
 } from "@/lib/pdf/vector";
 import { fixed0 } from "@/lib/pdf/pyfmt";
 import { PNG } from "pngjs";
@@ -37,6 +39,9 @@ export type BoxupArtboard = {
   clipping_bbox_in: BboxIn | null;
   design_image_bbox_in: BboxIn | null;
   total_length_m_neon: number;
+  // Total outline (contour) length of the letters, in metres — the "line" that
+  // follows each letter. Drives the 3D-print filament estimate.
+  total_outline_length_m: number;
   path_count_neon: number;
   by_color: ColorRow[];
   designs: BoxupDesign[];
@@ -52,6 +57,7 @@ type BoxupDesign = {
   content_bbox_in: BboxIn | null;
   letter_dimensions: AnyLetter[];
   total_length_m_neon: number;
+  total_outline_length_m: number;
   path_count_neon: number;
   by_color: ColorRow[];
   dimension_preview_url: string | null;
@@ -71,6 +77,7 @@ export type BoxupResult = {
   all_stroked_bbox_in: BboxIn | null;
   total_length_m_all_stroked_paths: number;
   total_length_m_neon: number;
+  total_outline_length_m: number;
   by_color: ColorRow[];
   strokes: never[];
   letter_dimensions: AnyLetter[];
@@ -252,7 +259,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
             sizeIn: { x_in: (X / POINTS_PER_INCH) * scale, y_in: (Y / POINTS_PER_INCH) * scale, width_in: wIn, height_in: hIn },
           };
         });
-      rasterDims.set(page.page, recordsFromSpec(r, items));
+      rasterDims.set(page.page, await classifyRecords(recordsFromSpec(r, items)));
       rasterContent.set(page.page, rasterContentBbox(r, renderScale));
       continue;
     }
@@ -313,7 +320,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
         best.bbox_in = { x_in: xIn, y_in: yIn, width_in: wIn, height_in: hIn };
       }
     }
-    rasterDims.set(page.page, recs);
+    rasterDims.set(page.page, await classifyRecords(recs));
     rasterContent.set(page.page, r ? rasterContentBbox(r, renderScale) : null);
   }
 
@@ -323,6 +330,13 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
     const pageStrokes = analyzer.strokes.filter((s) => s.page === pageNumber);
     const pageFills = analyzer.fills.filter((s) => s.page === pageNumber);
     const pageNeon = pageStrokes.filter((s) => isNeonColor(s.color));
+    // Outline source for the filament "line" measurement: fill contours when the
+    // artwork is filled (normal box-up letters); stroked paths when it is drawn
+    // as outlines (neon-style / stroked artwork).
+    const pageContourList = analyzer.contours.filter((c) => c.page === pageNumber);
+    const pageContours: Contour[] = pageContourList.length
+      ? pageContourList
+      : pageStrokes.map((s) => ({ page: pageNumber, bbox: s.bbox, lengthPt: s.lengthPt }));
     const pageImages = analyzer.images.filter((i) => i.page === pageNumber);
     const pageClips = analyzer.clips.filter((c) => c.page === pageNumber);
     const pageImageBbox = unionBbox(pageImages);
@@ -376,6 +390,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       const letters =
         (designRaster && designRaster.length ? designRaster : null) ||
         outlineLetterDimensions((designFills.length ? designFills : designStrokes) as { bbox: Bbox }[], scale, designBbox);
+      const designOutlineM = applyOutlineLengths(letters, pageContours, page.width_pt, page.height_pt, designBbox, scale);
       designs.push({
         name: `Design ${designIndex}`,
         page: pageNumber,
@@ -383,6 +398,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
         content_bbox_in: bboxToInches(designBbox, scale),
         letter_dimensions: nonEmpty(letters),
         total_length_m_neon: designNeon.reduce((a, s) => a + s.lengthPt, 0) * METERS_PER_POINT * scale,
+        total_outline_length_m: designOutlineM,
         path_count_neon: designNeon.length,
         by_color: summarizeNeonColors(designStrokes, scale),
         dimension_preview_url: buildDimensionPreview(rendered.get(pageNumber) || null, designBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0),
@@ -397,6 +413,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
     const letters =
       rasterDims.get(pageNumber) ||
       outlineLetterDimensions((pageFills.length ? pageFills : pageStrokes) as { bbox: Bbox }[], scale, pageContentBbox);
+    const artboardOutlineM = applyOutlineLengths(letters, pageContours, page.width_pt, page.height_pt, pageContentBbox, scale);
     artboards.push({
       name: `Artboard ${pageNumber}`,
       page: pageNumber,
@@ -406,6 +423,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       clipping_bbox_in: bboxToInches(pageClipBbox, scale),
       design_image_bbox_in: bboxToInches(pageImageBbox, scale),
       total_length_m_neon: pageNeon.reduce((a, s) => a + s.lengthPt, 0) * METERS_PER_POINT * scale,
+      total_outline_length_m: artboardOutlineM,
       path_count_neon: pageNeon.length,
       by_color: summarizeNeonColors(pageStrokes, scale),
       designs,
@@ -420,6 +438,14 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
   const topLetters =
     rasterDims.get(1) ||
     outlineLetterDimensions((analyzer.fills.length ? analyzer.fills : analyzer.strokes) as { bbox: Bbox }[], scale, contentBbox);
+  const page1 = pages[0];
+  const page1ContourList = analyzer.contours.filter((c) => c.page === 1);
+  const page1Contours: Contour[] = page1ContourList.length
+    ? page1ContourList
+    : analyzer.strokes.filter((s) => s.page === 1).map((s) => ({ page: 1, bbox: s.bbox, lengthPt: s.lengthPt }));
+  const topOutlineM = page1
+    ? applyOutlineLengths(topLetters, page1Contours, page1.width_pt, page1.height_pt, page1Content, scale)
+    : 0;
 
   return {
     file: fileName,
@@ -433,6 +459,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
     all_stroked_bbox_in: bboxToInches(allStrokedBbox, scale),
     total_length_m_all_stroked_paths: totalPtAll * METERS_PER_POINT * scale,
     total_length_m_neon: totalPtNeon * METERS_PER_POINT * scale,
+    total_outline_length_m: topOutlineM,
     by_color: summarizeNeonColors(analyzer.strokes, scale),
     strokes: [],
     letter_dimensions: nonEmpty(topLetters),
@@ -446,6 +473,124 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
 
 function nonEmpty(list: AnyLetter[]): AnyLetter[] {
   return list.length ? list : [];
+}
+
+// Once text is converted to outlines it is indistinguishable from a logo graphic,
+// so the per-record classifier falls back to size (a big graphic => "Logo"). That
+// mislabels large WORDING, where every glyph is itself a big graphic. Correct it
+// here with the shape the classifier can't see per-record: a run of similarly
+// sized shapes sitting on the same horizontal band is a WORD, so its members are
+// letters, not logos. Reclassify any such row (>= 3 members) to "Letter"; a
+// standalone big graphic keeps its "Logo" label. Pricing follows the label, so
+// this also moves these records from the Logo price to the Wording price.
+function reclassifyRowsAsLetters(recs: RasterEntry[]): RasterEntry[] {
+  const logos = recs.filter((r) => r.label.startsWith("Logo"));
+  const toLetter = new Set<RasterEntry>();
+  if (logos.length >= 3) {
+    for (const a of logos) {
+      if (toLetter.has(a)) continue;
+      const ah = a.bbox_in.height_in;
+      const ay0 = a.bbox_in.y_in;
+      const ay1 = ay0 + ah;
+      // Siblings on the same text band: comparable height (within ~60%) and
+      // vertical spans that overlap by more than half the shorter glyph.
+      const row = logos.filter((b) => {
+        const bh = b.bbox_in.height_in;
+        if (ah <= 0 || bh <= 0) return false;
+        if (Math.max(ah, bh) / Math.min(ah, bh) > 1.6) return false;
+        const by0 = b.bbox_in.y_in;
+        const by1 = by0 + bh;
+        const overlap = Math.min(ay1, by1) - Math.max(ay0, by0);
+        return overlap > 0.5 * Math.min(ah, bh);
+      });
+      if (row.length >= 3) row.forEach((r) => toLetter.add(r));
+    }
+  }
+  if (!toLetter.size) return recs;
+  // Flip grouped logos to letters, then renumber both sequences in document
+  // order so the raw (non-relabelled) artboard/top consumers stay clean too.
+  const counts: Record<string, number> = {};
+  return recs.map((r) => {
+    const prefix = toLetter.has(r) ? "Letter" : r.label.startsWith("Logo") ? "Logo" : "Letter";
+    counts[prefix] = (counts[prefix] || 0) + 1;
+    return { ...r, label: `${prefix} ${counts[prefix]}` };
+  });
+}
+
+// Classify records into Letter/Logo. The authority is OCR (a record whose glyph
+// reads as a letter/digit is a Letter, everything else a Logo); if the OCR
+// engine can't start, fall back to the geometric row heuristic so analysis still
+// produces sensible labels.
+async function classifyRecords(recs: RasterEntry[]): Promise<RasterEntry[]> {
+  try {
+    return await ocrRelabel(recs);
+  } catch {
+    return reclassifyRowsAsLetters(recs);
+  }
+}
+
+// Measure the letters' outline "line" — the total contour length that follows
+// each letter (the path a 3D-printed channel-letter return traces once per
+// layer). Every contour inside the content region is assigned to the letter it
+// falls in (smallest containing record wins; otherwise the nearest one, so no
+// geometry is lost from the total), each letter is stamped with its own
+// outline_length_m, and the region total (metres) is returned.
+function applyOutlineLengths(
+  letters: AnyLetter[],
+  pageContours: Contour[],
+  pageWpt: number,
+  pageHpt: number,
+  contentBbox: Bbox | null,
+  scale: number,
+): number {
+  const padPt = POINTS_PER_INCH * 0.1;
+  const region = pageContours.filter((c) => {
+    const w = c.bbox[2] - c.bbox[0];
+    const h = c.bbox[3] - c.bbox[1];
+    // Drop the full-page background rectangle — it isn't a letter outline.
+    if (w >= pageWpt * 0.85 && h >= pageHpt * 0.85) return false;
+    if (contentBbox) {
+      const cx = (c.bbox[0] + c.bbox[2]) / 2;
+      const cy = (c.bbox[1] + c.bbox[3]) / 2;
+      if (cx < contentBbox[0] - padPt || cx > contentBbox[2] + padPt || cy < contentBbox[1] - padPt || cy > contentBbox[3] + padPt) return false;
+    }
+    return true;
+  });
+  const totalM = region.reduce((a, c) => a + c.lengthPt, 0) * METERS_PER_POINT * scale;
+  if (letters.length) {
+    const sumsPt = new Array(letters.length).fill(0);
+    const tol = 0.05; // inches
+    for (const c of region) {
+      const cxIn = (((c.bbox[0] + c.bbox[2]) / 2) / POINTS_PER_INCH) * scale;
+      const cyIn = ((pageHpt - (c.bbox[1] + c.bbox[3]) / 2) / POINTS_PER_INCH) * scale;
+      let best = -1;
+      let bestArea = Infinity;
+      for (let i = 0; i < letters.length; i++) {
+        const b = letters[i].bbox_in;
+        if (!b) continue;
+        if (cxIn >= b.x_in - tol && cxIn <= b.x_in + b.width_in + tol && cyIn >= b.y_in - tol && cyIn <= b.y_in + b.height_in + tol) {
+          const area = Math.max(1e-6, b.width_in * b.height_in);
+          if (area < bestArea) { bestArea = area; best = i; }
+        }
+      }
+      if (best < 0) {
+        let bestD = Infinity;
+        for (let i = 0; i < letters.length; i++) {
+          const b = letters[i].bbox_in;
+          if (!b) continue;
+          const bx = b.x_in + b.width_in / 2;
+          const by = b.y_in + b.height_in / 2;
+          const d = (bx - cxIn) ** 2 + (by - cyIn) ** 2;
+          if (d < bestD) { bestD = d; best = i; }
+        }
+      }
+      if (best >= 0) sumsPt[best] += c.lengthPt;
+    }
+    letters.forEach((l, i) => {
+      (l as { outline_length_m?: number }).outline_length_m = sumsPt[i] * METERS_PER_POINT * scale;
+    });
+  }
+  return totalM;
 }
 
 // ---- previews ----

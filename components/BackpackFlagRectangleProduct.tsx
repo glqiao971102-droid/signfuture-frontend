@@ -21,21 +21,19 @@ const MM2_PER_SQFT = 92903.04;
 // pcs covers sizes sold as a multi-panel set - the quote must bill every panel.
 const areaOf = (s: { h: number; w: number; pcs?: number }) =>
   ((s.h * s.w) / MM2_PER_SQFT) * (s.pcs ?? 1);
-// Price scales with panel area, relative to the smallest sheet.
-const BASE_AREA = areaOf(SIZE[0]);
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+// Per-tier price [Agent, Silver, Gold, Diamond] from the price sheet, by Finishing.
+const PRICE: Record<string, number[]> = {
+  "Printing with Stand": [326.7, 163.4, 163.4, 163.4],
+  "Printing Only": [141.9, 71, 71, 71],
+  "Stand Only": [184.8, 92.4, 92.4, 92.4],
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -110,16 +108,16 @@ export default function BackpackFlagRectangleProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  const rush = standOnly ? 1 : collectOpt.mult;
   const sizeOpt = SIZE.find((s) => s.label === size)!;
-  const sizeMult = areaOf(sizeOpt) / BASE_AREA;
-  const total = BASE[finishing] * rush * sizeMult * qty;
+  // Per-tier live pricing from the price sheet, by Finishing.
+  const tierUnit: number[] = PRICE[finishing] ?? [0, 0, 0, 0];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

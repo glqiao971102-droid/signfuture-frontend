@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { HUMAN_PRICE, HUMAN_STAND_ONLY } from "@/lib/humanStandPrices";
 
 const FINISHING = ["Printing with Stand", "Stand Only"];
 
@@ -38,7 +39,7 @@ const PRINT_SIZE_METAL = [
 const PRINT_SIZE_MOUNTING = [...PRINT_SIZE_METAL, '48"(W)X96"(H) (180cm Stand)'];
 
 // A bare stand is sold in fewer heights than the printed panels use.
-const STAND_SIZE_METAL = ["60cm Stand", "90cm Stand"];
+const STAND_SIZE_METAL = ["60cm Stand"];
 const STAND_SIZE_MOUNTING = [
   "60cm Stand",
   "90cm Stand",
@@ -53,17 +54,11 @@ const sizesFor = (standee: string, bareStand: boolean) => {
 };
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
-
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Stand Only": 55,
-};
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -164,15 +159,19 @@ export default function HumanStandProduct() {
 
   const area = standOnly ? null : areaOf(size);
 
-  // simple live pricing (mirrors banner's agent tiers)
-  let unit = BASE[finishing];
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing [Agent, Silver, Gold, Diamond] from the price sheet:
+  // Printing depends on Standee + Material/Thickness + Size; Stand Only on
+  // Standee + height (material-independent).
+  const tierUnit: number[] = standOnly
+    ? HUMAN_STAND_ONLY[standee]?.[size] ?? [0, 0, 0, 0]
+    : HUMAN_PRICE[standee]?.[materialLabel]?.[size] ?? [0, 0, 0, 0];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {

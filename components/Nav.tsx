@@ -169,6 +169,7 @@ export default function Nav() {
               key={item.href}
               href={item.href}
               className={`nav-link${isActive(item.href) ? " active" : ""}`}
+              {...(item.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             >
               {item.label}
             </Link>

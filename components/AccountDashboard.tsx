@@ -21,7 +21,9 @@ type SectionKey =
   | "orders"
   | "invoice"
   | "reload"
-  | "pending";
+  | "pending"
+  | "installation"
+  | "installer";
 
 // Left sidebar menu (Feedback Message removed). Each item swaps the right panel.
 const SIDE: { key: SectionKey; label: string; glyph: string }[] = [
@@ -33,6 +35,34 @@ const SIDE: { key: SectionKey; label: string; glyph: string }[] = [
   { key: "invoice", label: "Download Invoice", glyph: "⤓" },
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
+  { key: "installation", label: "My Installation", glyph: "⚒" },
+  { key: "installer", label: "Installer", glyph: "⚑" },
+];
+
+// Customer-facing installation view: the Sales Ledger app's Installation tab
+// (Calendar / Map / Jobs only) embedded via ?customer=1, which hides its admin
+// sidebar/upload/tabs. Same :3200 origin the admin embed uses.
+const SALES_APP_ORIGIN =
+  process.env.NEXT_PUBLIC_SALES_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3200";
+
+// Malaysian states for the Installer directory's state filter.
+const MY_STATES = [
+  "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Labuan", "Melaka",
+  "Negeri Sembilan", "Pahang", "Penang", "Perak", "Perlis", "Putrajaya",
+  "Sabah", "Sarawak", "Selangor", "Terengganu",
+];
+
+// Installer directory. PLACEHOLDER sample data — these will be replaced by real
+// installers once registration adds a "categories" step: users who register and
+// pick the "Installation" category get listed here (matched to a region/state).
+type Installer = { name: string; state: string; phone: string; areas: string };
+const INSTALLERS: Installer[] = [
+  { name: "Selangor Sign Install", state: "Selangor", phone: "012-345 6789", areas: "Shah Alam, Klang, Subang Jaya" },
+  { name: "Klang Valley Fitters", state: "Selangor", phone: "017-880 2211", areas: "Petaling Jaya, Puchong, Kajang" },
+  { name: "KL Central Installers", state: "Kuala Lumpur", phone: "013-221 4455", areas: "Bukit Bintang, Cheras, Setapak" },
+  { name: "Johor Bahru Signage Team", state: "Johor", phone: "019-770 3388", areas: "JB, Skudai, Kulai" },
+  { name: "Penang Island Mounting", state: "Penang", phone: "016-455 9090", areas: "Georgetown, Bayan Lepas, Butterworth" },
+  { name: "Ipoh Sign Crew", state: "Perak", phone: "011-2233 4455", areas: "Ipoh, Taiping" },
 ];
 
 // Order pipeline counts (top status cards).
@@ -112,6 +142,7 @@ export default function AccountDashboard() {
   const { user } = useAuth();
   const [active, setActive] = useState<SectionKey>("consultant");
   const [points, setPoints] = useState<PointsInfo | null>(null);
+  const [installerState, setInstallerState] = useState("Selangor");
 
   // Point balance for the member summary. Members earn 1 point per RM 1;
   // plain customers stay at 0.
@@ -490,6 +521,78 @@ export default function AccountDashboard() {
           </section>
         );
 
+      case "installation":
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>My Installation</h2>
+              <span>Your installation calendar, Malaysia map and jobs.</span>
+            </div>
+            <iframe
+              src={`${SALES_APP_ORIGIN}/?view=installation&customer=1`}
+              title="My Installation"
+              style={{
+                width: "100%",
+                height: "1400px",
+                border: "0",
+                borderRadius: "12px",
+                background: "#0b1220",
+              }}
+            />
+          </section>
+        );
+
+      case "installer": {
+        const list = INSTALLERS.filter((i) => i.state === installerState);
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>Installer</h2>
+              <span>Pick a state to see the installers covering that area.</span>
+            </div>
+            <label
+              className="installer-state-filter"
+              style={{ display: "flex", alignItems: "center", gap: "10px", margin: "6px 0 4px", fontWeight: 700, color: "#b9c9dd" }}
+            >
+              <span>State</span>
+              <select
+                value={installerState}
+                onChange={(e) => setInstallerState(e.target.value)}
+                style={{
+                  padding: "8px 12px", borderRadius: "8px", minWidth: "220px",
+                  border: "1px solid rgba(120,150,190,0.4)", background: "rgba(3,15,31,0.6)",
+                  color: "#eaf2ff", fontWeight: 700,
+                }}
+              >
+                {MY_STATES.map((s) => (
+                  <option key={s} value={s} style={{ color: "#0b1220" }}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <p className="installer-count" style={{ color: "#9fb4d0", margin: "8px 0 12px", fontSize: "13px" }}>
+              {list.length} installer{list.length === 1 ? "" : "s"} in {installerState}
+            </p>
+            <div className="rec-list">
+              {list.map((i) => (
+                <article key={i.name + i.phone} className="rec-card">
+                  <div className="rec-main">
+                    <div className="rec-top">
+                      <strong className="rec-ref">{i.name}</strong>
+                      <span className="rec-status rs-pending">{i.state}</span>
+                    </div>
+                    <p className="rec-desc">Covers: {i.areas}</p>
+                    <p className="rec-need">📞 {i.phone}</p>
+                  </div>
+                </article>
+              ))}
+              {list.length === 0 && (
+                <div className="quote-empty">No installers in {installerState} yet.</div>
+              )}
+            </div>
+          </section>
+        );
+      }
+
       default:
         return null;
     }
@@ -516,7 +619,9 @@ export default function AccountDashboard() {
 
       {/* ---------- right main ---------- */}
       <div className="acct-main">
-        {/* member summary — always visible */}
+        {/* member card + status cards — only shown on the My Consultant section */}
+        {active === "consultant" && (
+          <>
         <div className="acct-summary">
           <span className={`acct-avatar tier-${tierClass}`}>
             <span className="acct-avatar-fallback">◆</span>
@@ -567,6 +672,8 @@ export default function AccountDashboard() {
             </div>
           ))}
         </div>
+          </>
+        )}
 
         {/* swappable section panel */}
         <div className="acct-section" aria-label={activeLabel}>

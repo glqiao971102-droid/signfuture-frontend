@@ -9,6 +9,13 @@ import {
   type InvoiceData,
   type EInvoiceItem,
 } from "@/lib/invoicePdf";
+import {
+  getLocalInvoices,
+  getLocalOrders,
+  subscribeLocalOrders,
+  LOCAL_STAGE_LABEL,
+  type LocalInvoice,
+} from "@/lib/localOrders";
 
 const PER_PAGE = 10;
 
@@ -56,6 +63,54 @@ export default function InvoiceList() {
     void load(page);
   }, [page, load]);
 
+  // Auto-generated invoices from locally-placed orders — one per job (1055-1…).
+  const [localInvoices, setLocalInvoices] = useState<LocalInvoice[]>([]);
+  useEffect(() => {
+    const sync = () => setLocalInvoices(getLocalInvoices());
+    sync();
+    return subscribeLocalOrders(sync);
+  }, []);
+
+  function downloadLocal(inv: LocalInvoice) {
+    const order = getLocalOrders().find((o) => o.id === inv.orderId);
+    const line = order?.lines[inv.jobIndex];
+    if (!order || !line) return;
+    const rm = (n: number) => "RM" + n.toFixed(2);
+    const addr = order.address;
+    const data: InvoiceData = {
+      title: "E-INVOICE",
+      status: LOCAL_STAGE_LABEL[inv.stage],
+      invoiceRef: inv.number,
+      dateTime: formatDate(order.date),
+      currency: "MYR",
+      exchangeRate: "1",
+      buyer: {
+        name: order.customerName || user?.name || "Customer",
+        address: addr ? [addr.address1, addr.address2].filter(Boolean).join(", ") || undefined : undefined,
+        city: addr?.city || undefined,
+        postal: addr?.postcode || undefined,
+        contact: addr?.mobile || undefined,
+      },
+      items: [
+        {
+          desc: line.name,
+          details: line.meta ? [line.meta] : [],
+          qty: String(line.quantity),
+          unitPrice: rm(line.total / line.quantity),
+          amount: rm(line.total),
+          taxRate: "0%",
+          taxAmount: rm(0),
+          inclTax: rm(line.total),
+        },
+      ],
+      subtotal: rm(line.total),
+      taxAmount: rm(0),
+      totalInclTax: rm(line.total),
+      totalPayable: rm(line.total),
+    };
+    downloadBlob(buildInvoicePdf(data), inv.number + ".pdf");
+  }
+
   /** Fetches the order behind an invoice and renders it as a PDF. */
   async function download(row: InvoiceRow) {
     if (busyId) return;
@@ -75,9 +130,49 @@ export default function InvoiceList() {
 
   return (
     <>
-      {error && <div className="quote-empty">{error}</div>}
-      {loading && !error && <div className="quote-empty">Loading invoices…</div>}
-      {!loading && !error && rows.length === 0 && (
+      {/* Auto-generated invoices — one per job. Only appear once the order's jobs
+          are confirmed (not Pending Confirmation / On Hold). Cancelled jobs show
+          as cancelled and aren't billed. */}
+      {localInvoices.length > 0 && (
+        <div className="rec-list">
+          {localInvoices.map((inv) => {
+            const cancelled = inv.stage === "cancelled";
+            return (
+              <article key={inv.number} className="rec-card">
+                <div className="rec-main">
+                  <div className="rec-top">
+                    <strong className="rec-ref">{inv.number}</strong>
+                    <span className={`rec-status ${cancelled ? "rs-fail" : "rs-success"}`}>
+                      {cancelled ? "Cancelled" : "Paid"}
+                    </span>
+                  </div>
+                  <span className="rec-date">{formatDate(inv.date)}</span>
+                  <p className="rec-desc">
+                    {inv.name}{cancelled ? " · Cancelled (not invoiced)" : ` · ${LOCAL_STAGE_LABEL[inv.stage]}`}
+                  </p>
+                </div>
+                <div className="rec-side">
+                  <span
+                    className="rec-amount"
+                    style={cancelled ? { textDecoration: "line-through", opacity: 0.55 } : undefined}
+                  >
+                    {money(inv.amount)}
+                  </span>
+                  {!cancelled && (
+                    <button type="button" className="hero-btn primary rec-btn" onClick={() => downloadLocal(inv)}>
+                      ⤓ Download PDF
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {error && localInvoices.length === 0 && <div className="quote-empty">{error}</div>}
+      {loading && !error && localInvoices.length === 0 && <div className="quote-empty">Loading invoices…</div>}
+      {!loading && !error && rows.length === 0 && localInvoices.length === 0 && (
         <div className="quote-empty">You have no invoices yet.</div>
       )}
 

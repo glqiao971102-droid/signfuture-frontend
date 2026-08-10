@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
+import { addLocalOrder } from "@/lib/localOrders";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -49,6 +50,24 @@ export default function CheckoutPage() {
     if (!order || !user || !enough) return;
     const ref = "SF" + Date.now().toString(36).toUpperCase().slice(-7);
     adjustWallet(-total);
+    // Persist the order locally — it starts at "Pending Confirmation" and shows
+    // in Order Status; the admin moves it forward from /admin/orders.
+    addLocalOrder({
+      ref,
+      date: new Date().toISOString(),
+      customerName: user.name || "Member",
+      customerRef: user.memberNo || user.email || "",
+      subtotal: order.subtotal,
+      shipping: order.shipping,
+      address: (order.address as Record<string, string> | null) ?? null,
+      total: order.total,
+      lines: order.items.map((it) => ({
+        name: it.label,
+        quantity: it.qty,
+        total: it.price * it.qty,
+        meta: it.meta,
+      })),
+    });
     clear();
     try {
       localStorage.removeItem(CHECKOUT_KEY);
@@ -114,22 +133,34 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Delivery */}
+              {/* Delivery — nothing includes delivery; it's requested via the consultant. */}
               <div className="checkout-block">
-                <h3 className="checkout-block-title">Delivery</h3>
-                <div className="checkout-ship">
-                  <span className="checkout-ship-method">{order.shipping.label || "Self Collect"}</span>
-                  <span className="checkout-ship-cost">{order.shipping.cost === 0 ? "Free" : formatRM(order.shipping.cost)}</span>
-                </div>
-                {order.address ? (
-                  <div className="checkout-addr">
-                    <p className="cart-addr-name">{order.address.receiver || order.address.profile}</p>
-                    {order.address.mobile && <p>{order.address.mobile}{order.address.tel ? " / " + order.address.tel : ""}</p>}
-                    <p>{[order.address.address1, order.address.address2].filter(Boolean).join(", ")}</p>
-                    <p>{[order.address.postcode, order.address.city].filter(Boolean).join(" ")}{order.address.state ? ", " + order.address.state : ""}</p>
-                  </div>
+                <h3 className="checkout-block-title">{order.shipping.id !== "pickup" ? "Request Delivery" : "Delivery"}</h3>
+                {order.shipping.id !== "pickup" ? (
+                  <>
+                    <div className="cart-ship-request">
+                      <p className="cart-ship-request-title">Need Delivery Service? (+Extra Working Day)</p>
+                      <p>Please contact your consultant via WhatsApp.</p>
+                      <p>After checking your order, your consultant will confirm the delivery fee.</p>
+                      <p>Please make payment and send the receipt via WhatsApp.</p>
+                    </div>
+                    {order.address && (order.address.receiver || order.address.address1) && (
+                      <div className="checkout-addr">
+                        <p className="cart-addr-name">{order.address.receiver}</p>
+                        {order.address.mobile && <p>{order.address.mobile}</p>}
+                        {order.address.address1 && <p>{[order.address.address1, order.address.address2].filter(Boolean).join(", ")}</p>}
+                        <p>{[order.address.postcode, order.address.city].filter(Boolean).join(" ")}{order.address.state ? ", " + order.address.state : ""}</p>
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <p className="checkout-pickup-note">Pick up at our outlet — no delivery address needed.</p>
+                  <>
+                    <div className="checkout-ship">
+                      <span className="checkout-ship-method">Self Collect</span>
+                      <span className="checkout-ship-cost">Free</span>
+                    </div>
+                    <p className="checkout-pickup-note">Pick up at our outlet — no delivery address needed.</p>
+                  </>
                 )}
               </div>
             </div>
@@ -144,7 +175,7 @@ export default function CheckoutPage() {
                   <span>− {formatRM(order.coupon.discount)}</span>
                 </div>
               )}
-              <div className="cart-sum-row"><span>Shipping</span><span>{order.shipping.cost === 0 ? "Free" : formatRM(order.shipping.cost)}</span></div>
+              <div className="cart-sum-row"><span>Shipping</span><span>{order.shipping.id !== "pickup" ? "On request" : "Free"}</span></div>
               <div className="cart-sum-row total"><span>Total</span><strong>{formatRM(order.total)}</strong></div>
 
               <div className="checkout-wallet">

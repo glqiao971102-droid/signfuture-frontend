@@ -9,31 +9,40 @@ const FINISHING = ["Printing with Stand", "Printing with Accessories", "Stand On
 const MATERIAL = "White Sticker Matt 80 Micron";
 // Backdrop panels are quoted by booth size; both are 230cm tall.
 const SIZE = [
-  { label: "3x3 (230cm X 344cm)", w: 344, h: 230 },
-  { label: "4x3 (230cm X 414cm)", w: 414, h: 230 },
+  { label: "3x3 (230cm X 359cm)", w: 359, h: 230 },
+  { label: "4x3 (230cm X 434cm)", w: 434, h: 230 },
 ];
 const CM2_PER_SQFT = 929.0304;
 // Matt options first, then gloss - the order the printed chart lists them in.
 const LAMINATION = [
-  "No Lamination",
-  "Indoor Matt Lam 60micron",
-  "Outdoor Matt Lam 100micron",
-  "Indoor Gloss Lam 60micron",
-  "Outdoor Gloss Lam 100micron",
+  "No Laminate",
+  "Matt Lam 100micron",
+  "Gloss Lam 100micron",
 ];
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing with Accessories": 95,
-  "Stand Only": 55,
+// Per-tier price [Agent, Silver, Gold, Diamond] from the Pop Up Backdrop price sheet.
+// Printing (with Stand / with Accessories) depends on Size + Lamination; Stand Only by Size.
+type Tier4 = number[];
+const PRICE: Record<string, Record<string, Record<string, Tier4>>> = {
+  "Printing with Stand": {
+    "3x3 (230cm X 359cm)": { "No Laminate": [1079.54, 1002.43, 1002.43, 1002.43], "Matt Lam 100micron": [1195.96, 1110.5, 1110.5, 1110.5], "Gloss Lam 100micron": [1195.96, 1110.5, 1110.5, 1110.5] },
+    "4x3 (230cm X 434cm)": { "No Laminate": [1247.4, 1158.3, 1158.3, 1158.3], "Matt Lam 100micron": [1391.5, 1292.1, 1292.1, 1292.1], "Gloss Lam 100micron": [1391.5, 1292.1, 1292.1, 1292.1] },
+  },
+  "Printing with Accessories": {
+    "3x3 (230cm X 359cm)": { "No Laminate": [646.8, 600.6, 600.6, 600.6], "Matt Lam 100micron": [763.2, 708.7, 708.7, 708.7], "Gloss Lam 100micron": [763.2, 708.7, 708.7, 708.7] },
+    "4x3 (230cm X 434cm)": { "No Laminate": [794.5, 737.9, 737.9, 737.9], "Matt Lam 100micron": [938.8, 871.7, 871.7, 871.7], "Gloss Lam 100micron": [938.8, 871.7, 871.7, 871.7] },
+  },
+};
+const STAND_ONLY: Record<string, Tier4> = {
+  "3x3 (230cm X 359cm)": [793.1, 736.4, 736.4, 736.4],
+  "4x3 (230cm X 434cm)": [887, 823.7, 823.7, 823.7],
 };
 
 const money = (v: number) => "RM " + v.toFixed(2);
@@ -109,19 +118,19 @@ export default function PopUpBackdropStraightProduct() {
   const standOnly = finishing === "Stand Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  // Outdoor laminate is the thicker 100micron film, hence the higher add-on.
-  const lamAdd = lam === "No Lamination" ? 0 : lam.startsWith("Outdoor") ? 8 : 5;
   const sizeOpt = SIZE.find((s) => s.label === size)!;
-  let unit = BASE[finishing];
-  if (!standOnly) unit = unit + lamAdd;
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: printing by Finishing + Size +
+  // Lamination; Stand Only by Size.
+  const tierUnit: number[] = standOnly
+    ? STAND_ONLY[size] ?? [0, 0, 0, 0]
+    : PRICE[finishing]?.[size]?.[lam] ?? [0, 0, 0, 0];
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {
@@ -159,19 +168,20 @@ export default function PopUpBackdropStraightProduct() {
           </div>
 
           {/* A bare stand has no printed panel, so the print options drop out. */}
+          {/* Size is chosen for both printing and Stand Only (frame size). */}
+          <div className="xprod-field" data-icon="⤢">
+            <label>Size</label>
+            <select value={size} onChange={(e) => setSize(e.target.value)} disabled={SIZE.length === 1}>
+              {SIZE.map((o) => <option key={o.label}>{o.label}</option>)}
+            </select>
+          </div>
+
           {!standOnly && (
             <>
               <div className="xprod-field" data-icon="▤">
                 <label>Printing Material</label>
                 <select disabled value={MATERIAL}>
                   <option>{MATERIAL}</option>
-                </select>
-              </div>
-
-              <div className="xprod-field" data-icon="⤢">
-                <label>Size</label>
-                <select value={size} onChange={(e) => setSize(e.target.value)} disabled={SIZE.length === 1}>
-                  {SIZE.map((o) => <option key={o.label}>{o.label}</option>)}
                 </select>
               </div>
 

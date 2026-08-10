@@ -20,18 +20,30 @@ const SIZE = [
 ];
 
 const COLLECT = [
-  { key: "standard7", label: "7 Working Days", img: "collect-7-working-days.png", mult: 1 },
   { key: "normal", label: "4 Working Days", img: "collect-4-working-days.png", mult: 1 },
-  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.12 },
-  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.25 },
-  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.5 },
+  { key: "quick3", label: "3 Working Days", img: "collect-3-working-days.png", mult: 1.45 },
+  { key: "rush2", label: "2 Working Days", img: "collect-2-working-days.png", mult: 1.55 },
+  { key: "next", label: "Next Working Days", img: "collect-next-working-days.png", mult: 1.65 },
 ];
 
-const BASE: Record<string, number> = {
-  "Printing with Stand": 75,
-  "Printing Only": 35,
-  "Stand Only": 55,
+// Per-size, per-tier price [Agent, Silver, Gold, Diamond] from the Tripod Stand price sheet.
+// UV Ink 1200dpi has no laminate; Eco Solvent has No Laminate vs Laminate (Matt = Gloss).
+// Rows follow the SIZE array order. Stand Only is size-independent.
+type SizePrice = {
+  pwUv: number[]; pwEcoNone: number[]; pwEcoLam: number[];
+  poUv: number[]; poEcoNone: number[]; poEcoLam: number[];
 };
+const PRICE: SizePrice[] = [
+  { pwUv:[55.95,46.63,46.63,46.63], pwEcoNone:[51.4,42.83,42.83,42.83], pwEcoLam:[74.21,61.84,61.84,61.84], poUv:[31.2,26,26,26], poEcoNone:[26.65,22.21,22.21,22.21], poEcoLam:[49.46,41.22,41.22,41.22] },
+  { pwUv:[50.93,42.44,42.44,42.44], pwEcoNone:[47.12,39.27,39.27,39.27], pwEcoLam:[66.13,55.11,55.11,55.11], poUv:[26.18,21.81,21.81,21.81], poEcoNone:[22.37,18.65,18.65,18.65], poEcoLam:[41.38,34.49,34.49,34.49] },
+  { pwUv:[63.52,52.93,52.93,52.93], pwEcoNone:[57.82,48.18,48.18,48.18], pwEcoLam:[86.33,71.94,71.94,71.94], poUv:[38.77,32.31,32.31,32.31], poEcoNone:[33.07,27.56,27.56,27.56], poEcoLam:[61.58,51.32,51.32,51.32] },
+  { pwUv:[57.22,47.69,47.69,47.69], pwEcoNone:[52.47,43.73,43.73,43.73], pwEcoLam:[76.23,63.53,63.53,63.53], poUv:[32.47,27.06,27.06,27.06], poEcoNone:[27.72,23.1,23.1,23.1], poEcoLam:[51.48,42.9,42.9,42.9] },
+  { pwUv:[71.08,59.24,59.24,59.24], pwEcoNone:[64.23,53.53,53.53,53.53], pwEcoLam:[98.45,82.04,82.04,82.04], poUv:[46.33,38.61,38.61,38.61], poEcoNone:[39.48,32.9,32.9,32.9], poEcoLam:[73.7,61.41,61.41,61.41] },
+  { pwUv:[63.52,52.93,52.93,52.93], pwEcoNone:[57.82,48.18,48.18,48.18], pwEcoLam:[86.33,71.94,71.94,71.94], poUv:[38.77,32.31,32.31,32.31], poEcoNone:[33.07,27.56,27.56,27.56], poEcoLam:[61.58,51.32,51.32,51.32] },
+  { pwUv:[86.19,71.82,71.82,71.82], pwEcoNone:[77.06,64.22,64.22,64.22], pwEcoLam:[122.68,102.23,102.23,102.23], poUv:[61.44,51.2,51.2,51.2], poEcoNone:[52.31,43.59,43.59,43.59], poEcoLam:[97.93,81.61,81.61,81.61] },
+  { pwUv:[95.91,79.93,79.93,79.93], pwEcoNone:[68.51,57.09,57.09,57.09], pwEcoLam:[126.32,105.27,105.27,105.27], poUv:[71.16,59.3,59.3,59.3], poEcoNone:[63.56,52.97,52.97,52.97], poEcoLam:[101.57,84.65,84.65,84.65] },
+];
+const STAND_ONLY: number[] = [20.6, 19.5, 19.5, 19.5];
 
 const money = (v: number) => "RM " + v.toFixed(2);
 
@@ -105,20 +117,36 @@ export default function TripodStandProduct() {
   }, []);
 
   const standOnly = finishing === "Stand Only";
+  const printingOnly = finishing === "Printing Only";
   const collectOpt = COLLECT.find((c) => c.key === collect)!;
 
-  // simple live pricing (mirrors banner's agent tiers)
-  const printMult = tech === "UV Ink 1200dpi" ? 1.1 : 1.0;
-  const lamAdd = lam.includes("Matt") ? 5 : lam.includes("Gloss") ? 6 : 0;
-  let unit = BASE[finishing];
-  if (!standOnly) unit = unit * printMult + lamAdd;
-  // No collect-date step for a bare stand, so no rush multiplier applies.
-  if (!standOnly) unit = unit * collectOpt.mult;
-  const total = unit * qty;
+  // Per-tier live pricing from the price sheet: pick the row for the chosen
+  // Size, then the column set for Finishing + Print Tech + Lamination.
+  const sizeIdx = Math.max(0, SIZE.indexOf(size));
+  const sizeDims = size.match(/(\d+)"\(W\) X (\d+)"\(H\)/);
+  const sizeW = sizeDims ? Number(sizeDims[1]) : 24;
+  const sizeH = sizeDims ? Number(sizeDims[2]) : 72;
+  const sizeArea = (sizeW * sizeH) / 144;
+  let tierUnit: number[];
+  if (standOnly) {
+    tierUnit = STAND_ONLY;
+  } else {
+    const rec = PRICE[sizeIdx] || PRICE[0];
+    const isUv = tech === "UV Ink 1200dpi";
+    const hasLam = lam !== "No Laminate"; // Matt & Gloss share the Laminate price
+    if (printingOnly) {
+      tierUnit = isUv ? rec.poUv : hasLam ? rec.poEcoLam : rec.poEcoNone;
+    } else {
+      tierUnit = isUv ? rec.pwUv : hasLam ? rec.pwEcoLam : rec.pwEcoNone;
+    }
+  }
+  const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
+  const total = tierTotals[0];
   const agents = [
-    { name: "Normal Agent Price", price: total },
-    { name: "Gold Agent Price", price: total * 0.85 },
-    { name: "Platinum Agent Price", price: total * 0.8 },
+    { name: "Agent Price", price: tierTotals[0] },
+    { name: "Silver Agent Price", price: tierTotals[1] },
+    { name: "Gold Agent Price", price: tierTotals[2] },
+    { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
   const addToCart = () => {
@@ -262,8 +290,8 @@ export default function TripodStandProduct() {
             <div className="xprod-summary-list">
               <div className="xprod-sline"><span data-icon="◈">Printing</span><strong>{standOnly ? "—" : tech}</strong></div>
               <div className="xprod-sline"><span data-icon="▤">Material</span><strong>{standOnly ? "Stand only" : "Synthetic Paper 180 Micron"}</strong></div>
-              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>24 x 72 in</strong></div>
-              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>12.00 sq.ft.</strong></div>
+              <div className="xprod-sline"><span data-icon="⤢">Size</span><strong>{standOnly ? "—" : `${sizeW} x ${sizeH} in`}</strong></div>
+              <div className="xprod-sline"><span data-icon="▦">Total Area</span><strong>{standOnly ? "—" : `${sizeArea.toFixed(2)} sq.ft.`}</strong></div>
               <div className="xprod-sline is-wide"><span data-icon="✎">Finishing</span><strong>{finishing}</strong></div>
               {!standOnly && (
               <div className="xprod-sline is-wide">
