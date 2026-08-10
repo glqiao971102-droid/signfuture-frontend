@@ -142,13 +142,37 @@ function padAndUpscale(src: PNG): PNG {
  * as. Sequences are renumbered in document order. Throws if the OCR engine can't
  * be started at all, so the caller can fall back to the geometric heuristic.
  */
+// Tesseract runs in a worker thread that hangs / crawls inside a Vercel
+// serverless function (it's fine on a normal always-on server). Bound it: on a
+// timeout or engine failure we mark OCR unavailable for the rest of this process
+// and rethrow so classifyRecords() falls back to the geometric row heuristic —
+// a slightly less precise Letter/Logo split, but the analysis COMPLETES instead
+// of timing out into a 504.
+const OCR_BUDGET_MS = 20000;
+let ocrUnavailable = false;
+
 export async function ocrRelabel<T extends Labelled>(records: T[]): Promise<T[]> {
   if (!records.length) return records;
-  // Diagnostic escape hatch: when the analyze route is called with __diag=nocr
-  // it sets this flag so we can measure the pipeline WITHOUT tesseract, to tell
-  // whether an OCR (worker/WASM) stall — not pdfium — is what times out on
-  // Vercel. Never set in normal use.
+  // Diagnostic escape hatch (__diag=nocr) — never set in normal use.
   if ((globalThis as { __SF_SKIP_OCR?: boolean }).__SF_SKIP_OCR) return records;
+  if (ocrUnavailable) throw new Error("OCR unavailable in this environment");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      ocrRelabelImpl(records),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("OCR timed out")), OCR_BUDGET_MS);
+      }),
+    ]);
+  } catch (err) {
+    ocrUnavailable = true; // don't hang again on later pages / requests
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function ocrRelabelImpl<T extends Labelled>(records: T[]): Promise<T[]> {
   const { PSM } = await tesseract();
   // Start the primary worker up-front: a hard failure here (engine can't init)
   // propagates so the caller falls back to the geometric heuristic. Per-glyph
