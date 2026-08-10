@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
 import { usePricingConfig } from "@/lib/usePricingConfig";
+import { tierIndex } from "@/lib/tier";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -115,7 +116,7 @@ export default function RollUpStand85x200LuxuryProduct() {
     tierUnit = tech === "UV Ink 1200dpi" ? fp.uv : fp.eco[lam === "No Laminate" ? "none" : "lam"];
   }
   const tierTotals = tierUnit.map((v) => Math.max(0, v * qty * collectOpt.mult));
-  const total = tierTotals[0];
+  const total = tierTotals[tierIndex(user?.tier)];
   const agents = [
     { name: "Agent Price", price: tierTotals[0] },
     { name: "Silver Agent Price", price: tierTotals[1] },
@@ -125,7 +126,7 @@ export default function RollUpStand85x200LuxuryProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Roll Up Stand 85cm x 200cm (Luxury)", href: "/catalog/roll-up-stand-85x200-luxury", price: total, image: "/products/roll-up-stand-85x200-luxury-hero.png" });
+    add({ label: "Roll Up Stand 85cm x 200cm (Luxury)", href: "/catalog/roll-up-stand-85x200-luxury", price: total, image: "/products/roll-up-stand-85x200-luxury-hero.png", tierPrices: tierTotals });
     setAdded(true);
   };
 

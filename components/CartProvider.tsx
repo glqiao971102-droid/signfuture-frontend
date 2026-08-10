@@ -12,9 +12,16 @@ export type CartItem = {
   meta?: string;
   /** Whether this product can be delivered. Materials are self-collect only. Defaults to true. */
   deliverable?: boolean;
+  /**
+   * The line price at each tier [Agent, Silver, Gold, Diamond] for this exact
+   * configuration. Present when a calculator supports member pricing; lets the
+   * cart charge the customer's own tier and show tier comparisons. `price`
+   * stays the fallback for items without it.
+   */
+  tierPrices?: number[];
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean };
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[] };
 
 type CartContextValue = {
   items: CartItem[];
@@ -53,6 +60,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               image: i.image,
               meta: i.meta,
               deliverable: i.deliverable,
+              tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
             };
             return { id: i.id ?? signatureOf(base), ...base };
           })
@@ -90,6 +98,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           image: item.image,
           meta: item.meta,
           deliverable: item.deliverable,
+          tierPrices: Array.isArray(item.tierPrices) ? item.tierPrices : undefined,
         },
       ];
     });

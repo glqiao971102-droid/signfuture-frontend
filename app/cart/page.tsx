@@ -6,7 +6,9 @@ import { useState, useRef, useEffect } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
+import { useAuth } from "@/components/AuthProvider";
 import { isDeliverable } from "@/lib/products";
+import { tierIndex, tierLabel, TIER_LABELS, TIER_THRESHOLD } from "@/lib/tier";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -37,7 +39,22 @@ const ADDR_KEY = "sign-studio-addresses";
 
 export default function CartPage() {
   const router = useRouter();
-  const { items, count, subtotal, setQty, remove, clear } = useCart();
+  const { items, count, setQty, remove, clear } = useCart();
+  const { user } = useAuth();
+
+  // The customer always pays their OWN tagged tier (Agent for guests). Cheaper
+  // tiers are only unlocked by topping up — never selectable here.
+  const myTier = tierIndex(user?.tier);
+  const unitAt = (i: (typeof items)[number], t: number) =>
+    i.tierPrices && i.tierPrices.length === 4 ? i.tierPrices[t] : i.price;
+  const unit = (i: (typeof items)[number]) => unitAt(i, myTier);
+  const subtotal = items.reduce((n, i) => n + unit(i) * i.qty, 0);
+  // Cart total at each tier (items without member pricing are constant).
+  const tierCart = [0, 1, 2, 3].map((t) => items.reduce((n, i) => n + unitAt(i, t) * i.qty, 0));
+  const hasTierItems = items.some((i) => i.tierPrices && i.tierPrices.length === 4);
+  const bestIdx = 3; // Diamond — cheapest
+  const bestSaving = Math.max(0, tierCart[myTier] - tierCart[bestIdx]);
+  const bestSavingPct = tierCart[myTier] > 0 ? Math.round((bestSaving / tierCart[myTier]) * 100) : 0;
 
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<Coupon | null>(null);
@@ -211,7 +228,7 @@ export default function CartPage() {
   const proceed = () => {
     if (items.length === 0) return;
     const order = {
-      items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: i.price, image: i.image, href: i.href, deliverable: isDeliverable(i) })),
+      items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image, href: i.href, deliverable: isDeliverable(i) })),
       subtotal,
       coupon: coupon ? { code: coupon.code, discount } : null,
       shipping: { id: shipId, label: shipMethod?.label ?? "", cost: shipping },
@@ -277,7 +294,10 @@ export default function CartPage() {
                   </div>
 
                   <div className="cart-cell" data-label="Price">
-                    <span className="cart-unit">{formatRM(item.price)}</span>
+                    <span className="cart-unit">{formatRM(unit(item))}</span>
+                    {item.tierPrices && myTier > 0 && (
+                      <span className="cart-unit-tier">{tierLabel(myTier)} price</span>
+                    )}
                   </div>
 
                   <div className="cart-cell" data-label="Quantity">
@@ -295,7 +315,7 @@ export default function CartPage() {
                   </div>
 
                   <div className="cart-cell" data-label="Subtotal">
-                    <strong className="cart-line">{formatRM(item.price * item.qty)}</strong>
+                    <strong className="cart-line">{formatRM(unit(item) * item.qty)}</strong>
                   </div>
 
                   <div className="cart-cell cart-cell-remove">
@@ -398,6 +418,42 @@ export default function CartPage() {
                   </>
                 )}
               </div>
+
+              {hasTierItems && (
+                <div className="tier-compare">
+                  <span className="tier-compare-title">Member pricing — you pay <strong>{tierLabel(myTier)}</strong></span>
+                  <div className="tier-compare-rows">
+                    {TIER_LABELS.map((label, t) => {
+                      const isMine = t === myTier;
+                      const cheaper = t > myTier; // higher index = cheaper tier
+                      return (
+                        <div key={label} className={`tier-compare-row${isMine ? " is-mine" : ""}`}>
+                          <span className="tier-compare-name">
+                            {label}{isMine && " (you)"}
+                          </span>
+                          <span className="tier-compare-price">{formatRM(tierCart[t])}</span>
+                          <span className="tier-compare-note">
+                            {isMine
+                              ? "your price"
+                              : cheaper
+                              ? `save ${formatRM(tierCart[myTier] - tierCart[t])}`
+                              : `+${formatRM(tierCart[t] - tierCart[myTier])}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {bestSaving > 0 && (
+                    <p className="tier-compare-upsell">
+                      💎 Become <strong>Diamond</strong> and save <strong>{formatRM(bestSaving)}</strong> ({bestSavingPct}%) on this cart.{" "}
+                      <Link href="/package">Top up RM{TIER_THRESHOLD.Diamond.toLocaleString("en-MY")} in one top-up to unlock →</Link>
+                    </p>
+                  )}
+                  {myTier === 0 && (
+                    <p className="tier-compare-note-guest">Prices shown are standard (Agent). Sign in &amp; top up to unlock member prices.</p>
+                  )}
+                </div>
+              )}
 
               <div className="cart-sum-row total">
                 <span>Total</span>
