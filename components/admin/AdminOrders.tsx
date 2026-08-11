@@ -328,7 +328,7 @@ export default function AdminOrders() {
             )}
 
             <h3 className="adm-drawer-sub">Line items — each can be handled separately</h3>
-            <div className="adm-table-scroll">
+            <div className="adm-lineitems">
               <table className="adm-table">
                 <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th><th>Item status</th></tr></thead>
                 <tbody>

@@ -4406,6 +4406,14 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------- table ---------- */
 .adm-table-scroll { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; }
+/* Line items: no scroll — fit the drawer width and wrap so every row shows. */
+.adm-lineitems { border: 1px solid var(--line-soft); border-radius: 12px; overflow: visible; }
+.adm-lineitems .adm-table { width: 100%; table-layout: fixed; }
+.adm-lineitems .adm-table th:nth-child(1), .adm-lineitems .adm-table td:nth-child(1) { width: 46%; white-space: normal; word-break: break-word; }
+.adm-lineitems .adm-table th:nth-child(2), .adm-lineitems .adm-table td:nth-child(2) { width: 10%; }
+.adm-lineitems .adm-table th:nth-child(3), .adm-lineitems .adm-table td:nth-child(3) { width: 18%; }
+.adm-lineitems .adm-table th:nth-child(4), .adm-lineitems .adm-table td:nth-child(4) { width: 26%; white-space: normal; }
+.adm-lineitems .adm-select { width: 100%; max-width: 100%; }
 .adm-table { border-collapse: collapse; width: 100%; min-width: 720px; }
 .adm-table thead th {
   text-align: left;
