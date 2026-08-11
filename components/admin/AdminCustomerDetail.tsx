@@ -133,9 +133,9 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
         <div className="adm-card-head-row">
           <h2>
             {profile.name || profile.login}{" "}
-            <span className={`adm-chip ${profile.isAdmin ? "adm-chip-admin" : profile.tier ? `tier-${profile.tier.toLowerCase()}` : "adm-chip-member"}`}>
-              {profile.isAdmin ? "ADMIN" : profile.tier ?? "Member"}
-            </span>
+            {profile.isAdmin && <span className="adm-chip adm-chip-admin">ADMIN</span>}
+            {profile.tier && <span className={`adm-chip tier-${profile.tier.toLowerCase()}`} style={{ marginLeft: profile.isAdmin ? 6 : 0 }}>{profile.tier}</span>}
+            {!profile.isAdmin && !profile.tier && <span className="adm-chip adm-chip-member">Member</span>}
           </h2>
           <span className="adm-card-sub">Member #{profile.memberNo}</span>
         </div>
@@ -163,25 +163,23 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
           )}
         </div>
 
-        {!profile.isAdmin && (
-          <div className="adm-tier-control">
-            <span className="adm-key-label">Change tier</span>
-            <div className="adm-radio-row">
-              {SETTABLE.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={`adm-filter${(profile.tier ?? "customer") === t ? " is-active" : ""}`}
-                  disabled={savingTier}
-                  onClick={() => changeTier(t)}
-                >
-                  {t === "customer" ? "No tier" : t}
-                </button>
-              ))}
-            </div>
-            {tierMsg && <em className="adm-card-sub">{tierMsg}</em>}
+        <div className="adm-tier-control">
+          <span className="adm-key-label">Change tier{profile.isAdmin ? " (admins can also hold a tier)" : ""}</span>
+          <div className="adm-radio-row">
+            {SETTABLE.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`adm-filter${(profile.tier ?? "customer") === t ? " is-active" : ""}`}
+                disabled={savingTier}
+                onClick={() => changeTier(t)}
+              >
+                {t === "customer" ? "No tier" : t}
+              </button>
+            ))}
           </div>
-        )}
+          {tierMsg && <em className="adm-card-sub">{tierMsg}</em>}
+        </div>
 
         {/* Referral / admin */}
         <div className="adm-tier-control">
