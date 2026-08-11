@@ -30,6 +30,15 @@ export default function ProductFrame({
       if (Array.isArray(item.artworks) && item.artworks.length) {
         return (item.artworks as { url: string; name: string }[]).filter((a) => a && a.url);
       }
+      // Neon / 3D box-up replace their page with the analysis result and expose
+      // the saved artwork here (their file input is gone by add-to-cart).
+      try {
+        const w = ref.current?.contentWindow as (Window & { __SF_ARTWORK?: { url: string; name: string } }) | null;
+        const a = w?.__SF_ARTWORK;
+        if (a && a.url) return [{ url: a.url, name: a.name || "artwork" }];
+      } catch {
+        /* cross-origin / not ready */
+      }
       const files: File[] = [];
       try {
         const doc = ref.current?.contentDocument;
