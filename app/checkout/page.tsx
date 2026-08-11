@@ -391,18 +391,12 @@ export default function CheckoutPage() {
 
               {!user ? (
                 <button type="button" className="hero-btn primary cart-checkout" onClick={openLogin}>Sign in to continue</button>
+              ) : enough ? (
+                <button type="button" className="hero-btn primary cart-checkout" disabled={submitting || uploading} onClick={() => submit("wallet")}>
+                  {submitting ? "Placing…" : "Submit order"}
+                </button>
               ) : (
-                <>
-                  {enough && (
-                    <button type="button" className="hero-btn primary cart-checkout" disabled={submitting || uploading} onClick={() => submit("wallet")}>
-                      {submitting ? "Placing…" : "Place order & pay by wallet"}
-                    </button>
-                  )}
-                  <button type="button" className={`hero-btn cart-checkout ${enough ? "ghost" : "primary"}`} disabled={submitting || uploading} onClick={() => submit("pending")}>
-                    {submitting ? "Submitting…" : "Submit order (pay later)"}
-                  </button>
-                  {!enough && <Link href="/package" className="cart-dd-btn ghost checkout-topup">Top up wallet</Link>}
-                </>
+                <Link href="/package" className="hero-btn primary cart-checkout checkout-topup">Top up wallet</Link>
               )}
               <p className="cart-sum-note">Final quote is confirmed after our team checks your artwork.</p>
             </aside>
