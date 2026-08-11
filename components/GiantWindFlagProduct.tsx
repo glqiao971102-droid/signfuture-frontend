@@ -253,7 +253,7 @@ export default function GiantWindFlagProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/giant-wind-flag-hero.png" });
     setAdded(true);
   };
 
@@ -263,7 +263,7 @@ export default function GiantWindFlagProduct() {
       <section className="xprod-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/products/wind-flag-hero.png"
+          src="/products/giant-wind-flag-hero.png"
           alt={`Custom ${PRODUCT_NAME} — premium quality`}
           className="xprod-hero-img"
         />

@@ -497,7 +497,7 @@ export default function WindFlagRectangleProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-rectangle-hero.png" });
     setAdded(true);
   };
 
@@ -507,7 +507,7 @@ export default function WindFlagRectangleProduct() {
       <section className="xprod-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/products/wind-flag-hero.png"
+          src="/products/wind-flag-rectangle-hero.png"
           alt={`Custom ${PRODUCT_NAME} — premium quality`}
           className="xprod-hero-img"
         />

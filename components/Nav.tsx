@@ -218,7 +218,6 @@ export default function Nav() {
                   <Link href="/vouchers" role="menuitem">My Vouchers{voucherCount > 0 ? ` (${voucherCount})` : ""}</Link>
                   <Link href="/package" role="menuitem">Top Up</Link>
                   <Link href="/track-order" role="menuitem">Track Order</Link>
-                  <Link href="/package" role="menuitem">My Offer</Link>
                   <Link href="/my-quotation" role="menuitem">My Quotation</Link>
                   <button type="button" role="menuitem" className="member-logout" onClick={logout}>
                     Log Out
@@ -307,7 +306,6 @@ export default function Nav() {
             <div className="m-account-links">
               <Link href="/account">Account</Link>
               <Link href="/package">Top Up</Link>
-              <Link href="/package">My Offer</Link>
               <Link href="/my-quotation">My Quotation</Link>
             </div>
           </div>

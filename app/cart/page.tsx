@@ -60,6 +60,7 @@ export default function CartPage() {
   const [voucherInput, setVoucherInput] = useState("");
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherMsg, setVoucherMsg] = useState<string | null>(null);
+  const [voucherOpen, setVoucherOpen] = useState(false);
   useEffect(() => {
     if (user) api.myVouchers().then((r) => setVouchers(r.data)).catch(() => setVouchers([]));
     else setVouchers([]);
@@ -408,39 +409,56 @@ export default function CartPage() {
 
               {user && (
                 <div className="cart-voucher">
-                  <span className="cart-ship-title">Voucher</span>
-                  {vouchers.length > 0 ? (
-                    <ul className="ckv-list">
-                      {vouchers.map((v) => {
-                        const active = voucherCode === v.code;
-                        const off = v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`;
-                        return (
-                          <li key={v.code}>
-                            <button
-                              type="button"
-                              className={`ckv-opt${active ? " is-active" : ""}`}
-                              onClick={() => applyVoucher(active ? "" : v.code)}
-                              aria-pressed={active}
-                            >
-                              <span className="ckv-off">{off}</span>
-                              <span className="ckv-info">
-                                <span className="ckv-code">{v.code}</span>
-                                <span className="ckv-scope">{v.scopeType === "all" ? "Any product" : v.scopeValues.join(" / ")}{v.minSpend > 0 ? ` · min RM${v.minSpend}` : ""}</span>
-                              </span>
-                              <span className="ckv-check" aria-hidden="true">{active ? "✓" : ""}</span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="cart-voucher-hint">No vouchers on your account. Enter a code if you have one.</p>
+                  <button
+                    type="button"
+                    className="cart-voucher-toggle"
+                    onClick={() => setVoucherOpen((o) => !o)}
+                    aria-expanded={voucherOpen}
+                  >
+                    <span className="cart-ship-title">Voucher</span>
+                    <span className="cart-voucher-apply">
+                      {voucherDiscount > 0 ? `Applied · ${voucherCode}` : "Apply"}
+                      <span className="cart-voucher-caret" aria-hidden="true">{voucherOpen ? "▲" : "▾"}</span>
+                    </span>
+                  </button>
+
+                  {voucherOpen && (
+                    <div className="cart-voucher-panel">
+                      <p className="cart-voucher-note">Choose one voucher to use (only one per order).</p>
+                      {vouchers.length > 0 ? (
+                        <ul className="ckv-list">
+                          {vouchers.map((v) => {
+                            const active = voucherCode === v.code;
+                            const off = v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`;
+                            return (
+                              <li key={v.code}>
+                                <button
+                                  type="button"
+                                  className={`ckv-opt${active ? " is-active" : ""}`}
+                                  onClick={() => applyVoucher(active ? "" : v.code)}
+                                  aria-pressed={active}
+                                >
+                                  <span className="ckv-off">{off}</span>
+                                  <span className="ckv-info">
+                                    <span className="ckv-code">{v.code}</span>
+                                    <span className="ckv-scope">{v.scopeType === "all" ? "Any product" : v.scopeValues.join(" / ")}{v.minSpend > 0 ? ` · min RM${v.minSpend}` : ""}</span>
+                                  </span>
+                                  <span className="ckv-check" aria-hidden="true">{active ? "✓" : ""}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="cart-voucher-hint">No vouchers on your account. Enter a code if you have one.</p>
+                      )}
+                      <div className="cart-voucher-manual">
+                        <input type="text" placeholder="Have a code? Enter it here" value={voucherInput} onChange={(e) => setVoucherInput(e.target.value.toUpperCase())} />
+                        <button type="button" onClick={() => applyVoucher(voucherInput)}>Apply</button>
+                      </div>
+                      {voucherMsg && <p className={`cart-voucher-msg ${voucherMsg.startsWith("✓") ? "ok" : "error"}`}>{voucherMsg}</p>}
+                    </div>
                   )}
-                  <div className="cart-voucher-manual">
-                    <input type="text" placeholder="Have a code? Enter it here" value={voucherInput} onChange={(e) => setVoucherInput(e.target.value.toUpperCase())} />
-                    <button type="button" onClick={() => applyVoucher(voucherInput)}>Apply</button>
-                  </div>
-                  {voucherMsg && <p className={`cart-voucher-msg ${voucherMsg.startsWith("✓") ? "ok" : "error"}`}>{voucherMsg}</p>}
                 </div>
               )}
 
@@ -712,6 +730,12 @@ export default function CartPage() {
         .cart-art-hint { display: block; margin-top: 4px; font-size: 11.5px; color: #9fb3c8; }
         .cart-voucher { margin: 10px 0 4px; }
         .cart-voucher .cart-ship-title { display: block; margin-bottom: 8px; }
+        .cart-voucher-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; background: none; border: 0; border-top: 1px solid rgba(120,160,210,.18); cursor: pointer; font-family: inherit; }
+        .cart-voucher-toggle .cart-ship-title { margin-bottom: 0; }
+        .cart-voucher-apply { display: inline-flex; align-items: center; gap: 6px; color: #35d8ff; font-weight: 700; font-size: 13px; }
+        .cart-voucher-caret { font-size: 10px; }
+        .cart-voucher-panel { margin-top: 6px; }
+        .cart-voucher-note { font-size: 12px; color: #9fb3c8; margin: 0 0 8px; }
         .cart-voucher-manual { display: flex; gap: 8px; margin-top: 8px; }
         .cart-voucher-manual input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(120,160,210,.35); background: rgba(10,23,48,.55); color: #e6eefc; }
         .cart-voucher-manual button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(53,216,255,.6); background: transparent; color: #35d8ff; font-weight: 700; cursor: pointer; }

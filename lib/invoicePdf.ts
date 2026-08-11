@@ -1,5 +1,12 @@
-// Dependency-free PDF generator for Malaysian LHDN-style E-Invoices.
-// Produces a valid single-page A4 PDF (Helvetica) as a Blob, downloadable client-side.
+// Dependency-free PDF generator for Sign Future documents (E-Invoice, Reload
+// slip, Statement). Produces a valid single-page A4 PDF as a Blob.
+//
+// Design: a navy brand header band carrying the company logo (fetched from
+// /logo.png and composited onto the band via <canvas>, embedded as a JPEG image
+// XObject), brand-coloured section titles, styled tables and a highlighted
+// totals box. Because the logo is embedded as binary JPEG, the PDF is assembled
+// as a byte array (not a string) so the xref offsets stay valid, and the two
+// document builders are async (they await the logo).
 
 export type Party = {
   name: string;
@@ -19,18 +26,18 @@ export type Party = {
 };
 
 export type EInvoiceItem = {
-  classification?: string; // e.g. "022"
-  unit?: string; // e.g. "EA"
-  itemRef?: string; // e.g. "#789487-1"
-  desc: string; // product name
-  details?: string[]; // extra spec lines
+  classification?: string;
+  unit?: string;
+  itemRef?: string;
+  desc: string;
+  details?: string[];
   qty: string;
-  unitPrice: string; // "RM6.40"
-  amount: string; // line amount excl. tax "RM28.35"
-  disc?: string; // "-" or "10%"
-  taxRate: string; // "10%"
-  taxAmount: string; // "RM0.64"
-  inclTax: string; // amount incl. tax "RM7.04"
+  unitPrice: string;
+  amount: string;
+  disc?: string;
+  taxRate: string;
+  taxAmount: string;
+  inclTax: string;
 };
 
 export type Payment = {
@@ -51,17 +58,17 @@ export type TaxSummary = {
 };
 
 export type InvoiceData = {
-  title?: string; // "E-INVOICE"
-  status?: string; // "Pending"
+  title?: string;
+  status?: string;
   invoiceRef: string;
   dateTime: string;
-  currency?: string; // "MYR"
-  exchangeRate?: string; // "1"
-  supplier?: Party; // defaults to Sign Future
+  currency?: string;
+  exchangeRate?: string;
+  supplier?: Party;
   payment?: Payment;
   buyer: Party;
   items: EInvoiceItem[];
-  subtotal: string; // total excluding tax
+  subtotal: string;
   taxAmount: string;
   totalInclTax: string;
   totalPayable: string;
@@ -89,126 +96,262 @@ export const SIGN_FUTURE_PAYMENT: Payment = {
   frequency: "Monthly",
 };
 
+// ---- brand palette (0..1 RGB for PDF) ----
+const NAVY = "0.043 0.090 0.188"; // #0b1730 header band
+const INK = "0.09 0.13 0.20"; // near-black body text
+const MUTED = "0.42 0.48 0.56"; // gray labels
+const CYAN = "0.208 0.847 1.0"; // #35d8ff accent
+const BOXBG = "0.945 0.965 1.0"; // pale blue totals box
+const RULE = "0.80 0.84 0.90"; // hairline rule
+const WHITE = "1 1 1";
+
 const esc = (s: string) =>
   String(s)
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)")
-    // strip non-ASCII so byte length == char length (keeps xref offsets valid)
     .replace(/[^\x20-\x7E]/g, "");
 
 // Rough Helvetica advance width (em) for right-aligned numbers/labels.
 const approxWidth = (s: string, size: number) => esc(s).length * size * 0.5;
 
-function pdfFromOps(ops: string[]): Blob {
-  const stream = ops.join("\n");
-  const objs: Record<number, string> = {
-    1: "<</Type /Catalog /Pages 2 0 R>>",
-    2: "<</Type /Pages /Kids [3 0 R] /Count 1>>",
-    3: "<</Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources <</Font <</F1 4 0 R /F2 5 0 R>>>> /Contents 6 0 R>>",
-    4: "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>",
-    5: "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold>>",
-    6: "<</Length " + stream.length + ">>\nstream\n" + stream + "\nendstream",
+// ---- byte-accurate PDF assembly (supports one embedded JPEG image) ----
+type EmbeddedImage = { jpeg: Uint8Array; w: number; h: number };
+
+function assemblePdf(stream: string, image?: EmbeddedImage | null): Blob {
+  const enc = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  const push = (data: Uint8Array | string) => {
+    const u = typeof data === "string" ? enc.encode(data) : data;
+    chunks.push(u);
+    length += u.length;
   };
-  let pdf = "%PDF-1.4\n";
+
+  const hasImg = !!image;
+  const xobjRes = hasImg ? " /XObject <</Im0 7 0 R>>" : "";
+  const objDefs = [
+    "<</Type /Catalog /Pages 2 0 R>>",
+    "<</Type /Pages /Kids [3 0 R] /Count 1>>",
+    `<</Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources <</Font <</F1 4 0 R /F2 5 0 R>>${xobjRes}>> /Contents 6 0 R>>`,
+    "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>",
+    "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold>>",
+  ];
+
   const offsets: number[] = [];
-  for (let i = 1; i <= 6; i++) {
-    offsets[i] = pdf.length;
-    pdf += `${i} 0 obj\n${objs[i]}\nendobj\n`;
+  push("%PDF-1.4\n");
+  for (let i = 0; i < 5; i++) {
+    offsets[i + 1] = length;
+    push(`${i + 1} 0 obj\n${objDefs[i]}\nendobj\n`);
   }
-  const xrefStart = pdf.length;
-  pdf += "xref\n0 7\n0000000000 65535 f \n";
-  for (let i = 1; i <= 6; i++) {
-    pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+  // object 6 — content stream
+  const streamBytes = enc.encode(stream);
+  offsets[6] = length;
+  push(`6 0 obj\n<</Length ${streamBytes.length}>>\nstream\n`);
+  push(streamBytes);
+  push("\nendstream\nendobj\n");
+
+  let count = 6;
+  if (hasImg) {
+    count = 7;
+    offsets[7] = length;
+    push(
+      `7 0 obj\n<</Type /XObject /Subtype /Image /Width ${image!.w} /Height ${image!.h} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image!.jpeg.length}>>\nstream\n`,
+    );
+    push(image!.jpeg);
+    push("\nendstream\nendobj\n");
   }
-  pdf += "trailer\n<</Size 7 /Root 1 0 R>>\nstartxref\n" + xrefStart + "\n%%EOF";
-  return new Blob([pdf], { type: "application/pdf" });
+
+  const xrefStart = length;
+  let xref = `xref\n0 ${count + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= count; i++) xref += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+  push(xref);
+  push(`trailer\n<</Size ${count + 1} /Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`);
+
+  return new Blob(chunks as BlobPart[], { type: "application/pdf" });
 }
 
-export function buildInvoicePdf(d: InvoiceData): Blob {
-  const ops: string[] = [];
-  const text = (x: number, y: number, size: number, font: string, s: string) =>
-    ops.push(`BT /${font} ${size} Tf ${x} ${y} Td (${esc(s)}) Tj ET`);
-  const textR = (xR: number, y: number, size: number, font: string, s: string) =>
-    text(xR - approxWidth(s, size), y, size, font, s);
-  const line = (x1: number, y1: number, x2: number, y2: number, w = 0.6) =>
-    ops.push(`${w} w 0.55 0.6 0.7 RG ${x1} ${y1} m ${x2} ${y2} l S`);
+// ---- logo: fetch /logo.png, composite on the navy band, embed as JPEG ----
+const LOGO_ASPECT = 1979 / 440; // native logo w/h
+let logoCache: EmbeddedImage | null | undefined;
 
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const b64 = dataUrl.split(",")[1] || "";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function getBrandLogo(): Promise<EmbeddedImage | null> {
+  if (logoCache !== undefined) return logoCache;
+  try {
+    if (typeof document === "undefined") throw new Error("no dom");
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = "/logo.png";
+    });
+    const h = 176;
+    const w = Math.round(h * (img.width / img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no ctx");
+    // fill with the navy band colour so the transparent logo blends seamlessly
+    ctx.fillStyle = "#0b1730";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    logoCache = { jpeg: dataUrlToBytes(canvas.toDataURL("image/jpeg", 0.92)), w, h };
+  } catch {
+    logoCache = null;
+  }
+  return logoCache;
+}
+
+// ---- shared drawing helpers over an ops buffer ----
+function pen(ops: string[]) {
+  const text = (x: number, y: number, size: number, font: string, s: string, color = INK) =>
+    ops.push(`${color} rg BT /${font} ${size} Tf ${x} ${y} Td (${esc(s)}) Tj ET`);
+  const textR = (xR: number, y: number, size: number, font: string, s: string, color = INK) =>
+    text(xR - approxWidth(s, size), y, size, font, s, color);
+  const rule = (x1: number, y: number, x2: number, color = RULE, w = 0.6) =>
+    ops.push(`${w} w ${color} RG ${x1} ${y} m ${x2} ${y} l S`);
+  const box = (x: number, y: number, w: number, h: number, color: string) =>
+    ops.push(`${color} rg ${x} ${y} ${w} ${h} re f`);
+  const image = (imX: number, imY: number, imW: number, imH: number) =>
+    ops.push(`q ${imW} 0 0 ${imH} ${imX} ${imY} cm /Im0 Do Q`);
+  return { text, textR, rule, box, image };
+}
+
+// Navy header band with the logo (or a text fallback) + the document title.
+function header(ops: string[], logo: EmbeddedImage | null, title: string) {
+  const p = pen(ops);
+  const bandY = 788;
+  const bandH = 54;
+  p.box(0, bandY, 595, bandH, NAVY); // navy band
+  p.box(0, bandY - 3, 595, 3, CYAN); // cyan accent under the band
+  if (logo) {
+    const h = 34;
+    const w = Math.round(h * LOGO_ASPECT);
+    p.image(40, bandY + (bandH - h) / 2, w, h);
+  } else {
+    p.text(40, bandY + 20, 20, "F2", "SIGN FUTURE", WHITE);
+    p.text(40, bandY + 8, 8, "F1", "Brighten Your Future", "0.7 0.8 0.95");
+  }
+  p.textR(555, bandY + 20, 17, "F2", title, WHITE);
+  return bandY - 3; // y just under the accent line
+}
+
+function footer(ops: string[], note: string) {
+  const p = pen(ops);
+  p.rule(40, 66, 555, RULE, 0.6);
+  p.text(40, 54, 7.5, "F1", note, MUTED);
+  p.textR(555, 54, 7.5, "F2", "signfuture.com.my", CYAN);
+}
+
+// =====================================================================
+//  E-INVOICE
+// =====================================================================
+export async function buildInvoicePdf(d: InvoiceData): Promise<Blob> {
+  const logo = await getBrandLogo();
+  const ops: string[] = [];
+  const p = pen(ops);
   const sup = { ...SIGN_FUTURE_SUPPLIER, ...d.supplier };
   const pay = { ...SIGN_FUTURE_PAYMENT, ...d.payment };
   const b = d.buyer;
-  const L = 40; // left margin
-  const R = 555; // right edge
+  const L = 40;
+  const R = 555;
 
-  // ---- letterhead (left) ----
-  text(L, 808, 13, "F2", `${sup.name} (${sup.regNo})`);
-  text(L, 794, 8, "F1", sup.address ?? "");
-  text(L, 783, 8, "F1", "Email: " + (sup.email ?? ""));
-  text(L, 772, 8, "F1", "Contact No: " + (sup.contact ?? ""));
+  header(ops, logo, d.title ?? "E-INVOICE");
 
-  // ---- e-invoice meta (right) ----
-  textR(R, 808, 14, "F2", d.title ?? "E-INVOICE");
-  textR(R, 793, 8, "F1", "E-Invoice Status: " + (d.status ?? "Pending"));
-  textR(R, 782, 8, "F1", "Original Invoice Ref. No.: " + d.invoiceRef);
-  textR(R, 771, 8, "F1", "Invoice Date and Time: " + d.dateTime);
-  textR(R, 760, 8, "F1", "Invoice Currency Code: " + (d.currency ?? "MYR"));
-  textR(R, 749, 8, "F1", "Currency Exchange Rate: " + (d.exchangeRate ?? "1"));
-
-  line(L, 742, R, 742);
-
-  // ---- supplier block (left) ----
-  let ly = 728;
-  text(L, ly, 9, "F2", sup.name.toUpperCase());
-  ly -= 14;
-  const supLines = [
-    "Supplier TIN: " + (sup.tin ?? "N/A"),
-    "Supplier Registration Number: " + (sup.regNo ?? "N/A"),
-    "Supplier SST ID: " + (sup.sstId ?? "N/A"),
-    "Supplier Tourism Tax: " + (sup.tourismTax ?? "N/A"),
-    "Supplier MSIC code: " + (sup.msic ?? "N/A"),
-    "Supplier Business Activity Description: " + (sup.activity ?? "N/A"),
+  // meta strip under the band (right-aligned)
+  let my = 770;
+  const meta: [string, string][] = [
+    ["Status", d.status ?? "Pending"],
+    ["Invoice Ref.", d.invoiceRef],
+    ["Date & Time", d.dateTime],
+    ["Currency", `${d.currency ?? "MYR"}  (rate ${d.exchangeRate ?? "1"})`],
   ];
-  for (const s of supLines) {
-    text(L, ly, 8, "F1", s);
-    ly -= 11;
+  for (const [k, v] of meta) {
+    p.textR(R - approxWidth(v, 8.5) - 6, my, 7.5, "F1", k, MUTED);
+    p.textR(R, my, 8.5, "F2", v);
+    my -= 13;
   }
 
-  // ---- payment block (right) ----
-  let py = 728;
-  const payLines = [
-    "Payment Mode: " + (pay.mode ?? "Other"),
-    "Bank Account no.: " + (pay.bankAccount ?? "N/A"),
-    pay.bankName ?? "",
-    "Frequency of billing: " + (pay.frequency ?? "N/A"),
-    "Billing Period: " + (pay.billingPeriod ?? "N/A"),
-  ];
-  for (const s of payLines) {
-    if (s) text(320, py, 8, "F1", s);
-    py -= 12;
-  }
-
-  // ---- buyer block (left) ----
+  // supplier letterhead (left)
+  let ly = 770;
+  p.text(L, ly, 11, "F2", sup.name, NAVY);
+  ly -= 13;
+  p.text(L, ly, 8, "F1", sup.address ?? "", MUTED);
+  ly -= 11;
+  p.text(L, ly, 8, "F1", `Email: ${sup.email ?? ""}   Tel: ${sup.contact ?? ""}`, MUTED);
   ly -= 6;
-  const buyerLines = [
-    "Buyer Name: " + b.name,
-    "Buyer TIN: " + (b.tin ?? "N/A"),
-    "Buyer Identification Number: " + (b.idNo ?? "N/A"),
-    "Buyer Registration Number: " + (b.regNo ?? "N/A"),
-    "Buyer City Name: " + (b.city ?? "N/A"),
-    "Buyer Postal Code: " + (b.postal ?? "N/A"),
-    "Buyer State Code: " + (b.stateCode ?? "N/A"),
-    "Buyer Address: " + (b.address ?? "N/A"),
-    "Buyer Contact Number (Mobile): " + (b.contact ?? "N/A"),
-    "Buyer Email: " + (b.email ?? "N/A"),
+
+  const cardTop = Math.min(ly, my) - 6;
+
+  // supplier details (left column)
+  let sy = cardTop - 4;
+  p.text(L, sy, 8.5, "F2", "SUPPLIER", CYAN);
+  sy -= 14;
+  const supLines = [
+    ["TIN", sup.tin ?? "N/A"],
+    ["Registration No.", sup.regNo ?? "N/A"],
+    ["SST ID", sup.sstId ?? "N/A"],
+    ["Tourism Tax", sup.tourismTax ?? "N/A"],
+    ["MSIC Code", sup.msic ?? "N/A"],
+    ["Activity", sup.activity ?? "N/A"],
   ];
-  for (const s of buyerLines) {
-    text(L, ly, 8, "F1", s);
-    ly -= 11;
+  for (const [k, v] of supLines) {
+    p.text(L, sy, 8, "F1", k, MUTED);
+    p.text(L + 96, sy, 8, "F1", v);
+    sy -= 11;
   }
 
-  // ---- line items table ----
-  let y = Math.min(ly, py) - 8;
-  // column x positions (right edges for numeric columns)
+  // payment details (right column)
+  let py = cardTop - 4;
+  p.text(320, py, 8.5, "F2", "PAYMENT", CYAN);
+  py -= 14;
+  const payLines = [
+    ["Mode", pay.mode ?? "Other"],
+    ["Bank Account", pay.bankAccount ?? "N/A"],
+    ["Bank", pay.bankName ?? "N/A"],
+    ["Frequency", pay.frequency ?? "N/A"],
+    ["Billing Period", pay.billingPeriod ?? "N/A"],
+  ];
+  for (const [k, v] of payLines) {
+    p.text(320, py, 8, "F1", k, MUTED);
+    p.text(320 + 84, py, 8, "F1", v);
+    py -= 11;
+  }
+
+  // buyer block (left, below supplier)
+  let by = Math.min(sy, py) - 8;
+  p.text(L, by, 8.5, "F2", "BUYER", CYAN);
+  by -= 14;
+  const buyerLines = [
+    ["Name", b.name],
+    ["TIN", b.tin ?? "N/A"],
+    ["ID Number", b.idNo ?? "N/A"],
+    ["Registration No.", b.regNo ?? "N/A"],
+    ["City", b.city ?? "N/A"],
+    ["Postal Code", b.postal ?? "N/A"],
+    ["State Code", b.stateCode ?? "N/A"],
+    ["Address", b.address ?? "N/A"],
+    ["Contact (Mobile)", b.contact ?? "N/A"],
+    ["Email", b.email ?? "N/A"],
+  ];
+  for (const [k, v] of buyerLines) {
+    p.text(L, by, 8, "F1", k, MUTED);
+    p.text(L + 96, by, 8, "F1", v);
+    by -= 11;
+  }
+
+  // ---- line-items table ----
+  let y = by - 10;
   const cDesc = L;
   const cQty = 318;
   const cUnit = 372;
@@ -217,145 +360,95 @@ export function buildInvoicePdf(d: InvoiceData): Blob {
   const cTaxA = 512;
   const cIncl = R;
 
-  line(L, y + 4, R, y + 4);
-  text(cDesc, y - 6, 7.5, "F2", "Description");
-  textR(cQty, y - 6, 7.5, "F2", "Qty");
-  textR(cUnit, y - 6, 7.5, "F2", "Unit Price");
-  textR(cAmt, y - 6, 7.5, "F2", "Amount");
-  textR(cTaxR, y - 6, 7.5, "F2", "Tax %");
-  textR(cTaxA, y - 6, 7.5, "F2", "Tax Amt");
-  textR(cIncl, y - 6, 7.5, "F2", "Incl. Tax");
-  y -= 12;
-  line(L, y, R, y);
-  y -= 14;
+  p.box(L, y - 4, R - L, 16, NAVY); // navy table header
+  p.text(cDesc + 4, y, 7.5, "F2", "DESCRIPTION", WHITE);
+  p.textR(cQty, y, 7.5, "F2", "Qty", WHITE);
+  p.textR(cUnit, y, 7.5, "F2", "Unit Price", WHITE);
+  p.textR(cAmt, y, 7.5, "F2", "Amount", WHITE);
+  p.textR(cTaxR, y, 7.5, "F2", "Tax %", WHITE);
+  p.textR(cTaxA, y, 7.5, "F2", "Tax Amt", WHITE);
+  p.textR(cIncl - 4, y, 7.5, "F2", "Incl. Tax", WHITE);
+  y -= 22;
 
   for (const it of d.items) {
     const tag = [it.classification, it.unit, it.itemRef].filter(Boolean).join("  ");
     if (tag) {
-      text(cDesc, y, 7.5, "F1", tag);
+      p.text(cDesc + 4, y, 7.5, "F1", tag, MUTED);
       y -= 11;
     }
-    // numeric row aligned to the product-name line
-    text(cDesc, y, 9, "F2", it.desc);
-    textR(cQty, y, 8, "F1", it.qty);
-    textR(cUnit, y, 8, "F1", it.unitPrice);
-    textR(cAmt, y, 8, "F1", it.amount);
-    textR(cTaxR, y, 8, "F1", it.taxRate);
-    textR(cTaxA, y, 8, "F1", it.taxAmount);
-    textR(cIncl, y, 8, "F1", it.inclTax);
+    p.text(cDesc + 4, y, 9, "F2", it.desc, INK);
+    p.textR(cQty, y, 8, "F1", it.qty);
+    p.textR(cUnit, y, 8, "F1", it.unitPrice);
+    p.textR(cAmt, y, 8, "F1", it.amount);
+    p.textR(cTaxR, y, 8, "F1", it.taxRate);
+    p.textR(cTaxA, y, 8, "F1", it.taxAmount);
+    p.textR(cIncl - 4, y, 8, "F1", it.inclTax);
     y -= 13;
     for (const dl of it.details ?? []) {
-      text(cDesc + 6, y, 7.5, "F1", dl);
+      p.text(cDesc + 10, y, 7.5, "F1", dl, MUTED);
       y -= 10;
     }
-    y -= 4;
+    y -= 3;
+    p.rule(L, y + 3, R, RULE, 0.4);
   }
 
-  line(L, y + 4, R, y + 4);
-
-  // ---- totals (right) ----
-  y -= 12;
+  // ---- totals box (right) ----
+  y -= 10;
+  const boxX = 330;
+  const boxW = R - boxX;
+  const boxH = 74;
+  p.box(boxX, y - boxH + 14, boxW, boxH, BOXBG);
+  let ty = y;
   const totRows: [string, string][] = [
-    ["Subtotal / Total excluding tax", d.subtotal],
+    ["Subtotal (excl. tax)", d.subtotal],
     ["Tax Amount", d.taxAmount],
-    ["Total including tax", d.totalInclTax],
+    ["Total (incl. tax)", d.totalInclTax],
   ];
   for (const [label, val] of totRows) {
-    text(360, y, 8.5, "F1", label);
-    textR(R, y, 8.5, "F1", val);
-    y -= 14;
+    p.text(boxX + 10, ty, 8.5, "F1", label, MUTED);
+    p.textR(R - 10, ty, 8.5, "F1", val);
+    ty -= 15;
   }
-  text(360, y, 10.5, "F2", "Total Payable Amount");
-  textR(R, y, 10.5, "F2", d.totalPayable);
-  y -= 22;
+  p.rule(boxX + 10, ty + 6, R - 10, RULE, 0.5);
+  ty -= 4;
+  p.text(boxX + 10, ty, 10.5, "F2", "Total Payable", NAVY);
+  p.textR(R - 10, ty, 11.5, "F2", d.totalPayable, NAVY);
 
   // ---- tax summary ----
   if (d.taxSummary) {
     const t = d.taxSummary;
-    line(L, y + 4, R, y + 4);
-    text(L, y - 6, 7, "F2", "Total Product / Service Price");
-    text(190, y - 6, 7, "F2", "Tax type");
-    text(255, y - 6, 7, "F2", "Tax Rate");
-    text(315, y - 6, 7, "F2", "Tax amount");
-    text(390, y - 6, 7, "F2", "Tax Exemption");
-    text(475, y - 6, 7, "F2", "Amount Exempted");
-    y -= 18;
-    text(L, y, 8, "F1", t.productPrice);
-    text(190, y, 8, "F1", t.taxType);
-    text(255, y, 8, "F1", t.taxRate);
-    text(315, y, 8, "F1", t.taxAmount);
-    text(390, y, 8, "F1", t.exemptionDetails);
-    text(475, y, 8, "F1", t.amountExempted);
+    let z = y - 4;
+    p.text(L, z, 8, "F2", "TAX SUMMARY", CYAN);
+    z -= 15;
+    p.box(L, z - 3, 290, 15, NAVY);
+    p.text(L + 4, z, 6.8, "F2", "Product Price", WHITE);
+    p.text(L + 78, z, 6.8, "F2", "Type", WHITE);
+    p.text(L + 120, z, 6.8, "F2", "Rate", WHITE);
+    p.text(L + 158, z, 6.8, "F2", "Tax", WHITE);
+    p.text(L + 205, z, 6.8, "F2", "Exemption", WHITE);
+    z -= 16;
+    p.text(L + 4, z, 7.5, "F1", t.productPrice);
+    p.text(L + 78, z, 7.5, "F1", t.taxType);
+    p.text(L + 120, z, 7.5, "F1", t.taxRate);
+    p.text(L + 158, z, 7.5, "F1", t.taxAmount);
+    p.text(L + 205, z, 7.5, "F1", t.exemptionDetails);
   }
 
-  // ---- footer ----
-  text(L, 60, 7.5, "F1", "This is a computer-generated e-invoice. No signature is required.");
-  text(L, 50, 7.5, "F1", sup.name + "  |  signfuture.com.my");
-
-  return pdfFromOps(ops);
+  footer(ops, "This is a computer-generated e-invoice. No signature is required.");
+  return assemblePdf(ops.join("\n"), logo);
 }
 
-// ---- simple statement (monthly roll-up of invoices) ----
-export type StatementData = {
-  title?: string;
-  periodLabel: string;
-  memberName: string;
-  memberNo: string;
-  rows: { date: string; ref: string; product: string; status: string; total: string }[];
-  total: string;
-};
-
-export function buildStatementPdf(d: StatementData): Blob {
-  const ops: string[] = [];
-  const text = (x: number, y: number, size: number, font: string, s: string) =>
-    ops.push(`BT /${font} ${size} Tf ${x} ${y} Td (${esc(s)}) Tj ET`);
-  const textR = (xR: number, y: number, size: number, font: string, s: string) =>
-    text(xR - approxWidth(s, size), y, size, font, s);
-  const line = (x1: number, y1: number, x2: number, y2: number, w = 0.6) =>
-    ops.push(`${w} w 0.55 0.6 0.7 RG ${x1} ${y1} m ${x2} ${y2} l S`);
-
-  const sup = SIGN_FUTURE_SUPPLIER;
-  text(40, 800, 20, "F2", "SIGN FUTURE");
-  text(40, 784, 9, "F1", sup.name + " (" + sup.regNo + ")");
-  textR(555, 802, 16, "F2", d.title ?? "STATEMENT");
-  textR(555, 786, 10, "F1", "Period: " + d.periodLabel);
-  line(40, 774, 555, 774);
-
-  text(40, 754, 10, "F2", "Member");
-  text(40, 740, 9, "F1", d.memberName + "  (Member " + d.memberNo + ")");
-
-  let y = 712;
-  text(40, y, 9, "F2", "Date");
-  text(120, y, 9, "F2", "Ref");
-  text(220, y, 9, "F2", "Product");
-  textR(555, y, 9, "F2", "Total (RM)");
-  line(40, y - 6, 555, y - 6);
-  y -= 22;
-  for (const r of d.rows) {
-    text(40, y, 9, "F1", r.date);
-    text(120, y, 9, "F1", r.ref);
-    text(220, y, 9, "F1", r.product.slice(0, 40));
-    textR(555, y, 9, "F1", r.total);
-    y -= 18;
-  }
-  line(360, y - 2, 555, y - 2);
-  y -= 18;
-  text(360, y, 11, "F2", "Total (RM)");
-  textR(555, y, 11, "F2", d.total);
-
-  text(40, 60, 8, "F1", "This is a computer-generated statement.  |  signfuture.com.my");
-  return pdfFromOps(ops);
-}
-
-// ---- reload / top-up confirmation slip ----
+// =====================================================================
+//  RELOAD / TOP-UP SLIP
+// =====================================================================
 export type ReloadSlipData = {
-  title?: string; // "RELOAD CONFIRMATION SLIP"
-  tagline?: string; // left header line, e.g. "Brighten Your Future"
-  transactionDate: string; // "20 June 2026"
+  title?: string;
+  tagline?: string;
+  transactionDate: string;
   transactionNo: string;
   agentCode: string;
-  billingTo: string[]; // name + address lines
-  rows: { method: string; amount: string }[]; // top-up methods + amounts (no "RM")
+  billingTo: string[];
+  rows: { method: string; amount: string }[];
   handlingCharge: string;
   totalAmount: string;
   amountInWords: string;
@@ -405,81 +498,136 @@ export function ringgitInWords(amount: number): string {
   return w + " ONLY";
 }
 
-export function buildReloadSlipPdf(d: ReloadSlipData): Blob {
+export async function buildReloadSlipPdf(d: ReloadSlipData): Promise<Blob> {
+  const logo = await getBrandLogo();
   const ops: string[] = [];
-  const text = (x: number, y: number, size: number, font: string, s: string) =>
-    ops.push(`BT /${font} ${size} Tf ${x} ${y} Td (${esc(s)}) Tj ET`);
-  const textR = (xR: number, y: number, size: number, font: string, s: string) =>
-    text(xR - approxWidth(s, size), y, size, font, s);
-  const line = (x1: number, y1: number, x2: number, y2: number, w = 0.6) =>
-    ops.push(`${w} w 0.55 0.6 0.7 RG ${x1} ${y1} m ${x2} ${y2} l S`);
-
+  const p = pen(ops);
   const sup = SIGN_FUTURE_SUPPLIER;
   const L = 40;
   const R = 555;
 
-  // header
-  text(L, 805, 11, "F1", d.tagline ?? "Brighten Your Future");
-  textR(R, 805, 14, "F2", d.title ?? "RELOAD CONFIRMATION SLIP");
+  header(ops, logo, d.title ?? "RELOAD SLIP");
+
+  // transaction meta (right, under band)
+  let my = 768;
+  const meta: [string, string][] = [
+    ["Transaction Date", d.transactionDate],
+    ["Transaction No.", d.transactionNo],
+    ["Agent Code", d.agentCode],
+  ];
+  for (const [k, v] of meta) {
+    p.textR(R - approxWidth(v, 9) - 8, my, 7.5, "F1", k, MUTED);
+    p.textR(R, my, 9, "F2", v);
+    my -= 15;
+  }
 
   // company (left)
-  let y = 782;
-  text(L, y, 11, "F2", sup.name.toUpperCase());
+  let y = 768;
+  p.text(L, y, 11, "F2", sup.name, NAVY);
   y -= 13;
-  for (const ln of (sup.address ?? "").split(", ")) {
-    text(L, y, 8.5, "F1", ln);
-    y -= 11;
-  }
-  text(L, y, 8.5, "F1", "TEL : " + (sup.contact ?? ""));
+  p.text(L, y, 8.5, "F1", sup.address ?? "", MUTED);
   y -= 11;
-  text(L, y, 8.5, "F1", "EMAIL : " + (sup.email ?? ""));
+  p.text(L, y, 8.5, "F1", `TEL: ${sup.contact ?? ""}`, MUTED);
+  y -= 11;
+  p.text(L, y, 8.5, "F1", `EMAIL: ${sup.email ?? ""}`, MUTED);
 
-  // transaction (right)
-  text(320, 782, 9, "F1", "Transaction Date  : " + d.transactionDate);
-  text(320, 768, 9, "F1", "Transaction No.   : " + d.transactionNo);
-
-  // agent code + billing to
-  let by = y - 26;
-  text(L, by, 9, "F2", "Agent Code : " + d.agentCode);
-  by -= 22;
-  text(L, by, 9, "F2", "Billing To :");
+  // billing-to card
+  let by = Math.min(y, my) - 22;
+  p.text(L, by, 8.5, "F2", "BILLING TO", CYAN);
   by -= 15;
   for (const ln of d.billingTo) {
-    text(L, by, 9, "F1", ln);
-    by -= 12;
+    p.text(L, by, 9.5, ln === d.billingTo[0] ? "F2" : "F1", ln, INK);
+    by -= 13;
   }
 
-  // table
-  let ty = by - 20;
-  line(L, ty + 12, R, ty + 12);
-  text(L, ty, 9, "F2", "No.");
-  text(80, ty, 9, "F2", "Top Up Method");
-  textR(R, ty, 9, "F2", "Amount (RM)");
-  ty -= 6;
-  line(L, ty, R, ty);
-  ty -= 18;
+  // ---- table ----
+  let ty = by - 22;
+  p.box(L, ty - 4, R - L, 16, NAVY);
+  p.text(L + 6, ty, 8.5, "F2", "No.", WHITE);
+  p.text(84, ty, 8.5, "F2", "Top Up Method", WHITE);
+  p.textR(R - 6, ty, 8.5, "F2", "Amount (RM)", WHITE);
+  ty -= 22;
   d.rows.forEach((r, i) => {
-    text(L, ty, 9, "F1", i + 1 + ".");
-    text(80, ty, 9, "F1", r.method);
-    textR(R, ty, 9, "F1", r.amount);
+    if (i % 2 === 1) p.box(L, ty - 5, R - L, 16, "0.96 0.975 0.99"); // zebra
+    p.text(L + 6, ty, 9, "F1", i + 1 + ".");
+    p.text(84, ty, 9, "F1", r.method);
+    p.textR(R - 6, ty, 9, "F1", r.amount);
     ty -= 18;
   });
+  p.rule(L, ty + 6, R, RULE, 0.5);
+
+  // ---- totals box ----
+  ty -= 6;
+  const boxX = 300;
+  const boxW = R - boxX;
+  p.box(boxX, ty - 34, boxW, 52, BOXBG);
+  p.text(boxX + 10, ty, 9, "F1", "Handling Charge", MUTED);
+  p.textR(R - 10, ty, 9, "F1", d.handlingCharge);
+  ty -= 16;
+  p.rule(boxX + 10, ty + 7, R - 10, RULE, 0.5);
   ty -= 4;
-  line(300, ty + 12, R, ty + 12);
-  text(360, ty, 9, "F1", "Handling Charge");
-  textR(R, ty, 9, "F1", d.handlingCharge);
-  ty -= 18;
-  text(360, ty, 10, "F2", "Total Amount");
-  textR(R, ty, 10, "F2", d.totalAmount);
-  line(300, ty - 6, R, ty - 6);
+  p.text(boxX + 10, ty, 11, "F2", "Total Amount", NAVY);
+  p.textR(R - 10, ty, 12, "F2", d.totalAmount, NAVY);
 
-  // amount in words
-  ty -= 28;
-  text(L, ty, 9, "F2", d.amountInWords);
+  // ---- amount in words ----
+  ty -= 34;
+  p.text(L, ty + 12, 7.5, "F1", "Amount in words", MUTED);
+  p.text(L, ty, 9.5, "F2", d.amountInWords, INK);
 
-  // note
-  text(L, 60, 8, "F1", "Note: This is a computer generated. No signature required.");
-  return pdfFromOps(ops);
+  footer(ops, "This is a computer-generated slip. No signature is required.");
+  return assemblePdf(ops.join("\n"), logo);
+}
+
+// =====================================================================
+//  STATEMENT (monthly roll-up) — sync, no logo needed
+// =====================================================================
+export type StatementData = {
+  title?: string;
+  periodLabel: string;
+  memberName: string;
+  memberNo: string;
+  rows: { date: string; ref: string; product: string; status: string; total: string }[];
+  total: string;
+};
+
+export async function buildStatementPdf(d: StatementData): Promise<Blob> {
+  const logo = await getBrandLogo();
+  const ops: string[] = [];
+  const p = pen(ops);
+  const L = 40;
+  const R = 555;
+
+  header(ops, logo, d.title ?? "STATEMENT");
+  p.textR(R, 770, 9, "F1", "Period: " + d.periodLabel, MUTED);
+
+  p.text(L, 758, 8.5, "F2", "MEMBER", CYAN);
+  p.text(L, 744, 10, "F2", d.memberName, INK);
+  p.text(L, 732, 8.5, "F1", "Member No. " + d.memberNo, MUTED);
+
+  let y = 706;
+  p.box(L, y - 4, R - L, 16, NAVY);
+  p.text(L + 6, y, 8.5, "F2", "Date", WHITE);
+  p.text(120, y, 8.5, "F2", "Ref", WHITE);
+  p.text(220, y, 8.5, "F2", "Product", WHITE);
+  p.textR(R - 6, y, 8.5, "F2", "Total (RM)", WHITE);
+  y -= 22;
+  d.rows.forEach((r, i) => {
+    if (i % 2 === 1) p.box(L, y - 5, R - L, 16, "0.96 0.975 0.99");
+    p.text(L + 6, y, 9, "F1", r.date);
+    p.text(120, y, 9, "F1", r.ref);
+    p.text(220, y, 9, "F1", r.product.slice(0, 42));
+    p.textR(R - 6, y, 9, "F1", r.total);
+    y -= 18;
+  });
+  p.rule(L, y + 6, R, RULE, 0.5);
+  y -= 8;
+  const boxX = 330;
+  p.box(boxX, y - 12, R - boxX, 26, BOXBG);
+  p.text(boxX + 10, y, 11, "F2", "Total (RM)", NAVY);
+  p.textR(R - 10, y, 12, "F2", d.total, NAVY);
+
+  footer(ops, "This is a computer-generated statement.");
+  return assemblePdf(ops.join("\n"), logo);
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

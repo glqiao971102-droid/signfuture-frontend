@@ -1,34 +1,74 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { api } from "@/lib/api";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
 import QuotationBrowser from "@/components/QuotationBrowser";
 import OrderStatusList from "@/components/OrderStatusList";
 import InvoiceList from "@/components/InvoiceList";
 import ReloadList from "@/components/ReloadList";
-import CustomTopUp from "@/components/CustomTopUp";
 import WalletTransactions from "@/components/WalletTransactions";
+import EditDetail from "@/components/EditDetail";
+import VoucherCards from "@/components/VoucherCards";
 import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 type SectionKey =
   | "consultant"
   | "quotation"
+  | "voucher"
   | "wallet"
   | "orders"
   | "invoice"
   | "reload"
-  | "pending";
+  | "pending"
+  | "installation"
+  | "installer"
+  | "account"
+  | "materialStore"
+  | "editDetail";
 
 // Left sidebar menu (Feedback Message removed). Each item swaps the right panel.
-const SIDE: { key: SectionKey; label: string; glyph: string }[] = [
+// `soon` items are disabled and show a small "soon" badge (coming later).
+const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] = [
   { key: "consultant", label: "My Consultant", glyph: "☎" },
   { key: "quotation", label: "My Quotation", glyph: "❝" },
+  { key: "voucher", label: "My Voucher", glyph: "▧" },
   { key: "wallet", label: "My Wallet", glyph: "◈" },
   { key: "orders", label: "Order Status", glyph: "⛟" },
   { key: "invoice", label: "Download Invoice", glyph: "⤓" },
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
+  { key: "installation", label: "My Installation", glyph: "⚒" },
+  { key: "installer", label: "Installer", glyph: "⚑", soon: true },
+  { key: "account", label: "Account", glyph: "⚙", soon: true },
+  { key: "materialStore", label: "Material Store", glyph: "▦", soon: true },
+  { key: "editDetail", label: "Edit Detail", glyph: "✎" },
+];
+
+// Customer-facing installation view: the Sales Ledger app's Installation tab
+// (Calendar / Map / Jobs only) embedded via ?customer=1, which hides its admin
+// sidebar/upload/tabs. Same :3200 origin the admin embed uses.
+const SALES_APP_ORIGIN =
+  process.env.NEXT_PUBLIC_SALES_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3200";
+
+// Malaysian states for the Installer directory's state filter.
+const MY_STATES = [
+  "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Labuan", "Melaka",
+  "Negeri Sembilan", "Pahang", "Penang", "Perak", "Perlis", "Putrajaya",
+  "Sabah", "Sarawak", "Selangor", "Terengganu",
+];
+
+// Installer directory. PLACEHOLDER sample data — replaced by real installers
+// once registration adds a "categories" step (users who pick "Installation").
+type Installer = { name: string; state: string; phone: string; areas: string };
+const INSTALLERS: Installer[] = [
+  { name: "Selangor Sign Install", state: "Selangor", phone: "012-345 6789", areas: "Shah Alam, Klang, Subang Jaya" },
+  { name: "Klang Valley Fitters", state: "Selangor", phone: "017-880 2211", areas: "Petaling Jaya, Puchong, Kajang" },
+  { name: "KL Central Installers", state: "Kuala Lumpur", phone: "013-221 4455", areas: "Bukit Bintang, Cheras, Setapak" },
+  { name: "Johor Bahru Signage Team", state: "Johor", phone: "019-770 3388", areas: "JB, Skudai, Kulai" },
+  { name: "Penang Island Mounting", state: "Penang", phone: "016-455 9090", areas: "Georgetown, Bayan Lepas, Butterworth" },
+  { name: "Ipoh Sign Crew", state: "Perak", phone: "011-2233 4455", areas: "Ipoh, Taiping" },
 ];
 
 // Order pipeline counts (top status cards).
@@ -40,16 +80,31 @@ const STATUS = [
 ];
 
 // The member's assigned consultant.
+// Default consultant, used when the member has no referrer on file / isn't
+// signed in to the backend. Real members show their own referrer (the admin
+// whose QR they scanned) — see api.myConsultant().
 const CONSULTANT = {
-  name: "Jacky Lim",
+  name: "Joe Lem",
   role: "Your Dedicated Sales Consultant",
   initials: "JL",
-  photo: "/consultant.jpg",
-  wa: "601113387198",
+  // Temporary placeholder until the real salesperson photo is uploaded.
+  photo: "/mascot-silver.webp",
+  wa: "60179907559",
 };
 
-// Customer service line for change-of-consultant requests.
-const SERVICE_WA = "601113387198";
+// Turn a local/intl phone into a wa.me-friendly number (Malaysia default).
+function waNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("60")) return digits;
+  if (digits.startsWith("0")) return `60${digits.slice(1)}`;
+  return digits;
+}
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "★";
+}
 
 // Net amount paid per month at the member's current tier (RM).
 const MONTHLY = [
@@ -87,11 +142,6 @@ const PENDING = [
 ];
 
 // Top-up packages (mirrors the /package promo) — shown in the My Wallet tab.
-const TOPUP_TIERS = [
-  { name: "Silver", glyph: "◆", topup: "RM 1,000", save: "50%", cls: "tier-silver", featured: false, perks: ["Lower unit prices", "Free vouchers", "Wallet credit for online orders"] },
-  { name: "Gold", glyph: "◆◆", topup: "RM 5,000", save: "60%", cls: "tier-gold", featured: true, perks: ["Bigger savings on every order", "Free vouchers", "Priority quotation"] },
-  { name: "Diamond", glyph: "◆◆◆", topup: "RM 10,000", save: "80%", cls: "tier-diamond", featured: false, perks: ["Maximum savings", "Free vouchers", "Best value for bulk orders"] },
-];
 
 const TIER_RATE: Record<MemberTier, number> = {
   Silver: 0.05,
@@ -107,6 +157,17 @@ const rm = (n: number) =>
 export default function AccountDashboard() {
   const { user } = useAuth();
   const [active, setActive] = useState<SectionKey>("consultant");
+  const [installerState, setInstallerState] = useState("Selangor");
+  // The member's consultant = the admin whose referral QR/code they registered
+  // under. Falls back to the default contact when there's no referrer / not
+  // signed in to the backend (e.g. preview session).
+  const [consultant, setConsultant] = useState<{ name: string; phone: string | null } | null>(null);
+  useEffect(() => {
+    api
+      .myConsultant()
+      .then((r) => setConsultant(r.consultant))
+      .catch(() => {});
+  }, []);
 
   if (!user) {
     return (
@@ -204,7 +265,10 @@ export default function AccountDashboard() {
   // ---- right-panel content per selected section ----
   const renderSection = () => {
     switch (active) {
-      case "consultant":
+      case "consultant": {
+        const cName = consultant?.name || CONSULTANT.name;
+        const cWa = waNumber(consultant?.phone) || CONSULTANT.wa;
+        const cInitials = consultant?.name ? initialsOf(consultant.name) : CONSULTANT.initials;
         return (
           <>
           {(user.stats || user.billing.address_1 || user.phone) && (
@@ -285,11 +349,11 @@ export default function AccountDashboard() {
             </div>
             <div className="acct-consultant-body">
               <span className="acct-consultant-avatar">
-                <span className="acct-consultant-fallback">{CONSULTANT.initials}</span>
+                <span className="acct-consultant-fallback">{cInitials}</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={CONSULTANT.photo}
-                  alt={CONSULTANT.name}
+                  alt={cName}
                   className="acct-consultant-img"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
@@ -297,30 +361,20 @@ export default function AccountDashboard() {
                 />
               </span>
               <div className="acct-consultant-info">
-                <strong>{CONSULTANT.name}</strong>
+                <strong>{cName}</strong>
                 <span>{CONSULTANT.role}</span>
               </div>
             </div>
             <div className="acct-consultant-actions">
               <a
-                href={`https://api.whatsapp.com/send?phone=${CONSULTANT.wa}&text=${encodeURIComponent(
-                  `Hi ${CONSULTANT.name}, I'm member ${user.memberNo}.`,
+                href={`https://api.whatsapp.com/send?phone=${cWa}&text=${encodeURIComponent(
+                  `Hi ${cName}, I'm member ${user.memberNo}.`,
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="acct-contact wa"
               >
-                <span>✆</span> WhatsApp {CONSULTANT.name.split(" ")[0]}
-              </a>
-              <a
-                href={`https://api.whatsapp.com/send?phone=${SERVICE_WA}&text=${encodeURIComponent(
-                  `Hi, I'm member ${user.memberNo}. I'd like to request a change of consultant.`,
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="acct-contact change"
-              >
-                <span>⇄</span> Request to Change Consultant
+                <span>✆</span> WhatsApp {cName.split(" ")[0]}
               </a>
             </div>
           </section>
@@ -329,6 +383,7 @@ export default function AccountDashboard() {
           {salesChart}
           </>
         );
+      }
 
       case "quotation":
         return (
@@ -338,6 +393,17 @@ export default function AccountDashboard() {
               <span>Filter by product, ref., date or status — then place your order.</span>
             </div>
             <QuotationBrowser quotes={SAMPLE_QUOTES} />
+          </section>
+        );
+
+      case "voucher":
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>My Voucher</h2>
+              <span>Your vouchers ready to use</span>
+            </div>
+            <VoucherCards />
           </section>
         );
 
@@ -353,40 +419,6 @@ export default function AccountDashboard() {
               </div>
               <WalletTransactions />
             </section>
-
-            <section className="acct-card acct-section-card">
-              <div className="acct-card-head">
-                <h2>Top Up Packages</h2>
-                <span>Top up now to enjoy a lower price and free vouchers.</span>
-              </div>
-              <div className="tier-grid">
-                {TOPUP_TIERS.map((t) => (
-                  <div key={t.name} className={`tier-card ${t.cls}${t.featured ? " featured" : ""}`}>
-                    {t.featured && <span className="tier-badge">Most Popular</span>}
-                    <span className="tier-glyph">{t.glyph}</span>
-                    <h2 className="tier-name">{t.name}</h2>
-                    <div className="tier-topup">
-                      <span>Top up</span>
-                      <strong>{t.topup}</strong>
-                    </div>
-                    <div className="tier-save">
-                      Save up to <b>{t.save}</b>
-                      <span className="plus">++</span>
-                    </div>
-                    <ul className="tier-perks">
-                      {t.perks.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                    <Link href="/package" className="hero-btn primary tier-btn">
-                      Top Up Now
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <CustomTopUp />
           </>
         );
 
@@ -457,6 +489,81 @@ export default function AccountDashboard() {
           </section>
         );
 
+      case "installation":
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>My Installation</h2>
+              <span>Your installation calendar, Malaysia map and jobs.</span>
+            </div>
+            <iframe
+              src={`${SALES_APP_ORIGIN}/?view=installation&customer=1`}
+              title="My Installation"
+              style={{
+                width: "100%",
+                height: "1900px",
+                border: "0",
+                borderRadius: "12px",
+                background: "#0b1220",
+              }}
+            />
+          </section>
+        );
+
+      case "installer": {
+        const list = INSTALLERS.filter((i) => i.state === installerState);
+        return (
+          <section className="acct-card acct-section-card">
+            <div className="acct-card-head">
+              <h2>Installer</h2>
+              <span>Pick a state to see the installers covering that area.</span>
+            </div>
+            <label
+              className="installer-state-filter"
+              style={{ display: "flex", alignItems: "center", gap: "10px", margin: "6px 0 4px", fontWeight: 700, color: "#b9c9dd" }}
+            >
+              <span>State</span>
+              <select
+                value={installerState}
+                onChange={(e) => setInstallerState(e.target.value)}
+                style={{
+                  padding: "8px 12px", borderRadius: "8px", minWidth: "220px",
+                  border: "1px solid rgba(120,150,190,0.4)", background: "rgba(3,15,31,0.6)",
+                  color: "#eaf2ff", fontWeight: 700,
+                }}
+              >
+                {MY_STATES.map((s) => (
+                  <option key={s} value={s} style={{ color: "#0b1220" }}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <p className="installer-count" style={{ color: "#9fb4d0", margin: "8px 0 12px", fontSize: "13px" }}>
+              {list.length} installer{list.length === 1 ? "" : "s"} in {installerState}
+            </p>
+            <div className="rec-list">
+              {list.map((i) => (
+                <article key={i.name + i.phone} className="rec-card">
+                  <div className="rec-main">
+                    <div className="rec-top">
+                      <strong className="rec-ref">{i.name}</strong>
+                      <span className="rec-status rs-pending">{i.state}</span>
+                    </div>
+                    <p className="rec-desc">Covers: {i.areas}</p>
+                    <p className="rec-need">📞 {i.phone}</p>
+                  </div>
+                </article>
+              ))}
+              {list.length === 0 && (
+                <div className="quote-empty">No installers in {installerState} yet.</div>
+              )}
+            </div>
+          </section>
+        );
+      }
+
+      case "editDetail":
+        return <EditDetail />;
+
       default:
         return null;
     }
@@ -471,60 +578,69 @@ export default function AccountDashboard() {
           <button
             key={s.key}
             type="button"
-            className={`acct-side-item${active === s.key ? " is-active" : ""}`}
-            onClick={() => setActive(s.key)}
+            className={`acct-side-item${active === s.key ? " is-active" : ""}${s.soon ? " is-soon" : ""}`}
+            onClick={() => {
+              if (!s.soon) setActive(s.key);
+            }}
+            disabled={s.soon}
             aria-current={active === s.key ? "page" : undefined}
           >
             <span className="acct-side-ico">{s.glyph}</span>
             <span>{s.label}</span>
+            {s.soon && <span className="acct-side-soon">soon</span>}
           </button>
         ))}
       </aside>
 
       {/* ---------- right main ---------- */}
       <div className="acct-main">
-        {/* member summary — always visible */}
-        <div className="acct-summary">
-          <span className={`acct-avatar tier-${tierClass}`}>
-            <span className="acct-avatar-fallback">◆</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/mascot-silver.webp"
-              alt=""
-              className="acct-avatar-img"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          </span>
-          <div className="acct-summary-meta">
-            <span className={`acct-tier-chip tier-${tierClass}`}>{tierLabel}</span>
-            <strong>{user.name}</strong>
-            <span className="acct-no">Member No. {user.memberNo}</span>
-          </div>
-          <div className="acct-summary-wallet">
-            <span>Wallet Balance</span>
-            <strong>
-              {walletCurrency} {rm(walletBalance)}
-            </strong>
-            <Link href="/package" className="hero-btn primary acct-topup">
-              Top Up
-            </Link>
-          </div>
-        </div>
-
-        {/* status cards — always visible */}
-        <div className="acct-status">
-          {STATUS.map((s) => (
-            <div key={s.label} className={`acct-status-card ${s.cls}`}>
-              <div>
-                <span className="acct-status-label">{s.label}</span>
-                <strong className="acct-status-value">{s.value}</strong>
+        {/* Member summary card + order status cards are shown ONLY on the My
+            Consultant section. Every other section (My Quotation, My Wallet, …)
+            goes straight to its own panel without this header. */}
+        {active === "consultant" && (
+          <>
+            <div className="acct-summary">
+              <span className={`acct-avatar tier-${tierClass}`}>
+                <span className="acct-avatar-fallback">◆</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/mascot-silver.webp"
+                  alt=""
+                  className="acct-avatar-img"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              </span>
+              <div className="acct-summary-meta">
+                <span className={`acct-tier-chip tier-${tierClass}`}>{tierLabel}</span>
+                <strong>{user.name}</strong>
+                <span className="acct-no">Member No. {user.memberNo}</span>
               </div>
-              <span className="acct-status-ico">{s.glyph}</span>
+              <div className="acct-summary-wallet">
+                <span>Wallet Balance</span>
+                <strong>
+                  {walletCurrency} {rm(walletBalance)}
+                </strong>
+                <Link href="/package" className="hero-btn primary acct-topup">
+                  Top Up
+                </Link>
+              </div>
             </div>
-          ))}
-        </div>
+
+            <div className="acct-status">
+              {STATUS.map((s) => (
+                <div key={s.label} className={`acct-status-card ${s.cls}`}>
+                  <div>
+                    <span className="acct-status-label">{s.label}</span>
+                    <strong className="acct-status-value">{s.value}</strong>
+                  </div>
+                  <span className="acct-status-ico">{s.glyph}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* swappable section panel */}
         <div className="acct-section" aria-label={activeLabel}>

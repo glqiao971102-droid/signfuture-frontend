@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { renderGet, renderPost, htmlHeaders } from "@/lib/boxup/server-impl";
 
 /**
@@ -104,6 +106,14 @@ const brand = (html: string, v: BoxUpVariant) => {
   }
   if (v.extraFields?.length) {
     out = applyExtraFields(out, v.extraFields);
+  }
+  // Per-product hero banner: every box-up page shares /3d-box-up/hero.png, but
+  // when a product-specific banner has been added at
+  // public/3d-box-up/hero-<slug>.png we swap it in for this product only.
+  const heroSlug = v.href.split("/").pop() || "";
+  const heroFile = `hero-${heroSlug}.png`;
+  if (heroSlug && existsSync(join(process.cwd(), "public", "3d-box-up", heroFile))) {
+    out = out.split('src="/3d-box-up/hero.png"').join(`src="/3d-box-up/${heroFile}"`);
   }
   return out;
 };

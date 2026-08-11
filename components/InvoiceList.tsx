@@ -9,6 +9,7 @@ import {
   type InvoiceData,
   type EInvoiceItem,
 } from "@/lib/invoicePdf";
+import { DEV_PREVIEW } from "@/lib/preview";
 
 const PER_PAGE = 10;
 
@@ -20,6 +21,120 @@ function formatDate(value: string): string {
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
+
+// Sample invoices shown in the preview (no backend). Each carries its own PDF
+// data so "Download PDF" works without fetching a real order.
+const SAMPLE_INVOICES: { row: InvoiceRow; data: InvoiceData }[] = [
+  {
+    row: {
+      orderId: -1001,
+      invoiceNumber: "INV-2026-0001",
+      invoiceDate: "2026-08-05 14:32:00",
+      total: 1272,
+      currency: "MYR",
+      status: "wc-completed",
+      statusLabel: "Completed",
+    },
+    data: {
+      title: "E-INVOICE",
+      status: "Valid",
+      invoiceRef: "INV-2026-0001",
+      dateTime: "2026-08-05 14:32:00",
+      currency: "MYR",
+      exchangeRate: "1",
+      buyer: {
+        name: "Acme Signs Sdn Bhd",
+        tin: "C1234567890",
+        regNo: "202301099888",
+        address: "12 Jalan PJU 5/1, Kota Damansara",
+        city: "Petaling Jaya",
+        postal: "47810",
+        stateCode: "Selangor",
+        email: "orders@acme.my",
+        contact: "012-345 6789",
+      },
+      items: [
+        {
+          itemRef: "#1001-1",
+          desc: "3D LED Box Up (Stainless Frontlit)",
+          details: ["Letter height: 30cm", "Depth: 8cm", "LED: White"],
+          qty: "1",
+          unitPrice: "RM980.00",
+          amount: "RM980.00",
+          disc: "-",
+          taxRate: "0%",
+          taxAmount: "RM0.00",
+          inclTax: "RM980.00",
+        },
+        {
+          itemRef: "#1001-2",
+          desc: "Neon Sign (Custom Wording)",
+          details: ["Colour: Ice Blue", "Size: 60cm"],
+          qty: "1",
+          unitPrice: "RM292.00",
+          amount: "RM292.00",
+          disc: "-",
+          taxRate: "0%",
+          taxAmount: "RM0.00",
+          inclTax: "RM292.00",
+        },
+      ],
+      subtotal: "RM1,272.00",
+      taxAmount: "RM0.00",
+      totalInclTax: "RM1,272.00",
+      totalPayable: "RM1,272.00",
+    },
+  },
+  {
+    row: {
+      orderId: -1002,
+      invoiceNumber: "INV-2026-0002",
+      invoiceDate: "2026-07-22 10:05:00",
+      total: 4500,
+      currency: "MYR",
+      status: "wc-completed",
+      statusLabel: "Completed",
+    },
+    data: {
+      title: "E-INVOICE",
+      status: "Valid",
+      invoiceRef: "INV-2026-0002",
+      dateTime: "2026-07-22 10:05:00",
+      currency: "MYR",
+      exchangeRate: "1",
+      buyer: {
+        name: "Sunrise Cafe Enterprise",
+        tin: "N/A",
+        regNo: "JR0056789-A",
+        address: "88 Jalan Bukit Bintang",
+        city: "Kuala Lumpur",
+        postal: "55100",
+        stateCode: "Kuala Lumpur",
+        email: "hello@sunrisecafe.my",
+        contact: "011-2233 4455",
+      },
+      items: [
+        {
+          itemRef: "#1002-1",
+          desc: "3D Printer Box Up (Backlit with 10mm Clear Acrylic)",
+          details: ["Letter height: 45cm", "Board: 3mm ACP"],
+          qty: "1",
+          unitPrice: "RM4,500.00",
+          amount: "RM4,500.00",
+          disc: "-",
+          taxRate: "0%",
+          taxAmount: "RM0.00",
+          inclTax: "RM4,500.00",
+        },
+      ],
+      subtotal: "RM4,500.00",
+      taxAmount: "RM0.00",
+      totalInclTax: "RM4,500.00",
+      totalPayable: "RM4,500.00",
+    },
+  },
+];
+const SAMPLE_INVOICE_DATA = new Map(SAMPLE_INVOICES.map((s) => [s.row.orderId, s.data]));
 
 /**
  * Real invoices, derived from the member's WooCommerce orders — an order
@@ -44,8 +159,8 @@ export default function InvoiceList() {
       setRows(res.data);
       setLastPage(res.meta.lastPage);
       setTotal(res.meta.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your invoices");
+    } catch {
+      // Not signed in to the backend (e.g. preview) — fall back to samples.
       setRows([]);
     } finally {
       setLoading(false);
@@ -61,11 +176,10 @@ export default function InvoiceList() {
     if (busyId) return;
     setBusyId(row.orderId);
     try {
-      const order = await api.order(row.orderId);
-      downloadBlob(
-        buildInvoicePdf(toInvoiceData(row, order, user?.name ?? "")),
-        `${row.invoiceNumber ?? `Order-${row.orderId}`}.pdf`,
-      );
+      const sample = SAMPLE_INVOICE_DATA.get(row.orderId);
+      const data = sample ?? toInvoiceData(row, await api.order(row.orderId), user?.name ?? "");
+      const blob = await buildInvoicePdf(data);
+      downloadBlob(blob, `${row.invoiceNumber ?? `Order-${row.orderId}`}.pdf`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not build the invoice PDF");
     } finally {
@@ -73,24 +187,27 @@ export default function InvoiceList() {
     }
   }
 
+  // Show the member's real invoices; only fall back to samples in local dev.
+  const shown = rows.length > 0 ? rows : DEV_PREVIEW ? SAMPLE_INVOICES.map((s) => s.row) : [];
+
   return (
     <>
       {error && <div className="quote-empty">{error}</div>}
-      {loading && !error && <div className="quote-empty">Loading invoices…</div>}
-      {!loading && !error && rows.length === 0 && (
+      {loading && <div className="quote-empty">Loading invoices…</div>}
+      {!loading && shown.length === 0 && (
         <div className="quote-empty">You have no invoices yet.</div>
       )}
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && shown.length > 0 && (
         <>
           <div className="wallet-tx-bar">
             <span className="wallet-tx-count">
-              {total.toLocaleString()} invoice{total === 1 ? "" : "s"}
+              {(rows.length > 0 ? total : shown.length).toLocaleString()} invoice{(rows.length > 0 ? total : shown.length) === 1 ? "" : "s"}
             </span>
           </div>
 
           <div className="rec-list">
-            {rows.map((inv) => {
+            {shown.map((inv) => {
               // Every order here was paid from the wallet, so anything not
               // cancelled or failed is settled.
               const paid = !["wc-cancelled", "wc-failed", "wc-refunded"].includes(inv.status);

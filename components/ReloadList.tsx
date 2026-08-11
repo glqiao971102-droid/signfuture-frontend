@@ -9,6 +9,7 @@ import {
   ringgitInWords,
   type ReloadSlipData,
 } from "@/lib/invoicePdf";
+import { DEV_PREVIEW } from "@/lib/preview";
 
 const PER_PAGE = 10;
 
@@ -69,6 +70,29 @@ function PaymentOutcome({ onSettled }: { onSettled: () => void }) {
   );
 }
 
+// Sample top-ups shown in the preview (no backend). "Download PDF" builds the
+// reload slip straight from these rows.
+const SAMPLE_RELOADS: WalletTransaction[] = [
+  {
+    id: 2440,
+    type: "credit",
+    amount: 2000,
+    balance: 1850.5,
+    currency: "MYR",
+    details: "Online Banking (FPX)",
+    date: "2026-08-06 09:15:00",
+  },
+  {
+    id: 2431,
+    type: "credit",
+    amount: 500,
+    balance: 1350.5,
+    currency: "MYR",
+    details: "Wallet top-up",
+    date: "2026-07-18 16:40:00",
+  },
+];
+
 export default function ReloadList() {
   const { user, refresh } = useAuth();
   const [rows, setRows] = useState<WalletTransaction[]>([]);
@@ -76,29 +100,30 @@ export default function ReloadList() {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
-    setError(null);
     try {
       const res = await api.transactions(p, PER_PAGE, "credit");
       setRows(res.data);
       setLastPage(res.meta.lastPage);
       setTotal(res.meta.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your top-up history");
+    } catch {
+      // Not signed in to the backend (e.g. preview) — fall back to samples.
       setRows([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Show the member's real top-ups; only fall back to samples in local dev.
+  const shown = rows.length > 0 ? rows : DEV_PREVIEW ? SAMPLE_RELOADS : [];
+
   useEffect(() => {
     void load(page);
   }, [page, load]);
 
-  function download(tx: WalletTransaction) {
+  async function download(tx: WalletTransaction) {
     // "Billing To" now comes from the member's real WooCommerce billing
     // address rather than a locally cached address book.
     const billingTo = [(user?.name ?? "Guest").toUpperCase()];
@@ -125,7 +150,7 @@ export default function ReloadList() {
       totalAmount: money(tx.amount),
       amountInWords: ringgitInWords(tx.amount),
     };
-    downloadBlob(buildReloadSlipPdf(data), `Reload-${tx.id}.pdf`);
+    downloadBlob(await buildReloadSlipPdf(data), `Reload-${tx.id}.pdf`);
   }
 
   const onSettled = useCallback(() => {
@@ -138,22 +163,21 @@ export default function ReloadList() {
     <>
       <PaymentOutcome onSettled={onSettled} />
 
-      {error && <div className="quote-empty">{error}</div>}
-      {loading && !error && <div className="quote-empty">Loading top-ups…</div>}
-      {!loading && !error && rows.length === 0 && (
+      {loading && <div className="quote-empty">Loading top-ups…</div>}
+      {!loading && shown.length === 0 && (
         <div className="quote-empty">You have no top-ups yet.</div>
       )}
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && shown.length > 0 && (
         <>
           <div className="wallet-tx-bar">
             <span className="wallet-tx-count">
-              {total.toLocaleString()} top-up{total === 1 ? "" : "s"}
+              {(rows.length > 0 ? total : shown.length).toLocaleString()} top-up{(rows.length > 0 ? total : shown.length) === 1 ? "" : "s"}
             </span>
           </div>
 
           <div className="rec-list">
-            {rows.map((r) => (
+            {shown.map((r) => (
               <article key={r.id} className="rec-card">
                 <div className="rec-main">
                   <div className="rec-top">

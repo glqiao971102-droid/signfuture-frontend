@@ -9,12 +9,16 @@ import { api, type NativeOrderRow } from "@/lib/api";
  * backend ORDER_STATUSES.
  */
 const STATUS_META: Record<string, { label: string; cls: string; pct: number }> = {
+  pending_confirmation: { label: "Pending Confirmation", cls: "rs-pending-confirm", pct: 5 },
+  on_hold: { label: "On Hold", cls: "rs-hold", pct: 5 },
   waiting: { label: "Waiting Order", cls: "rs-pending", pct: 10 },
+  pending: { label: "Waiting Order", cls: "rs-pending", pct: 10 },
   processing: { label: "Processing", cls: "rs-progress", pct: 35 },
   production: { label: "In Production", cls: "rs-progress", pct: 55 },
   ready: { label: "Available for Collection", cls: "rs-ready", pct: 80 },
   collection: { label: "Pickup Already", cls: "rs-success", pct: 100 },
   delivery: { label: "Delivery Arranged", cls: "rs-progress", pct: 88 },
+  shipped: { label: "Out for Delivery", cls: "rs-progress", pct: 88 },
   delivered: { label: "Delivered", cls: "rs-success", pct: 100 },
   completed: { label: "Completed", cls: "rs-success", pct: 100 },
   cancelled: { label: "Cancelled", cls: "rs-fail", pct: 0 },
@@ -24,6 +28,8 @@ const STATUS_META: Record<string, { label: string; cls: string; pct: number }> =
 
 // Chip order — only statuses that make sense as customer filters.
 const STATUS_ORDER = [
+  "pending_confirmation",
+  "on_hold",
   "waiting",
   "processing",
   "production",
@@ -33,6 +39,80 @@ const STATUS_ORDER = [
   "delivered",
   "completed",
   "cancelled",
+];
+
+/**
+ * The full customer-facing status lifecycle, shown as an always-visible guide so
+ * customers know exactly what every status means — independent of whether they
+ * currently have any orders.
+ */
+const STATUS_GUIDE: { key: string; label: string; cls: string; desc: string }[] = [
+  {
+    key: "pending_confirmation",
+    label: "Pending Confirmation",
+    cls: "rs-pending-confirm",
+    desc: "Express / special-request orders await our confirmation. Once approved they move to Processing; otherwise the order is cancelled and you'll be notified.",
+  },
+  {
+    key: "waiting",
+    label: "Waiting Order",
+    cls: "rs-pending",
+    desc: "Order received and queued — waiting to start.",
+  },
+  {
+    key: "on_hold",
+    label: "On Hold",
+    cls: "rs-hold",
+    desc: "Temporarily paused — e.g. awaiting artwork approval, payment, or stock.",
+  },
+  {
+    key: "processing",
+    label: "Processing",
+    cls: "rs-progress",
+    desc: "We're preparing your order for production.",
+  },
+  {
+    key: "production",
+    label: "In Production",
+    cls: "rs-progress",
+    desc: "Your item is being made.",
+  },
+  {
+    key: "ready",
+    label: "Available for Collection",
+    cls: "rs-ready",
+    desc: "Ready — you can collect it at our store.",
+  },
+  {
+    key: "shipped",
+    label: "Out for Delivery",
+    cls: "rs-progress",
+    desc: "Handed to the courier and on the way to you.",
+  },
+  {
+    key: "delivered",
+    label: "Delivered",
+    cls: "rs-success",
+    desc: "Delivered to your address.",
+  },
+  {
+    key: "collection",
+    label: "Collected",
+    cls: "rs-success",
+    desc: "Picked up at our store.",
+  },
+  {
+    key: "completed",
+    label: "Completed",
+    cls: "rs-success",
+    desc: "Order fully completed. Thank you!",
+  },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    cls: "rs-fail",
+    desc: "The order was cancelled.",
+  },
 ];
 
 const PER_PAGE = 10;
@@ -54,8 +134,11 @@ export default function OrderStatusList() {
   const [status, setStatus] = useState<string | "All">("All");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  // "unauthorized" when the viewer is not signed in to the backend (e.g. the
+  // preview session). We never surface a raw error here — the status guide is
+  // always shown, and the orders section just falls back to a gentle note.
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -63,10 +146,17 @@ export default function OrderStatusList() {
     api
       .myNativeOrders()
       .then((r) => {
-        if (alive) setOrders(r.data);
+        if (alive) {
+          setOrders(r.data);
+          setNeedsLogin(false);
+        }
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : "Could not load your orders");
+        if (!alive) return;
+        setOrders([]);
+        const msg = err instanceof Error ? err.message : String(err);
+        // Treat auth failures as "not signed in" rather than an error state.
+        setNeedsLogin(/unauth|401|forbidden|sign|token/i.test(msg));
       })
       .finally(() => alive && setLoading(false));
     return () => {
@@ -96,45 +186,68 @@ export default function OrderStatusList() {
 
   return (
     <>
-      <section className="acct-card order-flow">
+      {/* Always-visible legend: every status the system uses, and what it means. */}
+      <section className="acct-card">
         <div className="acct-card-head">
-          <h2>Order Statuses</h2>
-          <span>
-            {loading
-              ? "Loading your orders…"
-              : `${filtered.length.toLocaleString()} order${filtered.length === 1 ? "" : "s"} · click a status to filter`}
-          </span>
+          <h2>Order Status Guide</h2>
+          <span>What each status means — from order to collection or delivery</span>
         </div>
-        <div className="flow-chips">
-          <button
-            type="button"
-            onClick={() => changeStatus("All")}
-            className={`flow-chip rs-all${status === "All" ? " is-active" : ""}`}
-          >
-            All
-          </button>
-          {presentStatuses.map((s) => (
-            <button
-              type="button"
-              key={s}
-              onClick={() => changeStatus(s)}
-              className={`flow-chip ${meta(s).cls}${status === s ? " is-active" : ""}`}
-            >
-              {meta(s).label}
-            </button>
+        <div className="status-guide">
+          {STATUS_GUIDE.map((s) => (
+            <span key={s.key} className={`rec-status ${s.cls} status-guide-chip`}>
+              {s.label}
+            </span>
           ))}
         </div>
       </section>
 
-      {error && <div className="quote-empty">{error}</div>}
-      {loading && !error && <div className="quote-empty">Loading orders…</div>}
-      {!loading && !error && filtered.length === 0 && (
+      <section className="acct-card order-flow">
+        <div className="acct-card-head">
+          <h2>Your Orders</h2>
+          <span>
+            {loading
+              ? "Loading your orders…"
+              : `${filtered.length.toLocaleString()} order${filtered.length === 1 ? "" : "s"}${
+                  presentStatuses.length ? " · click a status to filter" : ""
+                }`}
+          </span>
+        </div>
+        {presentStatuses.length > 0 && (
+          <div className="flow-chips">
+            <button
+              type="button"
+              onClick={() => changeStatus("All")}
+              className={`flow-chip rs-all${status === "All" ? " is-active" : ""}`}
+            >
+              All
+            </button>
+            {presentStatuses.map((s) => (
+              <button
+                type="button"
+                key={s}
+                onClick={() => changeStatus(s)}
+                className={`flow-chip ${meta(s).cls}${status === s ? " is-active" : ""}`}
+              >
+                {meta(s).label}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {loading && <div className="quote-empty">Loading orders…</div>}
+
+      {!loading && filtered.length === 0 && (
         <div className="quote-empty">
-          {status === "All" ? "You have no orders yet." : "No orders with this status."}
+          {needsLogin
+            ? "Sign in to track your own orders here. The statuses above show every stage an order can go through."
+            : status === "All"
+              ? "You have no orders yet."
+              : "No orders with this status."}
         </div>
       )}
 
-      {!loading && !error && pageRows.length > 0 && (
+      {!loading && pageRows.length > 0 && (
         <>
           <div className="rec-list">
             {pageRows.map((o) => {

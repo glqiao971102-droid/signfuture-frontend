@@ -17,6 +17,7 @@ import {
   type MemberProfile,
   type MemberTier,
 } from "@/lib/api";
+import { DEV_PREVIEW } from "@/lib/preview";
 
 export type { MemberTier };
 
@@ -46,10 +47,42 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// TEMP DEV PREVIEW — auto-login as a Silver admin so account/admin pages are
+// viewable without a running backend. Remove this const and restore the initial
+// `useState<Member | null>(null)` / `useState(true)` below to return to normal
+// auth. (git checkout components/AuthProvider.tsx wipes this.)
+const PREVIEW_USER: Member = {
+  id: 1,
+  login: "john940827",
+  email: "john940827@gmail.com",
+  name: "John",
+  firstName: "John",
+  lastName: null,
+  tier: "Silver",
+  tierDiscount: 10,
+  largestTopup: 2000,
+  isAdmin: true,
+  isSuperAdmin: true,
+  memberNo: "SF-000123",
+  registeredAt: "2026-01-01T00:00:00Z",
+  roles: ["administrator", "silver_member"],
+  wallet: { balance: 1850.5, currency: "MYR" },
+  phone: "+60 12-345 6789",
+  billing: {},
+  shipping: {},
+  stats: { orderCount: 12, totalSpent: 8500 },
+  referralCode: null,
+  referredBy: null,
+  professions: [],
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<Member | null>(null);
-  const [loading, setLoading] = useState(true);
+  // DEV_PREVIEW: local dev auto-logs-in the preview user for convenience. In a
+  // production build DEV_PREVIEW is false, so live starts signed-out and runs
+  // the real token-restore flow below.
+  const [user, setUser] = useState<Member | null>(DEV_PREVIEW ? PREVIEW_USER : null);
+  const [loading, setLoading] = useState(!DEV_PREVIEW);
   // Referral code pulled from a ?ref=CODE link (e.g. a sales admin's QR code).
   const [pendingReferral, setPendingReferral] = useState<string | null>(null);
 

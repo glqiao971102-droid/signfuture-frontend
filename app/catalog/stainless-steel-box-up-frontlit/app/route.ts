@@ -14,7 +14,7 @@ export const maxDuration = 120;
 // affects the returns, which the 3D preview reads off Box Up Color.
 const { GET, POST } = boxUpRoutes({
   appRoute: "/catalog/stainless-steel-box-up-frontlit/app",
-  name: "3D Stainless Steel Box Up (Frontlit)",
+  name: "3D Stainless Steel Conceal Box Up (Frontlit)",
   href: "/catalog/stainless-steel-box-up-frontlit",
   optionOverrides: [
     STAINLESS_COLOUR_OPTIONS,

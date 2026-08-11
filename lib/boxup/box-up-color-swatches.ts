@@ -51,8 +51,14 @@ const style = `<style>
 // so the select is located via the surrounding result panel.
 const script = `<script>
 (function(){
-  if (window.__boxUpColorSwatchInit) return;
-  window.__boxUpColorSwatchInit = true;
+  // Guard on <html>, not window/document: results re-render via document.write
+  // (server-impl render()), which removes listeners but REUSES the same window
+  // and document objects — a flag on either survives and blocks re-binding,
+  // leaving the swatches dead after the first upload. document.write rebuilds the
+  // documentElement (<html>) node, so a flag there resets on every render.
+  var root = document.documentElement;
+  if (root.__boxUpColorSwatchInit) return;
+  root.__boxUpColorSwatchInit = true;
   var apply = function(group, value){
     var scope = group.closest('.result, .design-card') || document;
     var sel = scope.querySelector('.box-up-color-select');

@@ -214,7 +214,7 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
       {
         label: "Stainless Steel Box Up",
         children: [
-          { label: "3D Stainless Steel Box Up (Frontlit)", href: "/catalog/stainless-steel-box-up-frontlit", available: true },
+          { label: "3D Stainless Steel Conceal Box Up (Frontlit)", href: "/catalog/stainless-steel-box-up-frontlit", available: true },
           { label: "3D Stainless Steel Box Up (Backlit)", href: "/catalog/stainless-steel-box-up-backlit", available: true },
           { label: "3D Stainless Steel Box Up (Backlit with 10mm Clear Acrylic)", href: "/catalog/stainless-steel-box-up-backlit-acrylic", available: true },
         ],
@@ -222,7 +222,7 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
       {
         label: "EG Box Up",
         children: [
-          { label: "EG Box Up (Frontlit)", href: "/catalog/eg-box-up-frontlit", available: true },
+          { label: "3D EG Conceal Box Up (Frontlit)", href: "/catalog/eg-box-up-frontlit", available: true },
           { label: "EG Box Up (Backlit)", href: "/catalog/eg-box-up-backlit", available: true },
           { label: "EG Box Up (Backlit with 10mm Clear Acrylic)", href: "/catalog/eg-box-up-backlit-acrylic", available: true },
         ],

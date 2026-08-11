@@ -421,6 +421,16 @@ export const api = {
     );
   },
 
+  /**
+   * The signed-in member's consultant = the admin whose referral QR/code they
+   * registered under. `consultant` is null when the member has no referrer.
+   */
+  myConsultant() {
+    return request<{
+      consultant: { id: number; name: string; phone: string | null } | null;
+    }>("/api/v1/membership/consultant");
+  },
+
   /** Tier discount settings (admin). */
   adminTierDiscounts() {
     return request<{ discounts: Record<string, number> }>("/api/v1/admin/settings/tier-discounts");

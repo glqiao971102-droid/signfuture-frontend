@@ -12,7 +12,7 @@ export const maxDuration = 120;
 // Printer Backlit), not the 3D-print filament control.
 const { GET, POST } = boxUpRoutes({
   appRoute: "/catalog/eg-box-up-frontlit/app",
-  name: "EG Box Up (Frontlit)",
+  name: "3D EG Conceal Box Up (Frontlit)",
   href: "/catalog/eg-box-up-frontlit",
   optionOverrides: [
     // EG frontlit boxes come in two depths only.

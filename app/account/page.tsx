@@ -12,7 +12,10 @@ export default function Page() {
         <section className="category-header">
           <p className="eyebrow">My Account</p>
           <div className="category-title">
-            <span className="category-glyph lg">☺</span>
+            <span className="category-glyph lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/mascot-silver.webp" alt="" className="category-glyph-img" />
+            </span>
             <div>
               <h1>My Account</h1>
               <p>Your orders, quotations, wallet and membership at a glance.</p>

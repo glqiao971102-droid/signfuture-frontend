@@ -59,8 +59,17 @@ const style = `<style>
 // Single-select: clicking a colour selects only that one and clears the rest.
 const script = `<script>
 (function(){
-  if (window.__paintSwatchInit) return;
-  window.__paintSwatchInit = true;
+  // Guard on <html>, not window/document: the calculator re-renders results via
+  // document.open()/write()/close() (server-impl render()). That removes every
+  // listener on document but REUSES the same window AND document objects, so a
+  // flag on either survives the reset and blocks re-binding — leaving the
+  // swatches dead after the first upload. document.write does rebuild the
+  // documentElement (<html>) node, so a flag there is wiped on every render and
+  // the delegated handler re-attaches, while still preventing double-binding
+  // within a single document.
+  var root = document.documentElement;
+  if (root.__paintSwatchInit) return;
+  root.__paintSwatchInit = true;
   var sync = function(field){
     var selected = field.querySelector('.paint-swatch.is-selected');
     var hex = selected ? selected.querySelector('input').value : '';
