@@ -119,23 +119,6 @@ export default function AdminOrders() {
   }
 
   /** Native status change — confirms, then emails the customer. */
-  async function changeNativeStatus(newStatus: string) {
-    if (!nativeDetail) return;
-    const label = nativeStatuses.find((s) => s.value === newStatus)?.label ?? newStatus;
-    if (!window.confirm(`Change order ${nativeDetail.ref} to "${label}"?\n\nThe customer will be emailed this update.`)) return;
-    const note = window.prompt("Optional note to include in the email (leave blank to skip):") ?? undefined;
-    setSavingStatus(true);
-    try {
-      const r = await api.adminUpdateNativeStatus(nativeDetail.id, newStatus, note || undefined);
-      setNativeDetail((d) => (d ? { ...d, status: r.status, statusLabel: r.statusLabel } : d));
-      await load(page, search, status);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update status");
-    } finally {
-      setSavingStatus(false);
-    }
-  }
-
   // Per-item status: cancelling/refunding a single line refunds only that line.
   async function changeNativeItemStatus(itemId: number, newStatus: string, itemName: string) {
     if (!nativeDetail) return;
@@ -296,15 +279,8 @@ export default function AdminOrders() {
               ) : null}
             </div>
 
-            <label className="adm-modal-field">
-              <span>Status (customer is emailed on change)</span>
-              <select className="adm-select" value={nativeDetail.status} disabled={savingStatus}
-                onChange={(e) => changeNativeStatus(e.target.value)}>
-                {nativeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-              {savingStatus && <em className="adm-card-sub">Saving…</em>}
-            </label>
-
+            {/* Order-level status removed — each line item now carries its own
+                status (see "Line items — each can be handled separately"). */}
             <button
               type="button"
               className="adm-edit-link"

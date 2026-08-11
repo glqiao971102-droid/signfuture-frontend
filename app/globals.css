@@ -5075,7 +5075,7 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-radio-row { display: flex; gap: 8px; }
 
 /* Order detail drawer. */
-.adm-drawer { max-width: 640px; width: 92vw; max-height: 88vh; overflow-y: auto; }
+.adm-drawer { max-width: 1000px; width: 96vw; max-height: 90vh; overflow-y: auto; }
 .adm-drawer-meta {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
