@@ -31,11 +31,18 @@ export default function ProductFrame({
         return (item.artworks as { url: string; name: string }[]).filter((a) => a && a.url);
       }
       // Neon / 3D box-up replace their page with the analysis result and expose
-      // the saved artwork here (their file input is gone by add-to-cart).
+      // the saved artwork here (their file input is gone by add-to-cart) —
+      // either on window (large-file path) or in sessionStorage (fast path,
+      // saved in parallel with analysis).
       try {
         const w = ref.current?.contentWindow as (Window & { __SF_ARTWORK?: { url: string; name: string } }) | null;
         const a = w?.__SF_ARTWORK;
         if (a && a.url) return [{ url: a.url, name: a.name || "artwork" }];
+        const raw = w?.sessionStorage?.getItem("__SF_ARTWORK");
+        if (raw) {
+          const s = JSON.parse(raw) as { url?: string; name?: string };
+          if (s && s.url) return [{ url: s.url, name: s.name || "artwork" }];
+        }
       } catch {
         /* cross-origin / not ready */
       }
