@@ -23,9 +23,14 @@ export type CartItem = {
   spec?: Record<string, unknown>;
   /** Artwork files the customer attached to this line (saved on the server). */
   artworks?: { url: string; name: string }[];
+  /**
+   * True when this line is a special request (e.g. an express collect date) that
+   * needs sales approval — it becomes a Pending Confirmation job at checkout.
+   */
+  requiresConfirmation?: boolean;
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[] };
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[]; requiresConfirmation?: boolean };
 
 type CartContextValue = {
   items: CartItem[];
@@ -68,6 +73,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
               spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
               artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
+              requiresConfirmation: i.requiresConfirmation || undefined,
             };
             return { id: i.id ?? signatureOf(base), ...base };
           })
@@ -109,6 +115,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           tierPrices: Array.isArray(item.tierPrices) ? item.tierPrices : undefined,
           spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
           artworks,
+          requiresConfirmation: item.requiresConfirmation || undefined,
         },
       ];
     });

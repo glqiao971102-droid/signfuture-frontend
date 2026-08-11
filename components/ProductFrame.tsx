@@ -101,6 +101,9 @@ export default function ProductFrame({
               : undefined,
           spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
           artworks: artworks.length ? artworks : undefined,
+          // Calculators flag express/special requests with a "Pending Confirmation"
+          // status — carry it through so the job starts awaiting sales approval.
+          requiresConfirmation: item.status === "Pending Confirmation",
         });
       })();
     };

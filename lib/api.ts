@@ -487,6 +487,7 @@ export const api = {
       options?: { label: string; value: string }[];
       artworkUrl?: string;
       spec?: Record<string, unknown>;
+      requiresConfirmation?: boolean;
     }[];
     billing?: Record<string, string>;
     shipping?: Record<string, string>;

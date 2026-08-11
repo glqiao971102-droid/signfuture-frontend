@@ -17,7 +17,7 @@ const COLLECT_OPTIONS = [
 ];
 
 type Artwork = { url: string; name: string };
-type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[] };
+type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[]; requiresConfirmation?: boolean };
 type Address = {
   profile?: string; receiver?: string; mobile?: string; tel?: string;
   address1?: string; address2?: string; postcode?: string; city?: string; state?: string;
@@ -97,6 +97,8 @@ export default function CheckoutPage() {
         spec: it.spec as Record<string, unknown> | undefined,
         // This line's own artwork (first one attached to the line for back-compat).
         artworkUrl: it.artworks && it.artworks[0] ? it.artworks[0].url : undefined,
+        // Express-date / special requests start as Pending Confirmation.
+        requiresConfirmation: it.requiresConfirmation || undefined,
       }));
       const a = order.address;
       const res = await api.createOrder({

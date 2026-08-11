@@ -257,6 +257,8 @@ export default function CartPage() {
         href: i.href, deliverable: isDeliverable(i), spec: i.spec,
         // Artwork the customer attached to this exact line.
         artworks: i.artworks && i.artworks.length ? i.artworks : undefined,
+        // Special request (e.g. express collect date) → Pending Confirmation.
+        requiresConfirmation: i.requiresConfirmation || undefined,
       })),
       subtotal,
       coupon: null,
