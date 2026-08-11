@@ -12,14 +12,6 @@ import { tierIndex, tierLabel, TIER_LABELS, TIER_THRESHOLD } from "@/lib/tier";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
-type Coupon = { code: string; type: "percent" | "fixed"; value: number };
-
-// Demo coupons (no backend). Codes are case-insensitive.
-const COUPONS: Record<string, { type: "percent" | "fixed"; value: number }> = {
-  SIGN10: { type: "percent", value: 10 },
-  WELCOME20: { type: "fixed", value: 20 },
-};
-
 // Nothing includes delivery. Delivery is arranged on request via the consultant
 // (WhatsApp) — no fee is added at checkout; the consultant confirms it separately.
 const SHIPPING = [
@@ -61,9 +53,6 @@ export default function CartPage() {
   const bestSaving = Math.max(0, tierCart[effTier] - tierCart[3]);
   const bestSavingPct = tierCart[effTier] > 0 ? Math.round((bestSaving / tierCart[effTier]) * 100) : 0;
 
-  const [couponInput, setCouponInput] = useState("");
-  const [coupon, setCoupon] = useState<Coupon | null>(null);
-  const [couponError, setCouponError] = useState("");
   const [shipId, setShipId] = useState("pickup");
 
   const [addr, setAddr] = useState(EMPTY_ADDR);
@@ -201,41 +190,18 @@ export default function CartPage() {
     });
   };
 
-  const applyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = couponInput.trim().toUpperCase();
-    if (!code) return;
-    const found = COUPONS[code];
-    if (!found) {
-      setCoupon(null);
-      setCouponError(`"${code}" is not a valid coupon.`);
-      return;
-    }
-    setCoupon({ code, ...found });
-    setCouponError("");
-  };
-
-  const removeCoupon = () => {
-    setCoupon(null);
-    setCouponInput("");
-    setCouponError("");
-  };
-
-  const discount = coupon
-    ? coupon.type === "percent"
-      ? (subtotal * coupon.value) / 100
-      : Math.min(coupon.value, subtotal)
-    : 0;
   const shipMethod = SHIPPING.find((s) => s.id === shipId);
   const shipping = shipMethod?.cost ?? 0;
-  const total = Math.max(0, subtotal - discount) + shipping;
+  // Discounts (vouchers) are applied at checkout against the real backend, not
+  // here — the cart just carries the subtotal + shipping.
+  const total = subtotal + shipping;
 
   const proceed = () => {
     if (items.length === 0) return;
     const order = {
       items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image, href: i.href, deliverable: isDeliverable(i), spec: i.spec })),
       subtotal,
-      coupon: coupon ? { code: coupon.code, discount } : null,
+      coupon: null,
       shipping: { id: shipId, label: shipMethod?.label ?? "", cost: shipping },
       // Request Delivery carries the chosen saved shipping address.
       address: shipId !== "pickup" ? selectedAddr : null,
@@ -334,19 +300,8 @@ export default function CartPage() {
               ))}
 
               <div className="cart-table-foot">
-                <form className="cart-coupon" onSubmit={applyCoupon}>
-                  <input
-                    type="text"
-                    placeholder="Coupon code"
-                    value={couponInput}
-                    onChange={(e) => setCouponInput(e.target.value)}
-                    aria-label="Coupon code"
-                  />
-                  <button type="submit">Apply coupon</button>
-                </form>
                 <button type="button" className="cart-clear" onClick={clear}>Clear cart</button>
               </div>
-              {couponError && <p className="cart-coupon-msg error">{couponError}</p>}
             </div>
 
             <aside className="cart-summary">
@@ -355,16 +310,6 @@ export default function CartPage() {
                 <span>Subtotal</span>
                 <span>{formatRM(subtotal)}</span>
               </div>
-
-              {coupon && (
-                <div className="cart-sum-row discount">
-                  <span>
-                    Coupon <strong>{coupon.code}</strong>
-                    <button type="button" className="cart-coupon-remove" onClick={removeCoupon} aria-label="Remove coupon">✕</button>
-                  </span>
-                  <span>− {formatRM(discount)}</span>
-                </div>
-              )}
 
               <div className="cart-ship">
                 <span className="cart-ship-title">Shipping</span>

@@ -311,21 +311,60 @@ export default function CheckoutPage() {
               {user && (
                 <div className="checkout-voucher">
                   <span className="checkout-block-title">Voucher</span>
-                  {vouchers.length > 0 && (
-                    <select className="adm-select" value={voucherCode} onChange={(e) => applyVoucher(e.target.value)}>
-                      <option value="">No voucher</option>
-                      {vouchers.map((v) => (
-                        <option key={v.code} value={v.code}>
-                          {v.code} — {v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`} off {v.scopeType === "all" ? "" : v.scopeValues.join("/")}
-                        </option>
-                      ))}
-                    </select>
+
+                  {vouchers.length > 0 ? (
+                    <ul className="ckv-list">
+                      {vouchers.map((v) => {
+                        const active = voucherCode === v.code;
+                        const off = v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`;
+                        return (
+                          <li key={v.code}>
+                            <button
+                              type="button"
+                              className={`ckv-opt${active ? " is-active" : ""}`}
+                              onClick={() => applyVoucher(active ? "" : v.code)}
+                              aria-pressed={active}
+                            >
+                              <span className="ckv-off">{off}</span>
+                              <span className="ckv-info">
+                                <span className="ckv-code">{v.code}</span>
+                                <span className="ckv-scope">
+                                  {v.scopeType === "all" ? "Any product" : v.scopeValues.join(" / ")}
+                                  {v.minSpend > 0 ? ` · min RM${v.minSpend}` : ""}
+                                </span>
+                              </span>
+                              <span className="ckv-check" aria-hidden="true">{active ? "✓" : ""}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="checkout-hint">No vouchers on your account. Enter a code if you have one.</p>
                   )}
+
                   <div className="checkout-voucher-manual">
-                    <input type="text" placeholder="Or enter a code" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} />
+                    <input type="text" placeholder="Have a code? Enter it here" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} />
                     <button type="button" className="cart-dd-btn ghost" onClick={() => applyVoucher(voucherCode)}>Apply</button>
                   </div>
                   {voucherMsg && <p className={`checkout-hint ${voucherMsg.startsWith("✓") ? "ok" : ""}`}>{voucherMsg}</p>}
+
+                  <style>{`
+                    .ckv-list { list-style: none; margin: 8px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+                    .ckv-opt {
+                      width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+                      padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+                      border: 1px solid rgba(120,160,210,.35); background: rgba(10,23,48,.55); color: #e6eefc;
+                      transition: border-color .12s, background .12s;
+                    }
+                    .ckv-opt:hover { border-color: rgba(53,216,255,.7); }
+                    .ckv-opt.is-active { border-color: #35d8ff; background: rgba(53,216,255,.12); }
+                    .ckv-off { font-weight: 800; color: #35d8ff; font-size: 15px; min-width: 52px; }
+                    .ckv-info { display: flex; flex-direction: column; min-width: 0; }
+                    .ckv-code { font-weight: 700; font-family: ui-monospace, monospace; font-size: 13px; }
+                    .ckv-scope { font-size: 12px; color: #9fb3c8; }
+                    .ckv-check { color: #35d8ff; font-weight: 800; }
+                  `}</style>
                 </div>
               )}
 

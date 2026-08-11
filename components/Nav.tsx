@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PRODUCT_MENU, SITE_NAV, flattenMenu, nodeHref, type ProductMenuItem } from "@/lib/products";
 import { useCart } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
+import { api } from "@/lib/api";
 
 export default function Nav() {
   const pathname = usePathname();
@@ -15,6 +16,23 @@ export default function Nav() {
   // Mobile drawer state.
   const [menuOpen, setMenuOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  // Voucher count badge — the member's available vouchers.
+  const [voucherCount, setVoucherCount] = useState(0);
+  useEffect(() => {
+    if (!user) {
+      setVoucherCount(0);
+      return;
+    }
+    let alive = true;
+    api
+      .myVouchers()
+      .then((r) => alive && setVoucherCount(r.data.length))
+      .catch(() => alive && setVoucherCount(0));
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   // Close the drawer on navigation.
   useEffect(() => {
@@ -149,6 +167,13 @@ export default function Nav() {
                 <circle cx="17.5" cy="18.5" r="1.7" />
               </svg>
             </Link>
+            <Link href="/vouchers" className="icon-btn nav-icon-extra" aria-label="Vouchers" title="My Vouchers">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z" />
+                <path d="M15 6v12" strokeDasharray="2 2" />
+              </svg>
+              {voucherCount > 0 && <span className="icon-badge">{voucherCount}</span>}
+            </Link>
             <Link href="/cart" className="icon-btn" aria-label="Cart" title="Cart">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="9" cy="20" r="1.5" />
@@ -190,6 +215,7 @@ export default function Nav() {
 
                 <div className="member-dropdown" role="menu">
                   <Link href="/account" role="menuitem">Account</Link>
+                  <Link href="/vouchers" role="menuitem">My Vouchers{voucherCount > 0 ? ` (${voucherCount})` : ""}</Link>
                   <Link href="/package" role="menuitem">Top Up</Link>
                   <Link href="/track-order" role="menuitem">Track Order</Link>
                   <Link href="/package" role="menuitem">My Offer</Link>
