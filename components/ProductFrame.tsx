@@ -4,7 +4,18 @@ import { useEffect, useRef } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart } from "@/components/CartProvider";
+import { useAuth } from "@/components/AuthProvider";
+import { tierIndex } from "@/lib/tier";
 import { api } from "@/lib/api";
+
+type CardLook = {
+  hl: Record<string, string>;
+  plain: Record<string, string>;
+  hlSpan: string;
+  hlStrong: string;
+  plSpan: string;
+  plStrong: string;
+};
 
 export default function ProductFrame({
   src,
@@ -15,6 +26,13 @@ export default function ProductFrame({
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const { add } = useCart();
+  const { user } = useAuth();
+  // The member's own tier (Agent 0 … Diamond 3). The Order Summary in every
+  // calculator should mark THIS row as the customer's price.
+  const memberTier = tierIndex(user?.tier);
+  // Pristine highlight/plain look captured once per iframe content, so repeated
+  // applies (retries, tier changes) never read our own already-mutated styles.
+  const lookRef = useRef<CardLook | null>(null);
 
   // Bridge "add to cart" from the (same-origin) iframe calculators to the
   // storefront cart, so items added inside an embedded app appear in the nav
@@ -161,6 +179,72 @@ export default function ProductFrame({
       window.clearInterval(interval);
     };
   }, [src]);
+
+  // Fresh iframe content → forget the previously-captured look.
+  useEffect(() => {
+    lookRef.current = null;
+  }, [src]);
+
+  // Mark the member's own tier in the calculator's Order Summary. Every app
+  // statically highlights the first (Agent) card via CSS `:first-child`; here we
+  // MOVE that exact highlight onto the customer's tier card. We copy the app's
+  // own computed styles (captured once, while pristine) so it matches each app's
+  // theme without hardcoding any colour.
+  useEffect(() => {
+    const iframe = ref.current;
+    if (!iframe) return;
+    const HL = ["backgroundColor", "backgroundImage", "borderColor", "boxShadow"];
+    const grab = (cs: CSSStyleDeclaration): Record<string, string> =>
+      Object.fromEntries(HL.map((p) => [p, (cs as unknown as Record<string, string>)[p]]));
+    const textColor = (el: Element | null): string => (el ? getComputedStyle(el).color : "");
+
+    const apply = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        const cards = Array.from(doc.querySelectorAll<HTMLElement>(".agent-card"));
+        if (cards.length < 4) return;
+        const idx = Math.min(3, Math.max(0, memberTier));
+        // Capture the pristine highlight (card 0) + a plain card ONCE, before we
+        // mutate anything — otherwise later runs would read our own edits.
+        if (!lookRef.current) {
+          const plainRef = cards[1];
+          lookRef.current = {
+            hl: grab(getComputedStyle(cards[0])),
+            plain: grab(getComputedStyle(plainRef)),
+            hlSpan: textColor(cards[0].querySelector("span")),
+            hlStrong: textColor(cards[0].querySelector("strong")),
+            plSpan: textColor(plainRef.querySelector("span")),
+            plStrong: textColor(plainRef.querySelector("strong")),
+          };
+        }
+        const look = lookRef.current;
+        cards.forEach((card, i) => {
+          const cur = i === idx;
+          const src = cur ? look.hl : look.plain;
+          HL.forEach((p) => {
+            (card.style as unknown as Record<string, string>)[p] = src[p] ?? "";
+          });
+          const sp = card.querySelector<HTMLElement>("span");
+          const st = card.querySelector<HTMLElement>("strong");
+          if (sp) sp.style.color = cur ? look.hlSpan : look.plSpan;
+          if (st) st.style.color = cur ? look.hlStrong : look.plStrong;
+        });
+      } catch {
+        /* cross-origin / not ready */
+      }
+    };
+
+    const onLoad = () => apply();
+    iframe.addEventListener("load", onLoad);
+    if (iframe.contentDocument?.readyState === "complete") apply();
+    // Cards may render slightly after load — re-apply a few times.
+    const timers = [300, 1000, 2500].map((ms) => window.setTimeout(apply, ms));
+    return () => {
+      iframe.removeEventListener("load", onLoad);
+      timers.forEach((t) => window.clearTimeout(t));
+    };
+  }, [src, memberTier]);
 
   return (
     <>
