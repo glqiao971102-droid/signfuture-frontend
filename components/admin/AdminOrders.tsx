@@ -16,6 +16,15 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** Pulls the "N working days" production time out of a line item's spec/options. */
+function workingDaysOf(options: { label: string; value: string }[]): string {
+  for (const o of options) {
+    const m = /(\d+)\s*working\s*days?/i.exec(`${o.value} ${o.label}`);
+    if (m) return `${m[1]} working days`;
+  }
+  return "—";
+}
+
 function stageClass(stage: string): string {
   return `adm-chip adm-stage-${stage}`;
 }
@@ -271,7 +280,13 @@ export default function AdminOrders() {
               <div><span className="adm-key-label">Total</span>RM {money(nativeDetail.total)}</div>
               <div><span className="adm-key-label">Payment</span>{nativeDetail.paymentMethod}{nativeDetail.paidAt ? " (paid)" : ""}</div>
               <div><span className="adm-key-label">Delivery</span>{nativeDetail.deliveryMethod ?? "—"}</div>
-              <div><span className="adm-key-label">Collect</span>{nativeDetail.collectDate ?? "—"}</div>
+              <div><span className="adm-key-label">Collect</span>
+                {nativeDetail.lines.map((l, i) => (
+                  <span key={l.id} style={{ display: "block" }}>
+                    {nativeDetail.ref}-{i + 1} ({workingDaysOf(l.options)})
+                  </span>
+                ))}
+              </div>
               {nativeDetail.customerId ? (
                 <div><span className="adm-key-label">Customer</span>
                   <Link href={`/admin/users/${nativeDetail.customerId}`} className="adm-edit-link">{nativeDetail.customer ?? "—"}</Link>
@@ -308,11 +323,12 @@ export default function AdminOrders() {
               <table className="adm-table">
                 <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th><th>Item status</th></tr></thead>
                 <tbody>
-                  {nativeDetail.lines.map((l) => {
+                  {nativeDetail.lines.map((l, i) => {
                     const done = l.status === "cancelled" || l.status === "refunded";
                     return (
                     <tr key={l.id}>
                       <td>
+                        <strong className="adm-job-no">{nativeDetail.ref}-{i + 1}</strong>{" "}
                         {l.name}
                         {l.options.length > 0 && (
                           <div className="adm-line-opts">
