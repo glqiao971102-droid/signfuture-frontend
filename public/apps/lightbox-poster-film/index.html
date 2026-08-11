@@ -1635,7 +1635,7 @@
     const validate = () => {
       const hasTerms = $("#terms").checked;
       const hasArtworkQty = !!($("#artworkQty") && $("#artworkQty").value);
-      $("#addToCart").disabled = !hasTerms || !hasArtworkQty;
+      $("#addToCart").disabled = !($("#artwork") && $("#artwork").files && $("#artwork").files.length) || !hasTerms || !hasArtworkQty;
     };
 
     const setPickerOpen = (pickerId, isOpen) => {

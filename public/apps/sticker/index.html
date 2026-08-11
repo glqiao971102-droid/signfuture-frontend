@@ -1789,7 +1789,7 @@
       const hasArtworkQty = !!($("#artworkQty") && $("#artworkQty").value);
       const height = Number($("#height").value);
       const width = Number($("#width").value);
-      $("#addToCart").disabled =
+      $("#addToCart").disabled = !($("#artwork") && $("#artwork").files && $("#artwork").files.length) ||
         !hasTerms || !hasArtworkQty || height <= 0 || width <= 0;
     };
 

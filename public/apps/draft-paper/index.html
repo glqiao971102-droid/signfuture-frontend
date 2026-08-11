@@ -1634,7 +1634,7 @@
       const height = Number($("#height").value);
       const width = Number($("#width").value);
       const { widthOverMax } = quote();
-      $("#addToCart").disabled =
+      $("#addToCart").disabled = !($("#artwork") && $("#artwork").files && $("#artwork").files.length) ||
         !hasTerms || height <= 0 || width <= 0 || widthOverMax;
     };
 

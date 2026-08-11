@@ -333,7 +333,7 @@ export default function AcrylicSheetProduct() {
                 <span>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Terms and Conditions</a></span>
               </label>
 
-              <button type="button" className="xprod-addcart" disabled={!agreed} onClick={addToCart}>
+              <button type="button" className="xprod-addcart" disabled={!agreed || !artwork} onClick={addToCart}>
                 Add to Cart
               </button>
 

@@ -125,7 +125,7 @@ export default function JumboBannerProduct() {
 
   // A blank or zero dimension quotes RM 0.00, so hold the order until both are set.
   const hasSize = area > 0;
-  const canOrder = agreed && hasSize;
+  const canOrder = agreed && hasSize && !!artwork;
 
   const addToCart = () => {
     if (!canOrder) return;
