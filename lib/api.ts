@@ -650,6 +650,14 @@ export const api = {
     );
   },
 
+  /** Change one line item's status (per-item cancel/refund). */
+  adminUpdateNativeItemStatus(id: number, itemId: number, status: string, note?: string) {
+    return request<{ success: boolean; status: string; statusLabel: string }>(
+      `/api/v1/admin/orders/native/${id}/items/${itemId}/status`,
+      { method: "PATCH", body: JSON.stringify({ status, note }) },
+    );
+  },
+
   // ----- Admin: customer detail -----
 
   adminUserOrders(id: number, page = 1) {
@@ -853,7 +861,7 @@ export type NativeOrderDetail = {
   placedByAgent?: boolean;
   agentLabel?: string | null;
   date: string | null;
-  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null }[];
+  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status: string; statusLabel: string; refundedAt: string | null }[];
   history: { from: string | null; to: string; note: string | null; date: string | null }[];
 };
 

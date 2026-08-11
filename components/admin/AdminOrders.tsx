@@ -39,6 +39,7 @@ export default function AdminOrders() {
   // Detail drawer (native)
   const [nativeStatuses, setNativeStatuses] = useState<{ value: string; label: string }[]>([]);
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
+  const [savingItemId, setSavingItemId] = useState<number | null>(null);
 
   const load = useCallback(async (p: number, searchTerm: string, statusFilter: string) => {
     setLoading(true);
@@ -132,6 +133,29 @@ export default function AdminOrders() {
       setError(err instanceof Error ? err.message : "Could not update status");
     } finally {
       setSavingStatus(false);
+    }
+  }
+
+  // Per-item status: cancelling/refunding a single line refunds only that line.
+  async function changeNativeItemStatus(itemId: number, newStatus: string, itemName: string) {
+    if (!nativeDetail) return;
+    const label = nativeStatuses.find((s) => s.value === newStatus)?.label ?? newStatus;
+    const refunds = newStatus === "cancelled" || newStatus === "refunded";
+    if (
+      !window.confirm(
+        `Set "${itemName}" to "${label}"?` +
+          (refunds ? "\n\nThis refunds ONLY this item's amount to the customer's wallet and emails them." : "\n\nThe customer will be emailed."),
+      )
+    )
+      return;
+    setSavingItemId(itemId);
+    try {
+      await api.adminUpdateNativeItemStatus(nativeDetail.id, itemId, newStatus);
+      setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update item status");
+    } finally {
+      setSavingItemId(null);
     }
   }
 
@@ -294,12 +318,14 @@ export default function AdminOrders() {
               </>
             )}
 
-            <h3 className="adm-drawer-sub">Line items</h3>
+            <h3 className="adm-drawer-sub">Line items — each can be handled separately</h3>
             <div className="adm-table-scroll">
               <table className="adm-table">
-                <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th></tr></thead>
+                <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th><th>Item status</th></tr></thead>
                 <tbody>
-                  {nativeDetail.lines.map((l) => (
+                  {nativeDetail.lines.map((l) => {
+                    const done = l.status === "cancelled" || l.status === "refunded";
+                    return (
                     <tr key={l.id}>
                       <td>
                         {l.name}
@@ -313,11 +339,24 @@ export default function AdminOrders() {
                             <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
                           </div>
                         )}
+                        {l.refundedAt && <div className="adm-line-opts"><span style={{ color: "#9fe6c0" }}>Refunded RM {money(l.total)}</span></div>}
                       </td>
                       <td className="adm-num">{l.quantity}</td>
-                      <td className="adm-num adm-mono">{money(l.total)}</td>
+                      <td className={`adm-num adm-mono${done ? " " : ""}`} style={done ? { textDecoration: "line-through", opacity: 0.6 } : undefined}>{money(l.total)}</td>
+                      <td>
+                        <select
+                          className="adm-select"
+                          value={l.status}
+                          disabled={savingItemId === l.id}
+                          onChange={(e) => changeNativeItemStatus(l.id, e.target.value, l.name)}
+                        >
+                          {nativeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                        {savingItemId === l.id && <em className="adm-card-sub"> Saving…</em>}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
