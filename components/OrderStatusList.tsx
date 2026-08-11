@@ -199,6 +199,13 @@ export default function OrderStatusList() {
                     >
                       {openId === o.id ? "Hide" : "Details"}
                     </button>
+                    <button
+                      type="button"
+                      className="hero-btn ghost rec-btn"
+                      onClick={() => api.openNativeInvoice(o.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))}
+                    >
+                      Download invoice
+                    </button>
                   </div>
                 </article>
               );

@@ -305,6 +305,15 @@ export default function AdminOrders() {
               {savingStatus && <em className="adm-card-sub">Saving…</em>}
             </label>
 
+            <button
+              type="button"
+              className="adm-edit-link"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
+              onClick={() => api.openAdminNativeInvoice(nativeDetail.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))}
+            >
+              ↓ Download invoice PDF
+            </button>
+
             {nativeDetail.artworks && nativeDetail.artworks.length > 0 && (
               <>
                 <h3 className="adm-drawer-sub">Artwork ({nativeDetail.artworks.length}) — for review</h3>

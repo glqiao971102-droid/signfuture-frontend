@@ -512,6 +512,30 @@ export const api = {
     return body as { success: boolean; url: string };
   },
 
+  /** Opens the member's invoice PDF for a native order in a new tab. */
+  async openNativeInvoice(id: number) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/orders/native/${id}/invoice`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Could not load the invoice.", null);
+    const url = URL.createObjectURL(await res.blob());
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
+  /** Admin: open any native order's invoice PDF. */
+  async openAdminNativeInvoice(id: number) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/orders/native/${id}/invoice`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Could not load the invoice.", null);
+    const url = URL.createObjectURL(await res.blob());
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
   /** The member's own native orders. */
   myNativeOrders() {
     return request<{ data: NativeOrderRow[] }>("/api/v1/orders/native");
