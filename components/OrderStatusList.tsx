@@ -171,6 +171,11 @@ export default function OrderStatusList() {
                           <div key={k} className="order-line">
                             <span className="order-line-name">
                               {l.name}
+                              {l.status && l.status !== o.status && (
+                                <span className={`rec-status ${meta(l.status).cls}`} style={{ marginLeft: 8, fontSize: 11 }}>
+                                  {l.statusLabel || meta(l.status).label}
+                                </span>
+                              )}
                               {l.artworkUrl && (
                                 <>
                                   {" "}

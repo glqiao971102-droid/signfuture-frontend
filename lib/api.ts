@@ -832,7 +832,7 @@ export type NativeOrderRow = {
   total: number;
   currency: string;
   date: string | null;
-  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null }[];
+  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string }[];
 };
 
 export type NativeOrderDetail = {
