@@ -284,36 +284,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Collection + artwork + notes */}
-              <div className="checkout-block">
-                <h3 className="checkout-block-title">Order details</h3>
-                <label className="checkout-field">
-                  <span>Collection timeline</span>
-                  <select value={collectDate} onChange={(e) => setCollectDate(e.target.value)}>
-                    {COLLECT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </label>
-                <label className="checkout-field">
-                  <span>Upload artwork <em>(you can add several — JPG/PNG/PDF/AI/EPS/ZIP)</em></span>
-                  <input ref={fileRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip" onChange={handleArtwork} />
-                  {uploading && <em className="checkout-hint">Uploading…</em>}
-                  {artworks.length > 0 && (
-                    <ul className="checkout-artworks">
-                      {artworks.map((a) => (
-                        <li key={a.url}>
-                          <a href={a.url} target="_blank" rel="noreferrer">✓ {a.name}</a>
-                          <button type="button" onClick={() => removeArtwork(a.url)} aria-label={`Remove ${a.name}`}>✕</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <em className="checkout-hint">All uploaded files are saved for our team to review your order.</em>
-                </label>
-                <label className="checkout-field">
-                  <span>Order notes <em>(optional)</em></span>
-                  <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any special instructions…" />
-                </label>
-              </div>
             </div>
 
             {/* Payment */}
