@@ -856,6 +856,8 @@ export type AdminOrderRow = OrderSummary & {
   customerId: number | null;
   source?: "native" | "legacy";
   ref?: string;
+  /** Per-job statuses (native orders) so the list can show the mix. */
+  jobStatuses?: string[];
 };
 
 export type NativeOrderRow = {

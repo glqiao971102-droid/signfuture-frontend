@@ -25,6 +25,25 @@ function workingDaysOf(options: { label: string; value: string }[]): string {
   return "—";
 }
 
+// Fallback labels + display order for the per-job status summary shown in the
+// orders list (active statuses first, then the "needs attention" ones).
+const STATUS_LABEL_FALLBACK: Record<string, string> = {
+  waiting: "Waiting Order", on_hold: "On Hold", processing: "Processing", production: "In Production",
+  ready: "Available for Collection", collection: "Pickup Already", delivery: "Delivery Arranged",
+  delivered: "Delivered", completed: "Completed", cancelled: "Cancelled", refunded: "Refunded", failed: "Failed",
+};
+const DISPLAY_RANK: Record<string, number> = {
+  processing: 0, production: 1, ready: 2, delivery: 3, delivered: 4, collection: 5, completed: 6,
+  waiting: 7, pending_confirmation: 7, on_hold: 8, cancelled: 9, refunded: 9, failed: 9,
+};
+/** Distinct job statuses in a sensible order (deduped — repeats show once). */
+function distinctStatuses(statuses: string[]): string[] {
+  const out: string[] = [];
+  for (const s of statuses) if (!out.includes(s)) out.push(s);
+  out.sort((a, b) => (DISPLAY_RANK[a] ?? 5) - (DISPLAY_RANK[b] ?? 5));
+  return out;
+}
+
 function stageClass(stage: string): string {
   return `adm-chip adm-stage-${stage}`;
 }
@@ -225,9 +244,17 @@ export default function AdminOrders() {
                   )}
                 </td>
                 <td>
-                  <span className={o.source === "native" ? "adm-chip adm-chip-member" : stageClass(o.stage)}>
-                    {o.statusLabel}
-                  </span>
+                  {o.source === "native" && o.jobStatuses && o.jobStatuses.length > 0 ? (
+                    <span className="adm-chip adm-chip-member">
+                      {distinctStatuses(o.jobStatuses)
+                        .map((v) => nativeStatuses.find((s) => s.value === v)?.label ?? STATUS_LABEL_FALLBACK[v] ?? v)
+                        .join(" · ")}
+                    </span>
+                  ) : (
+                    <span className={o.source === "native" ? "adm-chip adm-chip-member" : stageClass(o.stage)}>
+                      {o.statusLabel}
+                    </span>
+                  )}
                 </td>
                 <td className="adm-num adm-mono">{money(o.total)}</td>
                 <td className="adm-num">{o.itemCount}</td>
