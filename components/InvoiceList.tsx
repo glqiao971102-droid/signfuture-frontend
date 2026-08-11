@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { api, type InvoiceRow, type OrderDetail } from "@/lib/api";
+import { api, type InvoiceRow, type OrderDetail, type NativeOrderRow } from "@/lib/api";
 import {
   buildInvoicePdf,
   downloadBlob,
@@ -10,6 +10,7 @@ import {
   type EInvoiceItem,
 } from "@/lib/invoicePdf";
 import { DEV_PREVIEW } from "@/lib/preview";
+import { invoiceReady, invoiceTotal } from "@/lib/nativeInvoice";
 
 const PER_PAGE = 10;
 
@@ -150,6 +151,9 @@ export default function InvoiceList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Native orders whose jobs are all confirmed (Processing+) — their invoice is
+  // generated here rather than on the Order Status page.
+  const [nativeInv, setNativeInv] = useState<NativeOrderRow[]>([]);
 
   const load = useCallback(async (p: number) => {
     setLoading(true);
@@ -170,6 +174,20 @@ export default function InvoiceList() {
   useEffect(() => {
     void load(page);
   }, [page, load]);
+
+  // Native orders that qualify for an invoice (all active jobs confirmed).
+  useEffect(() => {
+    let alive = true;
+    api
+      .myNativeOrders()
+      .then((r) => {
+        if (alive) setNativeInv(r.data.filter(invoiceReady));
+      })
+      .catch(() => alive && setNativeInv([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /** Fetches the order behind an invoice and renders it as a PDF. */
   async function download(row: InvoiceRow) {
@@ -194,8 +212,44 @@ export default function InvoiceList() {
     <>
       {error && <div className="quote-empty">{error}</div>}
       {loading && <div className="quote-empty">Loading invoices…</div>}
-      {!loading && shown.length === 0 && (
+      {!loading && shown.length === 0 && nativeInv.length === 0 && (
         <div className="quote-empty">You have no invoices yet.</div>
+      )}
+
+      {nativeInv.length > 0 && (
+        <>
+          <div className="wallet-tx-bar">
+            <span className="wallet-tx-count">
+              {nativeInv.length} order invoice{nativeInv.length === 1 ? "" : "s"} ready
+            </span>
+          </div>
+          <div className="rec-list">
+            {nativeInv.map((o) => (
+              <article key={`n${o.id}`} className="rec-card">
+                <div className="rec-main">
+                  <div className="rec-top">
+                    <strong className="rec-ref">INV-{o.ref}</strong>
+                    <span className="rec-status rs-success">Ready</span>
+                  </div>
+                  <span className="rec-date">{o.date ? formatDate(o.date) : "—"}</span>
+                  <p className="rec-desc">Order #{o.ref}</p>
+                </div>
+                <div className="rec-side">
+                  <span className="rec-amount">{money(invoiceTotal(o))}</span>
+                  <button
+                    type="button"
+                    className="hero-btn primary rec-btn"
+                    onClick={() =>
+                      api.openNativeInvoice(o.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))
+                    }
+                  >
+                    ⤓ Download PDF
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       )}
 
       {!loading && shown.length > 0 && (
