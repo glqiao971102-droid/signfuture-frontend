@@ -16,7 +16,7 @@ const STATUS_META: Record<string, { label: string; cls: string; pct: number }> =
   processing: { label: "Processing", cls: "rs-progress", pct: 35 },
   production: { label: "In Production", cls: "rs-progress", pct: 55 },
   ready: { label: "Available for Collection", cls: "rs-ready", pct: 80 },
-  collection: { label: "Pickup Already", cls: "rs-success", pct: 100 },
+  collection: { label: "Collected", cls: "rs-success", pct: 100 },
   delivery: { label: "Delivery Arranged", cls: "rs-progress", pct: 88 },
   shipped: { label: "Out for Delivery", cls: "rs-progress", pct: 88 },
   delivered: { label: "Delivered", cls: "rs-success", pct: 100 },
@@ -125,6 +125,40 @@ const PROGRESS: Record<string, number> = {
   pending_confirmation: 0, waiting: 1, pending: 1, on_hold: 1, processing: 2,
   production: 3, shipped: 4, delivery: 4, ready: 4, collection: 5, delivered: 5, completed: 5,
 };
+// The four milestone boxes shown per job. A job sits in exactly ONE box; that
+// box shows the job's real status label, the others show a generic milestone
+// label. cancelled/refunded/failed live in box 2 but render as a red stop.
+const DEAD = ["cancelled", "refunded", "failed"];
+const JOB_STEPS: { key: string; label: string; statuses: string[] }[] = [
+  { key: "order", label: "Waiting Order", statuses: ["pending_confirmation", "waiting", "pending"] },
+  { key: "processing", label: "Processing", statuses: ["processing", "on_hold", ...DEAD] },
+  { key: "ready", label: "Available for Collection", statuses: ["ready", "shipped", "delivery"] },
+  { key: "done", label: "Delivered", statuses: ["delivered", "collection", "completed"] },
+];
+function jobStepIndex(status: string): number {
+  const i = JOB_STEPS.findIndex((s) => s.statuses.includes(status));
+  return i < 0 ? 0 : i;
+}
+function JobSteps({ status }: { status: string }) {
+  const cur = jobStepIndex(status);
+  const dead = DEAD.includes(status);
+  return (
+    <div className="job-steps">
+      {JOB_STEPS.map((st, i) => {
+        const active = i === cur;
+        const done = i < cur;
+        const label = active ? meta(status).label : st.label;
+        const cls = active ? (dead ? "js-fail" : "js-active") : done ? "js-done" : "js-todo";
+        return (
+          <div key={st.key} className={`job-step ${cls}`}>
+            <span className="job-step-num">{done ? "✓" : dead && active ? "✕" : i + 1}</span>
+            <span className="job-step-label">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function deriveStatus(o: NativeOrderRow): string {
   const active = o.items.filter((l) => !["cancelled", "refunded", "failed"].includes(l.status ?? o.status));
   if (active.length === 0) return o.items.length > 0 ? "cancelled" : o.status;
@@ -289,24 +323,24 @@ export default function OrderStatusList() {
                     {openId === o.id && (
                       <div className="order-lines">
                         {o.items.map((l, k) => (
-                          <div key={k} className="order-line">
-                            <span className="order-line-name">
-                              {o.items.length > 1 && (
-                                <strong className="job-no" style={{ marginRight: 8 }}>{o.ref}-{k + 1}</strong>
-                              )}
-                              {l.name}
-                              <span className={`rec-status ${meta(l.status ?? o.status).cls}`} style={{ marginLeft: 8, fontSize: 11 }}>
-                                {l.statusLabel || meta(l.status ?? o.status).label}
+                          <div key={k} className="order-line order-line-job">
+                            <div className="order-line-head">
+                              <span className="order-line-name">
+                                {o.items.length > 1 && (
+                                  <strong className="job-no" style={{ marginRight: 8 }}>{o.ref}-{k + 1}</strong>
+                                )}
+                                {l.name}
+                                {l.artworkUrl && (
+                                  <>
+                                    {" "}
+                                    <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
+                                  </>
+                                )}
                               </span>
-                              {l.artworkUrl && (
-                                <>
-                                  {" "}
-                                  <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
-                                </>
-                              )}
-                            </span>
-                            <span className="order-line-qty">×{l.qty}</span>
-                            <span className="order-line-total">RM {money(l.total)}</span>
+                              <span className="order-line-qty">×{l.qty}</span>
+                              <span className="order-line-total">RM {money(l.total)}</span>
+                            </div>
+                            <JobSteps status={l.status ?? o.status} />
                           </div>
                         ))}
                       </div>
