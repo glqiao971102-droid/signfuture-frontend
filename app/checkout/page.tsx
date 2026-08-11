@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
-import { api, ApiError, type MemberVoucher } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -16,7 +16,8 @@ const COLLECT_OPTIONS = [
   "Urgent (Next Working Day)",
 ];
 
-type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown> };
+type Artwork = { url: string; name: string };
+type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[] };
 type Address = {
   profile?: string; receiver?: string; mobile?: string; tel?: string;
   address1?: string; address2?: string; postcode?: string; city?: string; state?: string;
@@ -25,6 +26,7 @@ type Order = {
   items: OrderItem[];
   subtotal: number;
   coupon: { code: string; discount: number } | null;
+  voucher?: { code: string; discount: number } | null;
   shipping: { id: string; label: string; cost: number };
   address: Address | null;
   total: number;
@@ -39,22 +41,15 @@ export default function CheckoutPage() {
   const [loaded, setLoaded] = useState(false);
   const [placed, setPlaced] = useState<{ ref: string; label: string; paid: number; pending: boolean } | null>(null);
 
-  // Extra order details (mirrors the old system).
-  const [collectDate, setCollectDate] = useState(COLLECT_OPTIONS[0]);
-  const [notes, setNotes] = useState("");
+  const [collectDate] = useState(COLLECT_OPTIONS[0]);
   const [agree, setAgree] = useState(false);
-  // All uploaded artwork files (saved to server for staff review).
-  const [artworks, setArtworks] = useState<{ url: string; name: string }[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Vouchers
-  const [vouchers, setVouchers] = useState<MemberVoucher[]>([]);
-  const [voucherCode, setVoucherCode] = useState("");
-  const [voucherDiscount, setVoucherDiscount] = useState(0);
-  const [voucherMsg, setVoucherMsg] = useState<string | null>(null);
+  // Voucher + artwork are chosen on the cart page; checkout only shows them.
+  const voucherCode = order?.voucher?.code ?? "";
+  const voucherDiscount = order?.voucher?.discount ?? 0;
+  const artworks = (order?.items ?? []).flatMap((it) => it.artworks ?? []);
 
   useEffect(() => {
     try {
@@ -66,36 +61,10 @@ export default function CheckoutPage() {
     setLoaded(true);
   }, []);
 
-  useEffect(() => {
-    if (user) api.myVouchers().then((r) => setVouchers(r.data)).catch(() => setVouchers([]));
-  }, [user]);
-
-  function orderScopeItems() {
-    return (order?.items ?? []).map((it) => ({ productName: it.label, lineTotal: it.price * it.qty }));
-  }
-
-  async function applyVoucher(code: string) {
-    setVoucherMsg(null);
-    setVoucherDiscount(0);
-    setVoucherCode(code);
-    if (!code) return;
-    try {
-      const r = await api.previewVoucher(code, orderScopeItems());
-      if (!r.applicable) {
-        setVoucherMsg("This voucher doesn't apply to any item in your cart.");
-        return;
-      }
-      setVoucherDiscount(r.discount);
-      setVoucherMsg(`✓ − RM ${r.discount.toFixed(2)} on: ${r.eligibleNames.join(", ")}`);
-    } catch (err) {
-      setVoucherMsg(err instanceof ApiError ? err.message : "Could not apply voucher.");
-      setVoucherCode("");
-    }
-  }
-
   const MIN_ORDER = 15; // RM — minimum spend per order
   const wallet = user?.wallet.balance ?? 0;
-  const rawTotal = Math.max(0, (order?.total ?? 0) - voucherDiscount);
+  // order.total already nets the voucher chosen on the cart page.
+  const rawTotal = Math.max(0, order?.total ?? 0);
   const belowMin = rawTotal > 0 && rawTotal < MIN_ORDER;
   const minAdjustment = belowMin ? Math.round((MIN_ORDER - rawTotal) * 100) / 100 : 0;
   const total = belowMin ? MIN_ORDER : rawTotal;
@@ -110,27 +79,6 @@ export default function CheckoutPage() {
     if (!belowMin) { setMinNoticeOpen(false); setMinNoticeDismissed(false); }
   }, [belowMin, minNoticeDismissed]);
 
-  async function handleArtwork(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    setUploading(true);
-    setError(null);
-    try {
-      for (const file of files) {
-        const res = await api.uploadArtwork(file);
-        setArtworks((prev) => [...prev, { url: res.url, name: file.name }]);
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Artwork upload failed.");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-  function removeArtwork(url: string) {
-    setArtworks((prev) => prev.filter((a) => a.url !== url));
-  }
-
   async function submit(paymentMethod: "wallet" | "pending") {
     if (!order || !user) return;
     if (!agree) {
@@ -140,16 +88,15 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const items = order.items.map((it, i) => ({
+      const items = order.items.map((it) => ({
         productName: it.label,
         qty: it.qty,
         unitPrice: it.price,
         options: it.meta ? [{ label: "Specification", value: it.meta }] : [],
         // Structured spec → server recomputes the authoritative price.
         spec: it.spec as Record<string, unknown> | undefined,
-        // Also attach the first artwork to the first line for back-compat; the
-        // full set is saved order-level below for staff review.
-        artworkUrl: i === 0 && artworks[0] ? artworks[0].url : undefined,
+        // This line's own artwork (first one attached to the line for back-compat).
+        artworkUrl: it.artworks && it.artworks[0] ? it.artworks[0].url : undefined,
       }));
       const a = order.address;
       const res = await api.createOrder({
@@ -169,10 +116,10 @@ export default function CheckoutPage() {
         customerPhone: a?.mobile || a?.tel || user.phone || undefined,
         deliveryMethod: order.shipping.label || "Self Pickup",
         collectDate,
-        notes: notes.trim() || undefined,
         paymentMethod,
         voucherCode: voucherCode || undefined,
         tier: order.tier,
+        // Order-level artwork = every line's files, so staff can review them all.
         artworks: artworks.length ? artworks : undefined,
       });
       // Real balance changed on the server when paid by wallet.
@@ -259,6 +206,15 @@ export default function CheckoutPage() {
                       <span className="checkout-item-title">{it.label}</span>
                       {it.meta && <span className="checkout-item-meta">{it.meta}</span>}
                       <span className="checkout-item-qty">Qty {it.qty} × {formatRM(it.price)}</span>
+                      {it.artworks && it.artworks.length > 0 ? (
+                        <span className="checkout-item-art">
+                          🎨 {it.artworks.map((a, k) => (
+                            <a key={a.url} href={a.url} target="_blank" rel="noreferrer">{a.name}{k < it.artworks!.length - 1 ? ", " : ""}</a>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="checkout-item-art none">No artwork attached — add it on the cart page.</span>
+                      )}
                     </div>
                     <strong className="checkout-item-line">{formatRM(it.price * it.qty)}</strong>
                   </div>
@@ -308,66 +264,6 @@ export default function CheckoutPage() {
                 <p className="checkout-hint">Minimum spend is RM{MIN_ORDER.toFixed(2)} per order — your total has been adjusted up to the minimum.</p>
               )}
 
-              {user && (
-                <div className="checkout-voucher">
-                  <span className="checkout-block-title">Voucher</span>
-
-                  {vouchers.length > 0 ? (
-                    <ul className="ckv-list">
-                      {vouchers.map((v) => {
-                        const active = voucherCode === v.code;
-                        const off = v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`;
-                        return (
-                          <li key={v.code}>
-                            <button
-                              type="button"
-                              className={`ckv-opt${active ? " is-active" : ""}`}
-                              onClick={() => applyVoucher(active ? "" : v.code)}
-                              aria-pressed={active}
-                            >
-                              <span className="ckv-off">{off}</span>
-                              <span className="ckv-info">
-                                <span className="ckv-code">{v.code}</span>
-                                <span className="ckv-scope">
-                                  {v.scopeType === "all" ? "Any product" : v.scopeValues.join(" / ")}
-                                  {v.minSpend > 0 ? ` · min RM${v.minSpend}` : ""}
-                                </span>
-                              </span>
-                              <span className="ckv-check" aria-hidden="true">{active ? "✓" : ""}</span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="checkout-hint">No vouchers on your account. Enter a code if you have one.</p>
-                  )}
-
-                  <div className="checkout-voucher-manual">
-                    <input type="text" placeholder="Have a code? Enter it here" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} />
-                    <button type="button" className="cart-dd-btn ghost" onClick={() => applyVoucher(voucherCode)}>Apply</button>
-                  </div>
-                  {voucherMsg && <p className={`checkout-hint ${voucherMsg.startsWith("✓") ? "ok" : ""}`}>{voucherMsg}</p>}
-
-                  <style>{`
-                    .ckv-list { list-style: none; margin: 8px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-                    .ckv-opt {
-                      width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
-                      padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left;
-                      border: 1px solid rgba(120,160,210,.35); background: rgba(10,23,48,.55); color: #e6eefc;
-                      transition: border-color .12s, background .12s;
-                    }
-                    .ckv-opt:hover { border-color: rgba(53,216,255,.7); }
-                    .ckv-opt.is-active { border-color: #35d8ff; background: rgba(53,216,255,.12); }
-                    .ckv-off { font-weight: 800; color: #35d8ff; font-size: 15px; min-width: 52px; }
-                    .ckv-info { display: flex; flex-direction: column; min-width: 0; }
-                    .ckv-code { font-weight: 700; font-family: ui-monospace, monospace; font-size: 13px; }
-                    .ckv-scope { font-size: 12px; color: #9fb3c8; }
-                    .ckv-check { color: #35d8ff; font-weight: 800; }
-                  `}</style>
-                </div>
-              )}
-
               <div className="checkout-wallet">
                 <div className="checkout-wallet-head">
                   <span>Wallet balance</span>
@@ -378,7 +274,7 @@ export default function CheckoutPage() {
                 ) : enough ? (
                   <p className="checkout-wallet-note ok">Balance after wallet payment: {formatRM(wallet - total)}</p>
                 ) : (
-                  <p className="checkout-wallet-note low">Not enough to pay by wallet — submit and pay later, or top up.</p>
+                  <p className="checkout-wallet-note low">Not enough to pay by wallet — please top up to place your order.</p>
                 )}
               </div>
 
@@ -392,7 +288,7 @@ export default function CheckoutPage() {
               {!user ? (
                 <button type="button" className="hero-btn primary cart-checkout" onClick={openLogin}>Sign in to continue</button>
               ) : enough ? (
-                <button type="button" className="hero-btn primary cart-checkout" disabled={submitting || uploading} onClick={() => submit("wallet")}>
+                <button type="button" className="hero-btn primary cart-checkout" disabled={submitting} onClick={() => submit("wallet")}>
                   {submitting ? "Placing…" : "Submit order"}
                 </button>
               ) : (

@@ -21,6 +21,8 @@ export type CartItem = {
   tierPrices?: number[];
   /** Structured pricing spec so the server can recompute (anti-tampering). */
   spec?: Record<string, unknown>;
+  /** Artwork files the customer attached to this line (saved on the server). */
+  artworks?: { url: string; name: string }[];
 };
 
 type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown> };
@@ -31,6 +33,7 @@ type CartContextValue = {
   subtotal: number;
   add: (item: AddInput) => void;
   setQty: (id: string, qty: number) => void;
+  setArtworks: (id: string, artworks: { url: string; name: string }[]) => void;
   remove: (id: string) => void;
   clear: () => void;
 };
@@ -64,6 +67,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               deliverable: i.deliverable,
               tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
               spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
+              artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
             };
             return { id: i.id ?? signatureOf(base), ...base };
           })
@@ -116,6 +120,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const setArtworks = useCallback((id: string, artworks: { url: string; name: string }[]) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, artworks } : i)));
+  }, []);
+
   const remove = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
@@ -126,7 +134,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal = items.reduce((n, i) => n + (i.price || 0) * i.qty, 0);
 
   return (
-    <CartContext.Provider value={{ items, count, subtotal, add, setQty, remove, clear }}>
+    <CartContext.Provider value={{ items, count, subtotal, add, setQty, setArtworks, remove, clear }}>
       {children}
     </CartContext.Provider>
   );

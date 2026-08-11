@@ -9,6 +9,7 @@ import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { isDeliverable } from "@/lib/products";
 import { tierIndex, tierLabel, TIER_LABELS, TIER_THRESHOLD } from "@/lib/tier";
+import { api, ApiError, type MemberVoucher } from "@/lib/api";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -31,7 +32,7 @@ const ADDR_KEY = "sign-studio-addresses";
 
 export default function CartPage() {
   const router = useRouter();
-  const { items, count, setQty, remove, clear } = useCart();
+  const { items, count, setQty, setArtworks, remove, clear } = useCart();
   const { user } = useAuth();
 
   // The customer's entitled tier (Agent for guests) is the CHEAPEST price they
@@ -52,6 +53,59 @@ export default function CartPage() {
   // Upsell to the cheapest tier (Diamond) they don't yet have.
   const bestSaving = Math.max(0, tierCart[effTier] - tierCart[3]);
   const bestSavingPct = tierCart[effTier] > 0 ? Math.round((bestSaving / tierCart[effTier]) * 100) : 0;
+
+  // ----- Vouchers (moved here from checkout) -----
+  const [vouchers, setVouchers] = useState<MemberVoucher[]>([]);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherInput, setVoucherInput] = useState("");
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [voucherMsg, setVoucherMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (user) api.myVouchers().then((r) => setVouchers(r.data)).catch(() => setVouchers([]));
+    else setVouchers([]);
+  }, [user]);
+  const orderScopeItems = () =>
+    items.map((i) => ({ productName: i.label, lineTotal: unit(i) * i.qty }));
+  async function applyVoucher(code: string) {
+    setVoucherMsg(null);
+    setVoucherDiscount(0);
+    setVoucherCode(code);
+    setVoucherInput(code);
+    if (!code) return;
+    try {
+      const r = await api.previewVoucher(code, orderScopeItems());
+      if (!r.applicable) {
+        setVoucherMsg("This voucher doesn't apply to any item in your cart.");
+        return;
+      }
+      setVoucherDiscount(r.discount);
+      setVoucherMsg(`✓ − RM ${r.discount.toFixed(2)} on: ${r.eligibleNames.join(", ")}`);
+    } catch (err) {
+      setVoucherMsg(err instanceof ApiError ? err.message : "Could not apply voucher.");
+      setVoucherCode("");
+    }
+  }
+
+  // ----- Per-line artwork upload -----
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  async function handleArtwork(id: string, files: FileList | null, existing: { url: string; name: string }[]) {
+    const list = Array.from(files ?? []);
+    if (!list.length) return;
+    setUploadingId(id);
+    try {
+      const added: { url: string; name: string }[] = [];
+      for (const file of list) {
+        const res = await api.uploadArtwork(file);
+        added.push({ url: res.url, name: file.name });
+      }
+      setArtworks(id, [...existing, ...added]);
+    } catch {
+      /* surfaced below via alert */
+      alert("Artwork upload failed. Please try again.");
+    } finally {
+      setUploadingId(null);
+    }
+  }
 
   const [shipId, setShipId] = useState("pickup");
 
@@ -192,16 +246,21 @@ export default function CartPage() {
 
   const shipMethod = SHIPPING.find((s) => s.id === shipId);
   const shipping = shipMethod?.cost ?? 0;
-  // Discounts (vouchers) are applied at checkout against the real backend, not
-  // here — the cart just carries the subtotal + shipping.
-  const total = subtotal + shipping;
+  const total = Math.max(0, subtotal - voucherDiscount) + shipping;
 
   const proceed = () => {
     if (items.length === 0) return;
     const order = {
-      items: items.map((i) => ({ label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image, href: i.href, deliverable: isDeliverable(i), spec: i.spec })),
+      items: items.map((i) => ({
+        label: i.label, meta: i.meta, qty: i.qty, price: unit(i), image: i.image,
+        href: i.href, deliverable: isDeliverable(i), spec: i.spec,
+        // Artwork the customer attached to this exact line.
+        artworks: i.artworks && i.artworks.length ? i.artworks : undefined,
+      })),
       subtotal,
       coupon: null,
+      // Chosen voucher (validated server-side again at order time).
+      voucher: voucherCode && voucherDiscount > 0 ? { code: voucherCode, discount: voucherDiscount } : null,
       shipping: { id: shipId, label: shipMethod?.label ?? "", cost: shipping },
       // Request Delivery carries the chosen saved shipping address.
       address: shipId !== "pickup" ? selectedAddr : null,
@@ -263,6 +322,33 @@ export default function CartPage() {
                     <div className="cart-prod-info">
                       <Link href={item.href} className="cart-prod-title">{item.label}</Link>
                       {item.meta && <span className="cart-prod-meta">{item.meta}</span>}
+
+                      <div className="cart-art">
+                        <label className="cart-art-btn">
+                          {uploadingId === item.id ? "Uploading…" : (item.artworks?.length ? "+ Add more artwork" : "⬆ Upload artwork")}
+                          <input
+                            type="file"
+                            multiple
+                            accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip"
+                            disabled={uploadingId === item.id}
+                            onChange={(e) => { handleArtwork(item.id, e.target.files, item.artworks ?? []); e.currentTarget.value = ""; }}
+                          />
+                        </label>
+                        {item.artworks && item.artworks.length > 0 && (
+                          <ul className="cart-art-list">
+                            {item.artworks.map((a) => (
+                              <li key={a.url}>
+                                <a href={a.url} target="_blank" rel="noreferrer">✓ {a.name}</a>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${a.name}`}
+                                  onClick={() => setArtworks(item.id, (item.artworks ?? []).filter((x) => x.url !== a.url))}
+                                >✕</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -310,6 +396,51 @@ export default function CartPage() {
                 <span>Subtotal</span>
                 <span>{formatRM(subtotal)}</span>
               </div>
+
+              {voucherDiscount > 0 && (
+                <div className="cart-sum-row discount">
+                  <span>Voucher <strong>{voucherCode}</strong></span>
+                  <span>− {formatRM(voucherDiscount)}</span>
+                </div>
+              )}
+
+              {user && (
+                <div className="cart-voucher">
+                  <span className="cart-ship-title">Voucher</span>
+                  {vouchers.length > 0 ? (
+                    <ul className="ckv-list">
+                      {vouchers.map((v) => {
+                        const active = voucherCode === v.code;
+                        const off = v.discountType === "percent" ? `${v.discountValue}%` : `RM${v.discountValue}`;
+                        return (
+                          <li key={v.code}>
+                            <button
+                              type="button"
+                              className={`ckv-opt${active ? " is-active" : ""}`}
+                              onClick={() => applyVoucher(active ? "" : v.code)}
+                              aria-pressed={active}
+                            >
+                              <span className="ckv-off">{off}</span>
+                              <span className="ckv-info">
+                                <span className="ckv-code">{v.code}</span>
+                                <span className="ckv-scope">{v.scopeType === "all" ? "Any product" : v.scopeValues.join(" / ")}{v.minSpend > 0 ? ` · min RM${v.minSpend}` : ""}</span>
+                              </span>
+                              <span className="ckv-check" aria-hidden="true">{active ? "✓" : ""}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="cart-voucher-hint">No vouchers on your account. Enter a code if you have one.</p>
+                  )}
+                  <div className="cart-voucher-manual">
+                    <input type="text" placeholder="Have a code? Enter it here" value={voucherInput} onChange={(e) => setVoucherInput(e.target.value.toUpperCase())} />
+                    <button type="button" onClick={() => applyVoucher(voucherInput)}>Apply</button>
+                  </div>
+                  {voucherMsg && <p className={`cart-voucher-msg ${voucherMsg.startsWith("✓") ? "ok" : "error"}`}>{voucherMsg}</p>}
+                </div>
+              )}
 
               <div className="cart-ship">
                 <span className="cart-ship-title">Shipping</span>
@@ -566,6 +697,34 @@ export default function CartPage() {
         )}
       </main>
       <Footer />
+
+      <style>{`
+        .cart-art { margin-top: 8px; }
+        .cart-art-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: #35d8ff; cursor: pointer; border: 1px dashed rgba(53,216,255,.5); border-radius: 8px; padding: 5px 10px; }
+        .cart-art-btn input { display: none; }
+        .cart-art-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+        .cart-art-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .cart-art-list a { color: #9fe6c0; text-decoration: none; word-break: break-all; }
+        .cart-art-list button { background: none; border: none; color: #ff8f8f; cursor: pointer; font-size: 12px; }
+        .cart-voucher { margin: 10px 0 4px; }
+        .cart-voucher .cart-ship-title { display: block; margin-bottom: 8px; }
+        .cart-voucher-manual { display: flex; gap: 8px; margin-top: 8px; }
+        .cart-voucher-manual input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(120,160,210,.35); background: rgba(10,23,48,.55); color: #e6eefc; }
+        .cart-voucher-manual button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(53,216,255,.6); background: transparent; color: #35d8ff; font-weight: 700; cursor: pointer; }
+        .cart-voucher-hint { font-size: 12.5px; color: #9fb3c8; }
+        .cart-voucher-msg { font-size: 12.5px; margin-top: 6px; }
+        .cart-voucher-msg.ok { color: #9fe6c0; }
+        .cart-voucher-msg.error { color: #ff8f8f; }
+        .ckv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+        .ckv-opt { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left; border: 1px solid rgba(120,160,210,.35); background: rgba(10,23,48,.55); color: #e6eefc; }
+        .ckv-opt:hover { border-color: rgba(53,216,255,.7); }
+        .ckv-opt.is-active { border-color: #35d8ff; background: rgba(53,216,255,.12); }
+        .ckv-off { font-weight: 800; color: #35d8ff; font-size: 15px; min-width: 52px; }
+        .ckv-info { display: flex; flex-direction: column; min-width: 0; }
+        .ckv-code { font-weight: 700; font-family: ui-monospace, monospace; font-size: 13px; }
+        .ckv-scope { font-size: 12px; color: #9fb3c8; }
+        .ckv-check { color: #35d8ff; font-weight: 800; }
+      `}</style>
     </>
   );
 }
