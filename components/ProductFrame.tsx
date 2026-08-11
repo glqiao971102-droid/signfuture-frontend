@@ -33,19 +33,32 @@ export default function ProductFrame({
       // Neon / 3D box-up replace their page with the analysis result and expose
       // the saved artwork here (their file input is gone by add-to-cart) —
       // either on window (large-file path) or in sessionStorage (fast path,
-      // saved in parallel with analysis).
-      try {
-        const w = ref.current?.contentWindow as (Window & { __SF_ARTWORK?: { url: string; name: string } }) | null;
-        const a = w?.__SF_ARTWORK;
-        if (a && a.url) return [{ url: a.url, name: a.name || "artwork" }];
-        const raw = w?.sessionStorage?.getItem("__SF_ARTWORK");
-        if (raw) {
-          const s = JSON.parse(raw) as { url?: string; name?: string };
-          if (s && s.url) return [{ url: s.url, name: s.name || "artwork" }];
+      // saved in parallel with analysis). The parallel save may still be in
+      // flight when the user clicks Add to Cart, so wait briefly for it.
+      const readSaved = (): { url: string; name: string } | null => {
+        try {
+          const w = ref.current?.contentWindow as (Window & { __SF_ARTWORK?: { url: string; name: string } }) | null;
+          if (w?.__SF_ARTWORK?.url) return { url: w.__SF_ARTWORK.url, name: w.__SF_ARTWORK.name || "artwork" };
+          const raw = w?.sessionStorage?.getItem("__SF_ARTWORK");
+          if (raw) {
+            const s = JSON.parse(raw) as { url?: string; name?: string };
+            if (s?.url) return { url: s.url, name: s.name || "artwork" };
+          }
+        } catch {
+          /* cross-origin / not ready */
         }
-      } catch {
-        /* cross-origin / not ready */
+        return null;
+      };
+      // Only wait when this looks like a calculator that uploads (an analysis
+      // result is showing) — detected by an artwork form having been present.
+      const looksLikeUploadApp = /\/(neon-line|3d-box-up|3d-signboard)\b/.test(item.href as string);
+      for (let i = 0; i < (looksLikeUploadApp ? 25 : 1); i++) {
+        const saved = readSaved();
+        if (saved) return [saved];
+        if (i === 0 && !looksLikeUploadApp) break;
+        await new Promise((r) => setTimeout(r, 200)); // up to ~5s
       }
+
       const files: File[] = [];
       try {
         const doc = ref.current?.contentDocument;
