@@ -4096,7 +4096,7 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   border-top: 1px dashed var(--line-soft, rgba(57, 151, 255, 0.24));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 .order-lines-msg { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
 .order-line {
@@ -4117,8 +4117,14 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   text-align: right;
   min-width: 92px;
 }
-/* Per-job row: a header line, then a 4-step progress stepper underneath. */
-.order-line-job { display: block; }
+/* Each job is its own framed card: a header line, then a 4-step stepper. */
+.order-lines .order-line-job {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--line-soft, rgba(57, 151, 255, 0.2));
+  border-radius: 14px;
+  background: rgba(11, 23, 48, 0.35);
+}
 .order-line-job .order-line-head {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -4126,51 +4132,61 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   align-items: baseline;
 }
 .job-steps {
-  margin-top: 10px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 .job-step {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line-soft, rgba(57, 151, 255, 0.18));
-  background: rgba(148, 163, 184, 0.06);
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
   min-width: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
+/* Future stages aren't shown yet — the cell stays blank to hold the layout. */
+.job-step.js-empty { border: none; background: transparent; }
 .job-step-num {
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: #fff;
-  background: rgba(148, 163, 184, 0.55);
+  line-height: 1;
 }
 .job-step-label {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.job-step.js-todo { opacity: 0.6; }
-.job-step.js-done { border-color: rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.1); }
+.job-step.js-done {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+}
 .job-step.js-done .job-step-num { background: #22c55e; }
-.job-step.js-done .job-step-label { color: var(--text); }
-.job-step.js-active { border-color: rgba(57, 151, 255, 0.55); background: rgba(57, 151, 255, 0.14); }
+.job-step.js-done .job-step-label { color: #86efac; }
+.job-step.js-active {
+  border-color: rgba(57, 151, 255, 0.6);
+  background: rgba(57, 151, 255, 0.16);
+  box-shadow: 0 0 0 1px rgba(57, 151, 255, 0.25), 0 6px 18px -8px rgba(57, 151, 255, 0.6);
+}
 .job-step.js-active .job-step-num { background: var(--cyan, #3997ff); }
-.job-step.js-active .job-step-label { color: var(--text); font-weight: 800; }
-.job-step.js-fail { border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.12); }
+.job-step.js-active .job-step-label { color: #dbeafe; }
+.job-step.js-fail {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.14);
+}
 .job-step.js-fail .job-step-num { background: #ef4444; }
-.job-step.js-fail .job-step-label { color: #fca5a5; font-weight: 800; }
+.job-step.js-fail .job-step-label { color: #fca5a5; }
 @media (max-width: 640px) {
   .job-steps { grid-template-columns: repeat(2, 1fr); }
 }

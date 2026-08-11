@@ -145,13 +145,15 @@ function JobSteps({ status }: { status: string }) {
   return (
     <div className="job-steps">
       {JOB_STEPS.map((st, i) => {
+        // Only reveal boxes up to the stage the job has actually reached; the
+        // ones ahead stay blank until it gets there.
+        if (i > cur) return <div key={st.key} className="job-step js-empty" aria-hidden />;
         const active = i === cur;
-        const done = i < cur;
         const label = active ? meta(status).label : st.label;
-        const cls = active ? (dead ? "js-fail" : "js-active") : done ? "js-done" : "js-todo";
+        const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
         return (
           <div key={st.key} className={`job-step ${cls}`}>
-            <span className="job-step-num">{done ? "✓" : dead && active ? "✕" : i + 1}</span>
+            <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
             <span className="job-step-label">{label}</span>
           </div>
         );
