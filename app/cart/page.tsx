@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { isDeliverable } from "@/lib/products";
-import { tierIndex, tierLabel, TIER_LABELS, TIER_THRESHOLD } from "@/lib/tier";
+import { tierIndex, tierLabel } from "@/lib/tier";
 import { api, ApiError, type MemberVoucher } from "@/lib/api";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
@@ -35,24 +35,13 @@ export default function CartPage() {
   const { items, count, setQty, setArtworks, remove, clear } = useCart();
   const { user } = useAuth();
 
-  // The customer's entitled tier (Agent for guests) is the CHEAPEST price they
-  // qualify for. On the cart they may switch to a lower rank (Agent/Silver…),
-  // which is MORE expensive, so it's safe; cheaper tiers than their entitlement
-  // stay locked (unlock by topping up). Tier index: Agent 0 … Diamond 3, and a
-  // higher index is cheaper — so "allowed to pay" means index ≤ entitled.
-  const myTier = tierIndex(user?.tier);
-  const [payTier, setPayTier] = useState<number | null>(null);
-  const effTier = payTier != null && payTier <= myTier ? payTier : myTier;
+  // The customer always pays their OWN member tier's price — no choosing a
+  // different tier at checkout. Tier index: Agent 0 (guests) … Diamond 3.
+  const effTier = tierIndex(user?.tier);
   const unitAt = (i: (typeof items)[number], t: number) =>
     i.tierPrices && i.tierPrices.length === 4 ? i.tierPrices[t] : i.price;
   const unit = (i: (typeof items)[number]) => unitAt(i, effTier);
   const subtotal = items.reduce((n, i) => n + unit(i) * i.qty, 0);
-  // Cart total at each tier (items without member pricing are constant).
-  const tierCart = [0, 1, 2, 3].map((t) => items.reduce((n, i) => n + unitAt(i, t) * i.qty, 0));
-  const hasTierItems = items.some((i) => i.tierPrices && i.tierPrices.length === 4);
-  // Upsell to the cheapest tier (Diamond) they don't yet have.
-  const bestSaving = Math.max(0, tierCart[effTier] - tierCart[3]);
-  const bestSavingPct = tierCart[effTier] > 0 ? Math.round((bestSaving / tierCart[effTier]) * 100) : 0;
 
   // ----- Vouchers (moved here from checkout) -----
   const [vouchers, setVouchers] = useState<MemberVoucher[]>([]);
@@ -523,48 +512,6 @@ export default function CartPage() {
                   </>
                 )}
               </div>
-
-              {hasTierItems && (
-                <div className="tier-compare">
-                  <span className="tier-compare-title">Choose pricing tier — paying <strong>{tierLabel(effTier)}</strong></span>
-                  <div className="tier-compare-rows">
-                    {TIER_LABELS.map((label, t) => {
-                      const allowed = t <= myTier; // own tier + lower ranks (more expensive)
-                      const selected = t === effTier;
-                      const locked = t > myTier; // cheaper than entitlement → needs top-up
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          className={`tier-compare-row${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
-                          disabled={!allowed}
-                          onClick={() => allowed && setPayTier(t)}
-                        >
-                          <span className="tier-compare-name">
-                            {label}
-                            {t === myTier && " · your tier"}
-                          </span>
-                          <span className="tier-compare-price">{formatRM(tierCart[t])}</span>
-                          <span className="tier-compare-note">
-                            {selected ? "✓ paying this" : locked ? "🔒 top up to unlock" : "tap to use"}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {bestSaving > 0 && (
-                    <p className="tier-compare-upsell">
-                      💎 Reach <strong>Diamond</strong> to save <strong>{formatRM(bestSaving)}</strong> ({bestSavingPct}%) on this cart.{" "}
-                      <Link href="/package">Top up RM{TIER_THRESHOLD.Diamond.toLocaleString("en-MY")} in one top-up →</Link>
-                    </p>
-                  )}
-                  <p className="tier-compare-note-guest">
-                    {myTier === 0
-                      ? "You're on standard (Agent) pricing. Sign in & top up to unlock cheaper member tiers."
-                      : "You can pay at a lower (more expensive) tier if you wish — cheaper tiers unlock by topping up."}
-                  </p>
-                </div>
-              )}
 
               <div className="cart-sum-row total">
                 <span>Total</span>
