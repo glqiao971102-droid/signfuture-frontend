@@ -72,12 +72,6 @@ const STATUS_GUIDE: { key: string; label: string; cls: string; desc: string }[] 
     desc: "We're preparing your order for production.",
   },
   {
-    key: "production",
-    label: "In Production",
-    cls: "rs-progress",
-    desc: "Your item is being made.",
-  },
-  {
     key: "ready",
     label: "Available for Collection",
     cls: "rs-ready",
@@ -102,12 +96,6 @@ const STATUS_GUIDE: { key: string; label: string; cls: string; desc: string }[] 
     desc: "Picked up at our store.",
   },
   {
-    key: "completed",
-    label: "Completed",
-    cls: "rs-success",
-    desc: "Order fully completed. Thank you!",
-  },
-  {
     key: "cancelled",
     label: "Cancelled",
     cls: "rs-fail",
@@ -128,6 +116,25 @@ function formatDate(value: string | null): string {
 }
 
 const meta = (s: string) => STATUS_META[s] ?? { label: s, cls: "rs-pending", pct: 10 };
+
+// The order's overall status is DERIVED from its jobs — it is as far along as
+// its least-advanced ACTIVE (non-cancelled) job. So once every job is
+// Processing, the order shows Processing instead of the stale order-level
+// "Waiting Order". Old orders whose lines carry no status fall back to o.status.
+const PROGRESS: Record<string, number> = {
+  pending_confirmation: 0, waiting: 1, pending: 1, on_hold: 1, processing: 2,
+  production: 3, shipped: 4, delivery: 4, ready: 4, collection: 5, delivered: 5, completed: 5,
+};
+function deriveStatus(o: NativeOrderRow): string {
+  const active = o.items.filter((l) => !["cancelled", "refunded", "failed"].includes(l.status ?? o.status));
+  if (active.length === 0) return o.items.length > 0 ? "cancelled" : o.status;
+  let best = active[0].status ?? o.status;
+  for (const l of active) {
+    const s = l.status ?? o.status;
+    if ((PROGRESS[s] ?? 1) < (PROGRESS[best] ?? 1)) best = s;
+  }
+  return best;
+}
 
 export default function OrderStatusList() {
   const [orders, setOrders] = useState<NativeOrderRow[]>([]);
@@ -166,12 +173,12 @@ export default function OrderStatusList() {
 
   // Which statuses the member actually has — only show those chips (+ All).
   const presentStatuses = useMemo(() => {
-    const set = new Set(orders.map((o) => o.status));
+    const set = new Set(orders.map((o) => deriveStatus(o)));
     return STATUS_ORDER.filter((s) => set.has(s));
   }, [orders]);
 
   const filtered = useMemo(
-    () => (status === "All" ? orders : orders.filter((o) => o.status === status)),
+    () => (status === "All" ? orders : orders.filter((o) => deriveStatus(o) === status)),
     [orders, status],
   );
 
@@ -251,14 +258,15 @@ export default function OrderStatusList() {
         <>
           <div className="rec-list">
             {pageRows.map((o) => {
-              const m = meta(o.status);
-              const cancelled = o.status === "cancelled" || o.status === "refunded" || o.status === "failed";
+              const os = deriveStatus(o);
+              const m = meta(os);
+              const cancelled = os === "cancelled" || os === "refunded" || os === "failed";
               return (
                 <article key={o.id} className="rec-card">
                   <div className="rec-main">
                     <div className="rec-top">
                       <strong className="rec-ref">{o.ref || `#${o.id}`}</strong>
-                      <span className={`rec-status ${m.cls}`}>{o.statusLabel || m.label}</span>
+                      <span className={`rec-status ${m.cls}`}>{m.label}</span>
                     </div>
                     <span className="rec-date">{formatDate(o.date)}</span>
                     <p className="rec-desc">
@@ -267,7 +275,7 @@ export default function OrderStatusList() {
 
                     {cancelled ? (
                       <p className="rec-need" style={{ color: "#ff6f8b" }}>
-                        This order was {(o.statusLabel || m.label).toLowerCase()}.
+                        This order was {m.label.toLowerCase()}.
                       </p>
                     ) : (
                       <div className="rec-progress">
