@@ -129,6 +129,16 @@ function formatDate(value: string | null): string {
 
 const meta = (s: string) => STATUS_META[s] ?? { label: s, cls: "rs-pending", pct: 10 };
 
+// A native order's per-job invoice availability (mirrors the backend gate): the
+// invoice is only ready once every ACTIVE job (not Cancelled) is confirmed
+// (Processing or later). A Waiting / On Hold job blocks the whole invoice.
+const INVOICE_CANCELLED = ["cancelled", "refunded", "failed"];
+const INVOICE_NOT_READY = ["waiting", "on_hold", "pending", "pending_confirmation"];
+function invoiceReady(o: NativeOrderRow): boolean {
+  const active = o.items.filter((l) => !INVOICE_CANCELLED.includes(l.status ?? o.status));
+  return active.length > 0 && !active.some((l) => INVOICE_NOT_READY.includes(l.status ?? o.status));
+}
+
 export default function OrderStatusList() {
   const [orders, setOrders] = useState<NativeOrderRow[]>([]);
   const [status, setStatus] = useState<string | "All">("All");
@@ -283,12 +293,13 @@ export default function OrderStatusList() {
                         {o.items.map((l, k) => (
                           <div key={k} className="order-line">
                             <span className="order-line-name">
-                              {l.name}
-                              {l.status && l.status !== o.status && (
-                                <span className={`rec-status ${meta(l.status).cls}`} style={{ marginLeft: 8, fontSize: 11 }}>
-                                  {l.statusLabel || meta(l.status).label}
-                                </span>
+                              {o.items.length > 1 && (
+                                <strong className="job-no" style={{ marginRight: 8 }}>{o.ref}-{k + 1}</strong>
                               )}
+                              {l.name}
+                              <span className={`rec-status ${meta(l.status ?? o.status).cls}`} style={{ marginLeft: 8, fontSize: 11 }}>
+                                {l.statusLabel || meta(l.status ?? o.status).label}
+                              </span>
                               {l.artworkUrl && (
                                 <>
                                   {" "}
@@ -312,13 +323,17 @@ export default function OrderStatusList() {
                     >
                       {openId === o.id ? "Hide" : "Details"}
                     </button>
-                    <button
-                      type="button"
-                      className="hero-btn ghost rec-btn"
-                      onClick={() => api.openNativeInvoice(o.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))}
-                    >
-                      Download invoice
-                    </button>
+                    {invoiceReady(o) ? (
+                      <button
+                        type="button"
+                        className="hero-btn ghost rec-btn"
+                        onClick={() => api.openNativeInvoice(o.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))}
+                      >
+                        Download invoice
+                      </button>
+                    ) : (
+                      <span className="rec-invoice-wait">Invoice ready once all jobs are confirmed</span>
+                    )}
                   </div>
                 </article>
               );
