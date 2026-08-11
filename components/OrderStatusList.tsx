@@ -1,33 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type OrderStage, type OrderSummary, type OrderDetail } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, type NativeOrderRow } from "@/lib/api";
 
 /**
- * The member's real orders, from the legacy WooCommerce data.
- *
- * Stages mirror the backend's mapping of WooCommerce statuses (including the
- * operator's custom ones such as `wc-custom-compick`) onto the handful of steps
- * worth showing a customer.
+ * The member's real orders — the NATIVE orders placed through this site's
+ * checkout (the ones the customer actually submits). Statuses mirror the
+ * backend ORDER_STATUSES.
  */
-const STAGE_META: Record<OrderStage, { label: string; cls: string; pct: number }> = {
-  pending_confirmation: { label: "Pending Confirmation", cls: "rs-pending", pct: 5 },
-  on_hold: { label: "On Hold", cls: "rs-pending", pct: 15 },
-  pending: { label: "Waiting Payment", cls: "rs-pending", pct: 10 },
+const STATUS_META: Record<string, { label: string; cls: string; pct: number }> = {
+  waiting: { label: "Waiting Order", cls: "rs-pending", pct: 10 },
   processing: { label: "Processing", cls: "rs-progress", pct: 35 },
   production: { label: "In Production", cls: "rs-progress", pct: 55 },
-  ready: { label: "Ready for Collection", cls: "rs-ready", pct: 78 },
-  shipped: { label: "Out for Delivery", cls: "rs-progress", pct: 90 },
+  ready: { label: "Available for Collection", cls: "rs-ready", pct: 80 },
+  collection: { label: "Pickup Already", cls: "rs-success", pct: 100 },
+  delivery: { label: "Delivery Arranged", cls: "rs-progress", pct: 88 },
+  delivered: { label: "Delivered", cls: "rs-success", pct: 100 },
   completed: { label: "Completed", cls: "rs-success", pct: 100 },
   cancelled: { label: "Cancelled", cls: "rs-fail", pct: 0 },
+  refunded: { label: "Refunded", cls: "rs-fail", pct: 0 },
+  failed: { label: "Failed", cls: "rs-fail", pct: 0 },
 };
 
-const STAGE_ORDER: OrderStage[] = [
-  "pending",
+// Chip order — only statuses that make sense as customer filters.
+const STATUS_ORDER = [
+  "waiting",
   "processing",
   "production",
   "ready",
-  "shipped",
+  "collection",
+  "delivery",
+  "delivered",
   "completed",
   "cancelled",
 ];
@@ -37,45 +40,57 @@ const PER_PAGE = 10;
 const money = (n: number) =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function formatDate(value: string): string {
+function formatDate(value: string | null): string {
+  if (!value) return "—";
   const d = new Date(value.includes("T") ? value : value.replace(" ", "T"));
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+const meta = (s: string) => STATUS_META[s] ?? { label: s, cls: "rs-pending", pct: 10 };
+
 export default function OrderStatusList() {
-  const [orders, setOrders] = useState<OrderSummary[]>([]);
-  const [stage, setStage] = useState<OrderStage | "All">("All");
+  const [orders, setOrders] = useState<NativeOrderRow[]>([]);
+  const [status, setStatus] = useState<string | "All">("All");
   const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
 
-  const load = useCallback(async (p: number, s: OrderStage | "All") => {
+  useEffect(() => {
+    let alive = true;
     setLoading(true);
-    setError(null);
-    try {
-      const res = await api.orders(p, PER_PAGE, s === "All" ? undefined : s);
-      setOrders(res.data);
-      setLastPage(res.meta.lastPage);
-      setTotal(res.meta.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your orders");
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+    api
+      .myNativeOrders()
+      .then((r) => {
+        if (alive) setOrders(r.data);
+      })
+      .catch((err) => {
+        if (alive) setError(err instanceof Error ? err.message : "Could not load your orders");
+      })
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  useEffect(() => {
-    void load(page, stage);
-  }, [page, stage, load]);
+  // Which statuses the member actually has — only show those chips (+ All).
+  const presentStatuses = useMemo(() => {
+    const set = new Set(orders.map((o) => o.status));
+    return STATUS_ORDER.filter((s) => set.has(s));
+  }, [orders]);
 
-  function changeStage(s: OrderStage | "All") {
-    setStage(s);
-    setPage(1); // a filtered list has different pages; never keep the old index
+  const filtered = useMemo(
+    () => (status === "All" ? orders : orders.filter((o) => o.status === status)),
+    [orders, status],
+  );
+
+  const lastPage = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const pageRows = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  function changeStatus(s: string | "All") {
+    setStatus(s);
+    setPage(1);
     setOpenId(null);
   }
 
@@ -87,25 +102,25 @@ export default function OrderStatusList() {
           <span>
             {loading
               ? "Loading your orders…"
-              : `${total.toLocaleString()} order${total === 1 ? "" : "s"} · click a status to filter`}
+              : `${filtered.length.toLocaleString()} order${filtered.length === 1 ? "" : "s"} · click a status to filter`}
           </span>
         </div>
         <div className="flow-chips">
           <button
             type="button"
-            onClick={() => changeStage("All")}
-            className={`flow-chip rs-all${stage === "All" ? " is-active" : ""}`}
+            onClick={() => changeStatus("All")}
+            className={`flow-chip rs-all${status === "All" ? " is-active" : ""}`}
           >
             All
           </button>
-          {STAGE_ORDER.map((s) => (
+          {presentStatuses.map((s) => (
             <button
               type="button"
               key={s}
-              onClick={() => changeStage(s)}
-              className={`flow-chip ${STAGE_META[s].cls}${stage === s ? " is-active" : ""}`}
+              onClick={() => changeStatus(s)}
+              className={`flow-chip ${meta(s).cls}${status === s ? " is-active" : ""}`}
             >
-              {STAGE_META[s].label}
+              {meta(s).label}
             </button>
           ))}
         </div>
@@ -113,46 +128,62 @@ export default function OrderStatusList() {
 
       {error && <div className="quote-empty">{error}</div>}
       {loading && !error && <div className="quote-empty">Loading orders…</div>}
-      {!loading && !error && orders.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div className="quote-empty">
-          {stage === "All" ? "You have no orders yet." : "No orders with this status."}
+          {status === "All" ? "You have no orders yet." : "No orders with this status."}
         </div>
       )}
 
-      {!loading && !error && orders.length > 0 && (
+      {!loading && !error && pageRows.length > 0 && (
         <>
           <div className="rec-list">
-            {orders.map((o) => {
-              const meta = STAGE_META[o.stage];
-              const cancelled = o.stage === "cancelled";
+            {pageRows.map((o) => {
+              const m = meta(o.status);
+              const cancelled = o.status === "cancelled" || o.status === "refunded" || o.status === "failed";
               return (
                 <article key={o.id} className="rec-card">
                   <div className="rec-main">
                     <div className="rec-top">
-                      <strong className="rec-ref">#{o.id}</strong>
-                      <span className={`rec-status ${meta.cls}`}>{o.statusLabel}</span>
+                      <strong className="rec-ref">{o.ref || `#${o.id}`}</strong>
+                      <span className={`rec-status ${m.cls}`}>{o.statusLabel || m.label}</span>
                     </div>
                     <span className="rec-date">{formatDate(o.date)}</span>
                     <p className="rec-desc">
-                      {o.itemCount} item{o.itemCount === 1 ? "" : "s"}
-                      {o.shippingMethod ? ` · ${o.shippingMethod}` : ""}
-                      {o.invoiceNumber ? ` · Invoice ${o.invoiceNumber}` : ""}
+                      {o.items.length} item{o.items.length === 1 ? "" : "s"}
                     </p>
 
                     {cancelled ? (
                       <p className="rec-need" style={{ color: "#ff6f8b" }}>
-                        This order was {o.statusLabel.toLowerCase()}.
+                        This order was {(o.statusLabel || m.label).toLowerCase()}.
                       </p>
                     ) : (
                       <div className="rec-progress">
                         <div
-                          className={`rec-progress-fill${meta.pct === 100 ? " full" : ""}`}
-                          style={{ width: `${meta.pct}%` }}
+                          className={`rec-progress-fill${m.pct === 100 ? " full" : ""}`}
+                          style={{ width: `${m.pct}%` }}
                         />
                       </div>
                     )}
 
-                    {openId === o.id && <OrderLines orderId={o.id} />}
+                    {openId === o.id && (
+                      <div className="order-lines">
+                        {o.items.map((l, k) => (
+                          <div key={k} className="order-line">
+                            <span className="order-line-name">
+                              {l.name}
+                              {l.artworkUrl && (
+                                <>
+                                  {" "}
+                                  <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
+                                </>
+                              )}
+                            </span>
+                            <span className="order-line-qty">×{l.qty}</span>
+                            <span className="order-line-total">RM {money(l.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="rec-side">
                     <span className="rec-amount">RM {money(o.total)}</span>
@@ -171,21 +202,11 @@ export default function OrderStatusList() {
 
           {lastPage > 1 && (
             <div className="wallet-tx-pager">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
+              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
                 ← Prev
               </button>
-              <span>
-                Page {page} of {lastPage}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-                disabled={page >= lastPage}
-              >
+              <span>Page {page} of {lastPage}</span>
+              <button type="button" onClick={() => setPage((p) => Math.min(lastPage, p + 1))} disabled={page >= lastPage}>
                 Next →
               </button>
             </div>
@@ -193,66 +214,5 @@ export default function OrderStatusList() {
         </>
       )}
     </>
-  );
-}
-
-/** Line items for one order, fetched on demand when the row is expanded. */
-function OrderLines({ orderId }: { orderId: number }) {
-  const [detail, setDetail] = useState<OrderDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const d = await api.order(orderId);
-        if (!cancelled) setDetail(d);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load details");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orderId]);
-
-  if (error) return <p className="order-lines-msg">{error}</p>;
-  if (!detail) return <p className="order-lines-msg">Loading details…</p>;
-
-  // Shipping and fee rows are shown apart from the purchased products.
-  const products = detail.lines.filter((l) => l.type === "line_item");
-  const extras = detail.lines.filter((l) => l.type !== "line_item" && l.name);
-
-  return (
-    <div className="order-lines">
-      {products.map((l) => (
-        <div key={l.id} className="order-line">
-          <span className="order-line-name">{l.name}</span>
-          <span className="order-line-qty">×{l.quantity}</span>
-          <span className="order-line-total">RM {money(l.total)}</span>
-        </div>
-      ))}
-
-      {extras.map((l) => (
-        <div key={l.id} className="order-line is-extra">
-          <span className="order-line-name">{l.name}</span>
-          <span className="order-line-qty" />
-          <span className="order-line-total">{l.total ? `RM ${money(l.total)}` : "—"}</span>
-        </div>
-      ))}
-
-      {detail.shipping.address_1 && (
-        <p className="order-ship-to">
-          <strong>Ship to:</strong> {detail.shipping.address_1}
-          {detail.shipping.city ? `, ${detail.shipping.city}` : ""}
-          {detail.shipping.postcode ? ` ${detail.shipping.postcode}` : ""}
-        </p>
-      )}
-      {detail.paymentMethod && (
-        <p className="order-ship-to">
-          <strong>Paid by:</strong> {detail.paymentMethod}
-        </p>
-      )}
-    </div>
   );
 }
