@@ -25,7 +25,7 @@ export type CartItem = {
   artworks?: { url: string; name: string }[];
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown> };
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[] };
 
 type CartContextValue = {
   items: CartItem[];
@@ -89,10 +89,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const add = useCallback((item: AddInput) => {
     const id = signatureOf(item);
     setItems((prev) => {
+      const artworks = Array.isArray(item.artworks) && item.artworks.length ? item.artworks : undefined;
       const existing = prev.find((i) => i.id === id);
       if (existing) {
-        // Same exact configuration — just add one more.
-        return prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i));
+        // Same exact configuration — bump qty; adopt freshly-uploaded artwork.
+        return prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1, artworks: artworks ?? i.artworks } : i));
       }
       return [
         ...prev,
@@ -107,6 +108,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           deliverable: item.deliverable,
           tierPrices: Array.isArray(item.tierPrices) ? item.tierPrices : undefined,
           spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
+          artworks,
         },
       ];
     });

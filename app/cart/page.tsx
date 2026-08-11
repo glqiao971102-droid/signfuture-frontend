@@ -324,29 +324,31 @@ export default function CartPage() {
                       {item.meta && <span className="cart-prod-meta">{item.meta}</span>}
 
                       <div className="cart-art">
-                        <label className="cart-art-btn">
-                          {uploadingId === item.id ? "Uploading…" : (item.artworks?.length ? "+ Add more artwork" : "⬆ Upload artwork")}
-                          <input
-                            type="file"
-                            multiple
-                            accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip"
-                            disabled={uploadingId === item.id}
-                            onChange={(e) => { handleArtwork(item.id, e.target.files, item.artworks ?? []); e.currentTarget.value = ""; }}
-                          />
-                        </label>
-                        {item.artworks && item.artworks.length > 0 && (
-                          <ul className="cart-art-list">
-                            {item.artworks.map((a) => (
-                              <li key={a.url}>
-                                <a href={a.url} target="_blank" rel="noreferrer">✓ {a.name}</a>
-                                <button
-                                  type="button"
-                                  aria-label={`Remove ${a.name}`}
-                                  onClick={() => setArtworks(item.id, (item.artworks ?? []).filter((x) => x.url !== a.url))}
-                                >✕</button>
-                              </li>
-                            ))}
-                          </ul>
+                        {item.artworks && item.artworks.length > 0 ? (
+                          <>
+                            <ul className="cart-art-list">
+                              {item.artworks.map((a) => (
+                                <li key={a.url}>
+                                  <a href={a.url} target="_blank" rel="noreferrer">🎨 {a.name}</a>
+                                </li>
+                              ))}
+                            </ul>
+                            <span className="cart-art-locked">Artwork locked — the price was measured from this file. To change it, remove this item and reconfigure it on the product page.</span>
+                          </>
+                        ) : (
+                          <>
+                            <label className="cart-art-btn">
+                              {uploadingId === item.id ? "Uploading…" : "⬆ Upload artwork"}
+                              <input
+                                type="file"
+                                multiple
+                                accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.ai,.eps,.psd,.tif,.tiff,.zip"
+                                disabled={uploadingId === item.id}
+                                onChange={(e) => { handleArtwork(item.id, e.target.files, item.artworks ?? []); e.currentTarget.value = ""; }}
+                              />
+                            </label>
+                            <span className="cart-art-hint">Attach the artwork for this item.</span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -706,6 +708,8 @@ export default function CartPage() {
         .cart-art-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
         .cart-art-list a { color: #9fe6c0; text-decoration: none; word-break: break-all; }
         .cart-art-list button { background: none; border: none; color: #ff8f8f; cursor: pointer; font-size: 12px; }
+        .cart-art-locked { display: block; margin-top: 4px; font-size: 11.5px; color: #7fa2c4; }
+        .cart-art-hint { display: block; margin-top: 4px; font-size: 11.5px; color: #9fb3c8; }
         .cart-voucher { margin: 10px 0 4px; }
         .cart-voucher .cart-ship-title { display: block; margin-bottom: 8px; }
         .cart-voucher-manual { display: flex; gap: 8px; margin-top: 8px; }
