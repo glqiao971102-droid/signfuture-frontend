@@ -18,6 +18,7 @@ import {
   type MemberTier,
 } from "@/lib/api";
 import { DEV_PREVIEW } from "@/lib/preview";
+import { tierIndex } from "@/lib/tier";
 
 export type { MemberTier };
 
@@ -85,6 +86,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(!DEV_PREVIEW);
   // Referral code pulled from a ?ref=CODE link (e.g. a sales admin's QR code).
   const [pendingReferral, setPendingReferral] = useState<string | null>(null);
+
+  // Expose the member's tier (0 Agent … 3 Diamond) on <html> so the product
+  // pages' Order Summary can highlight the customer's OWN tier via CSS, instead
+  // of always the first (Agent) row.
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.memberTier = String(tierIndex(user?.tier));
+    }
+  }, [user]);
 
   // A ?ref=CODE in the URL (from a QR code / referral link) opens the register
   // modal with the code pre-filled.

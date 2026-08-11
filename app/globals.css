@@ -1736,10 +1736,30 @@ a { color: inherit; text-decoration: none; }
 
 .xprod-agents { display: grid; gap: 7px; }
 .xprod-agent { padding: 10px; border: 1px solid rgba(63, 176, 255, 0.42); border-radius: 8px; background: rgba(3, 13, 30, 0.72); display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
-.xprod-agent:first-child { border-color: rgba(53, 216, 255, 0.95); background: linear-gradient(90deg, rgba(8, 70, 116, 0.92), rgba(4, 35, 67, 0.92)); box-shadow: 0 0 14px rgba(53, 216, 255, 0.22), inset 0 0 14px rgba(53, 216, 255, 0.08); }
 .xprod-agent span { color: var(--muted); font-size: 13px; font-weight: 900; text-transform: uppercase; }
 .xprod-agent strong { font-size: 15px; color: #f7fbff; }
-.xprod-agent:first-child span, .xprod-agent:first-child strong { color: #62efff; }
+/* Highlight the member's OWN tier row, not always Agent. `data-member-tier`
+   (0 Agent … 3 Diamond) is set on <html> by AuthProvider; the 4 rows are always
+   rendered in tier order, so nth-child maps 1:1. Before hydration the attribute
+   is absent and no row is highlighted (brief, then corrects). */
+:root[data-member-tier="0"] .xprod-agent:nth-child(1),
+:root[data-member-tier="1"] .xprod-agent:nth-child(2),
+:root[data-member-tier="2"] .xprod-agent:nth-child(3),
+:root[data-member-tier="3"] .xprod-agent:nth-child(4) {
+  border-color: rgba(53, 216, 255, 0.95);
+  background: linear-gradient(90deg, rgba(8, 70, 116, 0.92), rgba(4, 35, 67, 0.92));
+  box-shadow: 0 0 14px rgba(53, 216, 255, 0.22), inset 0 0 14px rgba(53, 216, 255, 0.08);
+}
+:root[data-member-tier="0"] .xprod-agent:nth-child(1) span,
+:root[data-member-tier="0"] .xprod-agent:nth-child(1) strong,
+:root[data-member-tier="1"] .xprod-agent:nth-child(2) span,
+:root[data-member-tier="1"] .xprod-agent:nth-child(2) strong,
+:root[data-member-tier="2"] .xprod-agent:nth-child(3) span,
+:root[data-member-tier="2"] .xprod-agent:nth-child(3) strong,
+:root[data-member-tier="3"] .xprod-agent:nth-child(4) span,
+:root[data-member-tier="3"] .xprod-agent:nth-child(4) strong {
+  color: #62efff;
+}
 .xprod-qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: end; margin-top: 12px; }
 .xprod-qrow > span { color: #77c9ff; font-size: 12px; font-weight: 900; text-transform: uppercase; }
 .xprod-stepper { display: grid; grid-template-columns: 36px 58px 36px; gap: 7px; align-items: center; }
