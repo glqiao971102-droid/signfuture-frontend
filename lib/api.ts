@@ -579,6 +579,14 @@ export const api = {
     return request<MemberProfile>(`/api/v1/admin/users/${id}`);
   },
 
+  /** Admin: edit a member's contact details (email / phone / name). */
+  adminUpdateUserContact(id: number, patch: { email?: string; phone?: string; name?: string }) {
+    return request<{ success: boolean; profile: MemberProfile }>(
+      `/api/v1/admin/users/${id}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    );
+  },
+
   adminProducts() {
     return request<{ data: AdminProductRow[] }>("/api/v1/admin/products");
   },

@@ -32,6 +32,40 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
   const [savingTier, setSavingTier] = useState(false);
   const [tierMsg, setTierMsg] = useState<string | null>(null);
 
+  // Editable contact details (name / email / phone).
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactMsg, setContactMsg] = useState<string | null>(null);
+
+  function startEdit() {
+    if (!profile) return;
+    setEditName(profile.name ?? "");
+    setEditEmail(profile.email ?? "");
+    setEditPhone(profile.phone ?? "");
+    setContactMsg(null);
+    setEditing(true);
+  }
+  async function saveContact() {
+    setSavingContact(true);
+    setContactMsg(null);
+    try {
+      const r = await api.adminUpdateUserContact(id, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        phone: editPhone.trim(),
+      });
+      setProfile(r.profile);
+      setEditing(false);
+    } catch (err) {
+      setContactMsg(err instanceof Error ? err.message : "Could not save changes.");
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
   // Referral / admin
   const [downline, setDownline] = useState<
     { id: number; email: string; name: string; registeredAt: string | null }[]
@@ -162,6 +196,38 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             </div>
           )}
         </div>
+
+        {!editing ? (
+          <div className="adm-tier-control">
+            <button type="button" className="hero-btn ghost" onClick={startEdit}>✎ Edit contact details</button>
+            {contactMsg && <em className="adm-card-sub" style={{ color: "#ff8f8f" }}>{contactMsg}</em>}
+          </div>
+        ) : (
+          <div className="adm-tier-control" style={{ display: "grid", gap: 10, maxWidth: 460 }}>
+            <span className="adm-key-label">Edit contact details</span>
+            <label className="adm-modal-field">
+              <span>Name</span>
+              <input className="adm-input" type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Full name" />
+            </label>
+            <label className="adm-modal-field">
+              <span>Email</span>
+              <input className="adm-input" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="name@example.com" />
+            </label>
+            <label className="adm-modal-field">
+              <span>Phone</span>
+              <input className="adm-input" type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="01x-xxx xxxx" />
+            </label>
+            {contactMsg && <em className="adm-card-sub" style={{ color: "#ff8f8f" }}>{contactMsg}</em>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="hero-btn primary" disabled={savingContact} onClick={saveContact}>
+                {savingContact ? "Saving…" : "Save"}
+              </button>
+              <button type="button" className="hero-btn ghost" disabled={savingContact} onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="adm-tier-control">
           <span className="adm-key-label">Change tier{profile.isAdmin ? " (admins can also hold a tier)" : ""}</span>
