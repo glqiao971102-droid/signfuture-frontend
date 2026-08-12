@@ -4500,6 +4500,9 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------- table ---------- */
 .adm-table-scroll { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; }
+/* Clickable table rows (e.g. Installations customer list). */
+.adm-table tbody tr.adm-row-click { cursor: pointer; }
+.adm-table tbody tr.adm-row-click:hover { background: rgba(57, 151, 255, 0.1); }
 
 /* ---- Admin Installations ---- */
 .adm-sub { margin: -4px 0 16px; color: var(--muted); font-size: 13.5px; }
