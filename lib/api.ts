@@ -433,6 +433,17 @@ export const api = {
     }>("/api/v1/membership/consultant", { cache: "no-store" });
   },
 
+  /** Join under an agent's referral code (only if you have no consultant yet). */
+  joinConsultant(referralCode: string) {
+    return request<{
+      success: boolean;
+      consultant: { id: number; name: string; phone: string | null } | null;
+    }>("/api/v1/membership/consultant/join", {
+      method: "POST",
+      body: JSON.stringify({ referralCode }),
+    });
+  },
+
   /** Tier discount settings (admin). */
   adminTierDiscounts() {
     return request<{ discounts: Record<string, number> }>("/api/v1/admin/settings/tier-discounts");

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
 import QuotationBrowser from "@/components/QuotationBrowser";
 import OrderStatusList from "@/components/OrderStatusList";
@@ -168,6 +168,28 @@ export default function AccountDashboard() {
       .then((r) => setConsultant(r.consultant))
       .catch(() => {});
   }, []);
+
+  // Member without a consultant can enter an agent's referral code to join.
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinErr, setJoinErr] = useState<string | null>(null);
+  async function joinConsultant() {
+    const code = joinCode.trim();
+    if (!code || joining) return;
+    setJoining(true);
+    setJoinErr(null);
+    try {
+      const r = await api.joinConsultant(code);
+      setConsultant(r.consultant);
+      setJoinCode("");
+    } catch (e) {
+      setJoinErr(
+        e instanceof ApiError ? e.message : "Couldn't join with that code. Please try again.",
+      );
+    } finally {
+      setJoining(false);
+    }
+  }
 
   if (!user) {
     return (
@@ -374,7 +396,7 @@ export default function AccountDashboard() {
                   <div className="acct-consultant-actions">
                     <a
                       href={`https://api.whatsapp.com/send?phone=${cWa}&text=${encodeURIComponent(
-                        `Hi ${cName}, I'm member ${user.memberNo}.`,
+                        `Hi ${cName}, I'm ${user.name}.`,
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -390,10 +412,56 @@ export default function AccountDashboard() {
                 )}
               </>
             ) : (
-              <p className="acct-card-sub" style={{ padding: "8px 0" }}>
-                You don’t have an assigned consultant yet. Register with a Sign Future
-                agent’s referral code to get a dedicated consultant.
-              </p>
+              <div style={{ padding: "8px 0" }}>
+                <p className="acct-card-sub" style={{ marginBottom: 12 }}>
+                  You don’t have an assigned consultant yet. Enter a Sign Future
+                  agent’s referral code below to join under them.
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    joinConsultant();
+                  }}
+                  style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                >
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    placeholder="Referral code"
+                    disabled={joining}
+                    className="acct-input"
+                    style={{
+                      flex: "1 1 160px",
+                      minWidth: 0,
+                      padding: "10px 12px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 8,
+                      fontSize: 14,
+                    }}
+                    autoCapitalize="characters"
+                  />
+                  <button
+                    type="submit"
+                    className="acct-contact wa"
+                    disabled={joining || !joinCode.trim()}
+                    style={{
+                      whiteSpace: "nowrap",
+                      opacity: joining || !joinCode.trim() ? 0.6 : 1,
+                    }}
+                  >
+                    {joining ? "Joining…" : "Join"}
+                  </button>
+                </form>
+                {joinErr && (
+                  <p
+                    className="acct-card-sub"
+                    style={{ marginTop: 8, color: "#dc2626" }}
+                  >
+                    {joinErr}
+                  </p>
+                )}
+              </div>
             )}
           </section>
           {thisMonthCard}
