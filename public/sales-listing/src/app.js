@@ -841,6 +841,7 @@ function bindManualInstallationForm() {
       invoiceNo: val("#miInvNo"),
       installerPhone: val("#miInstallerPhone"),
       customerPhone: val("#miCustomerPhone"),
+      address: val("#miAddress"),
       date: document.querySelector("#miDate")?.value || "",
       startTime: document.querySelector("#miStartTime")?.value || "",
       endTime: document.querySelector("#miEndTime")?.value || "",
@@ -852,7 +853,51 @@ function bindManualInstallationForm() {
     form.reset();
     form.hidden = true;
     render();
+    // Look up the address → precise coordinates so the map pin lands on it.
+    geocodeInstallations();
   });
+}
+
+// Geocode manual installations that have an address but no coordinates yet, so
+// their 🚚 pin sits on the real spot instead of a city-level guess. Uses the
+// free OSM Nominatim service (max ~1 req/sec), caches lat/lng on the record, and
+// re-renders the map when done. Fails quietly — the keyword fallback still works.
+let geocodingInFlight = false;
+async function geocodeInstallations() {
+  if (geocodingInFlight) return;
+  const pending = (state.installations || []).filter(
+    (it) => it.address && it.address.trim() && it.geocodedFor !== it.address.trim()
+  );
+  if (!pending.length) return;
+  geocodingInFlight = true;
+  let changed = false;
+  try {
+    for (const it of pending) {
+      try {
+        const q = encodeURIComponent(it.address.trim());
+        const res = await fetch(
+          "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=my&q=" + q,
+          { headers: { Accept: "application/json" } }
+        );
+        if (res.ok) {
+          const arr = await res.json();
+          if (arr && arr[0] && arr[0].lat && arr[0].lon) {
+            it.lat = parseFloat(arr[0].lat);
+            it.lng = parseFloat(arr[0].lon);
+            it.geocodedFor = it.address.trim();
+            changed = true;
+            persist();
+          }
+        }
+      } catch (err) {
+        /* network/CORS — leave it to the keyword fallback */
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    }
+  } finally {
+    geocodingInFlight = false;
+    if (changed && typeof renderInstallationMap === "function") renderInstallationMap();
+  }
 }
 
 function bindEvents() {
@@ -1395,9 +1440,12 @@ function manualInstallationJobs() {
       startTime: it.startTime || "",
       endTime: it.endTime || "",
       completed: it.completed,
-      address: "",
+      address: it.address || "",
       postcode: "",
       state: "",
+      // Cached precise coordinates from geocoding (when available).
+      lat: typeof it.lat === "number" ? it.lat : undefined,
+      lng: typeof it.lng === "number" ? it.lng : undefined,
     },
   }));
 }
@@ -1464,8 +1512,12 @@ function renderInstallationPage() {
       </article>
     `;
   }).join("");
-  renderInstallationMap(invoiceJobs);
+  // Include manually-added installations on the map (not just invoice jobs), so
+  // their address pin shows too.
+  renderInstallationMap(jobs);
   renderInstallationCalendar(jobs);
+  // Geocode any manual installations whose address hasn't been located yet.
+  geocodeInstallations();
 }
 
 function renderInstallationCalendar(jobs = installationInvoices()) {
@@ -1597,6 +1649,11 @@ function installationMapPoint(invoice, index, mapRect) {
 }
 
 function installationGeoPoint(invoice, index) {
+  // Precise geocoded coordinates win — the pin lands exactly on the address.
+  const inst = invoice.installation || {};
+  if (typeof inst.lat === "number" && !Number.isNaN(inst.lat) && typeof inst.lng === "number" && !Number.isNaN(inst.lng)) {
+    return { lat: inst.lat, lng: inst.lng };
+  }
   const address = `${invoice.installation?.address || ""} ${invoice.installation?.postcode || ""} ${invoice.installation?.state || ""} ${invoice.customer || ""}`.toLowerCase();
   const known = [
     { keys: ["johor", "jb", "johor bahru"], lat: 1.4927, lng: 103.7414 },
@@ -1671,7 +1728,7 @@ function fitInstallationMapToJobs(jobs, mapRect) {
   installationMapState = { ...center, zoom: bestZoom };
 }
 
-function renderInstallationMap(jobs = installationInvoices()) {
+function renderInstallationMap(jobs = installationInvoices().concat(manualInstallationJobs())) {
   if (!els.installationMap || !els.installationMapTiles || !els.installationMapMarkers) return;
   const rect = els.installationMap.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
