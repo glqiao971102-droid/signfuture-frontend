@@ -39,7 +39,7 @@ const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] 
   { key: "invoice", label: "Download Invoice", glyph: "⤓" },
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
-  { key: "installation", label: "My Installation", glyph: "⚒", soon: true },
+  { key: "installation", label: "My Installation", glyph: "⚒" },
   { key: "installer", label: "Installer", glyph: "⚑", soon: true },
   { key: "account", label: "Account", glyph: "⚙", soon: true },
   { key: "materialStore", label: "Material Store", glyph: "▦", soon: true },
