@@ -276,6 +276,13 @@ export const api = {
     return res.user;
   },
 
+  /** DEV ONLY: sign in as an admin without a password (404s in production). */
+  async devLogin() {
+    const res = await request<SessionResponse>("/api/v1/auth/dev-login", { method: "POST" });
+    setToken(res.token.value);
+    return res.user;
+  },
+
   /** Sends a 6-digit email verification code for registration. */
   sendRegisterOtp(email: string) {
     return request<{ success: boolean; message: string }>(

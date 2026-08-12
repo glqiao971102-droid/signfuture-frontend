@@ -116,6 +116,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     (async () => {
+      // DEV: fetch a REAL admin session from the local backend so the local app
+      // can actually call the admin/data APIs (the mock preview user carries no
+      // token, so every request would 401). Dev-only endpoint — 404s in prod.
+      if (DEV_PREVIEW && !getToken()) {
+        try {
+          const me = await api.devLogin();
+          if (!cancelled) setUser(me);
+        } catch {
+          /* backend down / no admin — fall back to the mock preview user */
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
       if (!getToken()) {
         setLoading(false);
         return;
