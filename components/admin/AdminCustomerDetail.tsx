@@ -195,6 +195,19 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
               </div>
             </div>
           )}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <span className="adm-key-label">Upline (referrer)</span>
+            {profile.upline ? (
+              <>
+                <Link href={`/admin/users/${profile.upline.id}`} className="adm-edit-link">
+                  {profile.upline.name || `User ${profile.upline.id}`}
+                </Link>
+                {profile.upline.phone ? ` · ${profile.upline.phone}` : ""}
+              </>
+            ) : (
+              <span>— (registered without a referral code)</span>
+            )}
+          </div>
         </div>
 
         {!editing ? (

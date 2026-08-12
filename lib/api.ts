@@ -44,6 +44,8 @@ export type MemberProfile = {
   referralCode: string | null;
   /** The admin user id that referred this member, else null. */
   referredBy: number | null;
+  /** The member's upline (the agent they registered under). Admin view only. */
+  upline?: { id: number; name: string; phone: string | null } | null;
   /** Trades the member selected at sign-up (may be empty). */
   professions: string[];
 };

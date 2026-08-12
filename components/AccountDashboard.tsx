@@ -266,9 +266,12 @@ export default function AccountDashboard() {
   const renderSection = () => {
     switch (active) {
       case "consultant": {
-        const cName = consultant?.name || CONSULTANT.name;
-        const cWa = waNumber(consultant?.phone) || CONSULTANT.wa;
-        const cInitials = consultant?.name ? initialsOf(consultant.name) : CONSULTANT.initials;
+        // The consultant is the agent the member registered under (their
+        // referral code). No hardcoded fallback — if there's no referrer, we
+        // show an empty state instead of a fake consultant.
+        const cName = consultant?.name || null;
+        const cWa = waNumber(consultant?.phone);
+        const cInitials = cName ? initialsOf(cName) : "★";
         return (
           <>
           {(user.stats || user.billing.address_1 || user.phone) && (
@@ -347,36 +350,51 @@ export default function AccountDashboard() {
               <h2>My Consultant</h2>
               <span>Your dedicated contact for quotes &amp; orders</span>
             </div>
-            <div className="acct-consultant-body">
-              <span className="acct-consultant-avatar">
-                <span className="acct-consultant-fallback">{cInitials}</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={CONSULTANT.photo}
-                  alt={cName}
-                  className="acct-consultant-img"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              </span>
-              <div className="acct-consultant-info">
-                <strong>{cName}</strong>
-                <span>{CONSULTANT.role}</span>
-              </div>
-            </div>
-            <div className="acct-consultant-actions">
-              <a
-                href={`https://api.whatsapp.com/send?phone=${cWa}&text=${encodeURIComponent(
-                  `Hi ${cName}, I'm member ${user.memberNo}.`,
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="acct-contact wa"
-              >
-                <span>✆</span> WhatsApp {cName.split(" ")[0]}
-              </a>
-            </div>
+            {cName ? (
+              <>
+                <div className="acct-consultant-body">
+                  <span className="acct-consultant-avatar">
+                    <span className="acct-consultant-fallback">{cInitials}</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={CONSULTANT.photo}
+                      alt={cName}
+                      className="acct-consultant-img"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </span>
+                  <div className="acct-consultant-info">
+                    <strong>{cName}</strong>
+                    <span>{CONSULTANT.role}</span>
+                  </div>
+                </div>
+                {cWa ? (
+                  <div className="acct-consultant-actions">
+                    <a
+                      href={`https://api.whatsapp.com/send?phone=${cWa}&text=${encodeURIComponent(
+                        `Hi ${cName}, I'm member ${user.memberNo}.`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="acct-contact wa"
+                    >
+                      <span>✆</span> WhatsApp {cName.split(" ")[0]}
+                    </a>
+                  </div>
+                ) : (
+                  <p className="acct-card-sub" style={{ marginTop: 8 }}>
+                    No WhatsApp number on file for your consultant yet.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="acct-card-sub" style={{ padding: "8px 0" }}>
+                You don’t have an assigned consultant yet. Register with a Sign Future
+                agent’s referral code to get a dedicated consultant.
+              </p>
+            )}
           </section>
           {thisMonthCard}
           </div>
