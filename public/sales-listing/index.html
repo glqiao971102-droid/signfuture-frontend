@@ -50,13 +50,15 @@
       .installation-jobs-monthnote { font-size: 12.5px; font-weight: 700; color: #cfe0f5; margin: 0 0 10px; padding: 7px 11px; border-radius: 8px; background: rgba(53,216,255,0.08); border: 1px solid rgba(53,216,255,0.25); }
       .installation-jobs-monthnote b.done { color: #34d399; }
       .installation-jobs-monthnote b.pend { color: #ffc857; }
-      .manual-install-form { margin: 0 0 12px; padding: 12px; border: 1px solid rgba(74, 134, 255, 0.34); border-radius: 10px; background: rgba(11, 21, 53, 0.5); }
-      .manual-install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .manual-install-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #b9c9dd; }
-      .manual-install-grid input { padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(120,150,190,0.35); background: rgba(3,15,31,0.6); color: #eaf2ff; }
-      .manual-time-range { display: flex; align-items: center; gap: 6px; }
-      .manual-time-range input { flex: 1 1 0; min-width: 0; }
-      .manual-time-dash { color: #9fb4d0; font-weight: 800; }
+      .manual-install-form { margin: 0 0 12px; padding: 14px; border: 1px solid rgba(74, 134, 255, 0.34); border-radius: 10px; background: rgba(11, 21, 53, 0.5); }
+      .manual-install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .manual-install-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: #b9c9dd; }
+      .manual-install-grid input, .manual-install-grid select { padding: 10px 11px; border-radius: 8px; border: 1px solid rgba(120,150,190,0.35); background: rgba(3,15,31,0.6); color: #eaf2ff; font-size: 14px; }
+      /* Date + Time get their own full-width rows so the pickers are large and easy to tap. */
+      .manual-install-grid label.manual-full { grid-column: 1 / -1; }
+      .manual-time-range { display: flex; align-items: center; gap: 10px; }
+      .manual-time-range input, .manual-time-range select { flex: 1 1 0; min-width: 0; padding: 12px; font-size: 15px; }
+      .manual-time-dash { color: #9fb4d0; font-weight: 800; font-size: 16px; }
       .manual-install-actions { display: flex; gap: 8px; margin-top: 10px; }
       .installation-job-contact { display: block; font-size: 12px; color: #9fb4d0; margin-top: 2px; }
     </style>
@@ -227,8 +229,8 @@
               <p id="installationJobsMonthNote" class="installation-jobs-monthnote" hidden></p>
               <form id="manualInstallationForm" class="manual-install-form" hidden>
                 <div class="manual-install-grid">
-                  <label>Installation date<input id="miDate" type="date" required /></label>
-                  <label>Time (from – to)
+                  <label class="manual-full">Installation date<input id="miDate" type="date" required /></label>
+                  <label class="manual-full">Time (from – to)
                     <span class="manual-time-range">
                       <select id="miStartTime" aria-label="Start time"></select>
                       <span class="manual-time-dash">–</span>
