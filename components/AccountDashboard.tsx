@@ -47,10 +47,10 @@ const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] 
 ];
 
 // Customer-facing installation view: the Sales Ledger app's Installation tab
-// (Calendar / Map / Jobs only) embedded via ?customer=1, which hides its admin
-// sidebar/upload/tabs. Same :3200 origin the admin embed uses.
-const SALES_APP_ORIGIN =
-  process.env.NEXT_PUBLIC_SALES_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3200";
+// (Calendar / Map / Jobs only), served from this storefront's own
+// public/sales-listing copy via ?customer=1 — which hides the admin
+// sidebar/upload/tabs. Self-hosted so it stays up on live independent of any
+// local dev server.
 
 // Malaysian states for the Installer directory's state filter.
 const MY_STATES = [
@@ -583,7 +583,10 @@ export default function AccountDashboard() {
               <span>Your installation calendar, Malaysia map and jobs.</span>
             </div>
             <iframe
-              src={`${SALES_APP_ORIGIN}/?view=installation&customer=1`}
+              // Served from the storefront's own domain (public/sales-listing),
+              // so My Installation stays up on live regardless of any local dev
+              // server — no dependency on :3200.
+              src="/sales-listing/index.html?view=installation&customer=1"
               title="My Installation"
               style={{
                 width: "100%",

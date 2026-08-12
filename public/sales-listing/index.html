@@ -5,6 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sales Performance Ledger</title>
     <link rel="stylesheet" href="src/styles.css?v=20260610-1215" />
+    <style>
+      /* Customer embed mode (?customer=1): only the Installation view (Calendar
+         / Map / Jobs). Hides the admin sidebar (filters + upload + data tools)
+         and the top tab switcher so end users can't reach the other views. */
+      .customer-mode .app-shell { grid-template-columns: 1fr; }
+      .customer-mode .sidebar { display: none; }
+      .customer-mode .topbar { display: none; }
+      /* Customer view: Map, Jobs and Calendar stacked full-width (no resize UI). */
+      .customer-mode .installation-layout { display: flex; flex-direction: column; gap: 16px; }
+      .customer-mode .installation-map-panel { width: 100%; height: 460px; display: flex; flex-direction: column; }
+      .customer-mode .installation-jobs-panel { width: 100%; height: 520px; }
+      .customer-mode .installation-calendar-panel { width: 100%; height: auto; grid-column: auto; }
+      .customer-mode .installation-map-panel,
+      .customer-mode .installation-jobs-panel { position: relative; overflow: hidden; }
+      /* Calendar shows its full month grid directly — no fixed height / clipping. */
+      .customer-mode .installation-calendar-panel { position: relative; overflow: visible; }
+      /* Map fills the whole panel (below the header). */
+      .customer-mode .malaysia-map { flex: 1 1 auto; width: 100%; min-height: 0; }
+      /* Add New Installation form (shown in both admin + customer). */
+      /* The jobs panel was a 3-row grid built for [header, list, empty]; the new
+         button + form landed in the flexible 1fr row and got stretched huge.
+         Switch to a flex column so the button stays its natural size and the job
+         list fills the remaining space + scrolls. */
+      .installation-jobs-panel { display: flex; flex-direction: column; }
+      .installation-jobs { flex: 1 1 auto; }
+      .manual-install-add {
+        align-self: flex-start; width: auto; min-height: 0;
+        padding: 8px 16px; font-size: 13px; font-weight: 800;
+        margin: 4px 0 12px; cursor: pointer;
+        border: 1px solid rgba(140, 175, 255, 0.55); border-radius: 8px;
+        background: linear-gradient(90deg, #6d5efc, #35a0ff); color: #ffffff;
+        box-shadow: 0 4px 10px rgba(31, 8, 47, 0.22);
+      }
+      .manual-install-add:hover { filter: brightness(1.1); color: #ffffff; }
+      .manual-install-add::before { content: none !important; }
+      /* Jobs toolbar: Add-New on the left, month filter pushed to the right. */
+      .installation-jobs-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+      .installation-jobs-toolbar .manual-install-add { margin: 0; }
+      .installation-jobs-month { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; font-weight: 700; color: #b9c9dd; }
+      .installation-jobs-month input[type="month"] { padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(120,150,190,0.35); background: rgba(3,15,31,0.6); color: #eaf2ff; font-weight: 700; }
+      .installation-jobs-month button { padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(120,150,190,0.4); background: rgba(3,15,31,0.5); color: #cfe0f5; font-weight: 700; cursor: pointer; }
+      .installation-jobs-month button:hover { border-color: rgba(53,216,255,0.6); color: #eaf2ff; }
+      .installation-jobs-monthnote { font-size: 12.5px; font-weight: 700; color: #cfe0f5; margin: 0 0 10px; padding: 7px 11px; border-radius: 8px; background: rgba(53,216,255,0.08); border: 1px solid rgba(53,216,255,0.25); }
+      .installation-jobs-monthnote b.done { color: #34d399; }
+      .installation-jobs-monthnote b.pend { color: #ffc857; }
+      .manual-install-form { margin: 0 0 12px; padding: 12px; border: 1px solid rgba(74, 134, 255, 0.34); border-radius: 10px; background: rgba(11, 21, 53, 0.5); }
+      .manual-install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .manual-install-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #b9c9dd; }
+      .manual-install-grid input { padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(120,150,190,0.35); background: rgba(3,15,31,0.6); color: #eaf2ff; }
+      .manual-time-range { display: flex; align-items: center; gap: 6px; }
+      .manual-time-range input { flex: 1 1 0; min-width: 0; }
+      .manual-time-dash { color: #9fb4d0; font-weight: 800; }
+      .manual-install-actions { display: flex; gap: 8px; margin-top: 10px; }
+      .installation-job-contact { display: block; font-size: 12px; color: #9fb4d0; margin-top: 2px; }
+    </style>
   </head>
   <body>
     <div class="app-shell">
@@ -71,9 +126,9 @@
             <button class="nav-tab" data-view="mission" type="button">Mission</button>
             <button class="nav-tab" data-view="facebook" type="button">Facebook Listing</button>
             <button class="nav-tab" data-view="settings" type="button">Settings</button>
+            <button id="newMissionButton" class="quick-entry-button nav-new-mission" type="button" style="display:none;">+ New Mission</button>
           </nav>
           <button id="quickEntryButton" class="quick-entry-button" type="button">New invoice / cost</button>
-          <button id="newMissionButton" class="quick-entry-button" type="button" style="display:none;">New Mission</button>
         </header>
 
         <section id="dashboardView" class="view active">
@@ -161,6 +216,34 @@
                 <h3>Installation Jobs</h3>
                 <span id="installationJobCount"></span>
               </div>
+              <div class="installation-jobs-toolbar">
+                <button id="addInstallationButton" class="manual-install-add" type="button">+ Add New Installation</button>
+                <label class="installation-jobs-month">
+                  <span>Month</span>
+                  <input id="installationJobsMonthInput" type="month" />
+                  <button id="installationJobsMonthClear" type="button" title="Show all months">All</button>
+                </label>
+              </div>
+              <p id="installationJobsMonthNote" class="installation-jobs-monthnote" hidden></p>
+              <form id="manualInstallationForm" class="manual-install-form" hidden>
+                <div class="manual-install-grid">
+                  <label>Installation date<input id="miDate" type="date" required /></label>
+                  <label>Time (from – to)
+                    <span class="manual-time-range">
+                      <input id="miStartTime" type="time" aria-label="Start time" />
+                      <span class="manual-time-dash">–</span>
+                      <input id="miEndTime" type="time" aria-label="End time" />
+                    </span>
+                  </label>
+                  <label>Installer contact no.<input id="miInstallerPhone" type="tel" placeholder="01x-xxx xxxx" /></label>
+                  <label>Customer contact no.<input id="miCustomerPhone" type="tel" placeholder="01x-xxx xxxx" /></label>
+                  <label>Invoice No / Job<input id="miInvNo" type="text" placeholder="IV2606-001" /></label>
+                </div>
+                <div class="manual-install-actions">
+                  <button type="submit">Save installation</button>
+                  <button id="miCancel" type="button" class="danger-ghost">Cancel</button>
+                </div>
+              </form>
               <div id="installationJobs" class="installation-jobs"></div>
               <div id="installationEmpty" class="empty-state">
                 <h3>No installation jobs yet</h3>
@@ -988,7 +1071,7 @@
     </dialog>
     <script src="src/seed-data.js?v=20260609-1905"></script>
     <script src="src/app.js?v=20260610-1215"></script>
-    <!-- Bridge for the admin embed: open a specific tab via ?view= or postMessage. -->
+    <!-- Admin embed bridge: open a specific tab via ?view= or postMessage. -->
     <script>
       (function () {
         function applyView(v) {
@@ -998,7 +1081,13 @@
           return false;
         }
         function initialView() {
-          var v = new URLSearchParams(location.search).get("view");
+          var params = new URLSearchParams(location.search);
+          // Customer embed mode (?customer=1): a stripped view for end users —
+          // only the Installation tab (Calendar / Map / Jobs), no sidebar
+          // filters/upload and no tab switcher. Locked to installation.
+          var customer = params.get("customer") === "1";
+          if (customer) document.documentElement.classList.add("customer-mode");
+          var v = customer ? "installation" : params.get("view");
           if (!v) return;
           var tries = 0;
           (function attempt() {
@@ -1011,6 +1100,26 @@
         });
         if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialView);
         else initialView();
+      })();
+    </script>
+    <!-- Customer mode: keep the Malaysia map filling its (fixed) panel by
+         re-tiling once on load and whenever the window size changes. -->
+    <script>
+      (function () {
+        if (new URLSearchParams(location.search).get("customer") !== "1") return;
+        var t;
+        function refill() {
+          if (typeof renderInstallationMap === "function") {
+            try { renderInstallationMap(); } catch (e) {}
+          }
+        }
+        function schedule() { clearTimeout(t); t = setTimeout(refill, 300); }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", schedule);
+        } else {
+          schedule();
+        }
+        window.addEventListener("resize", schedule);
       })();
     </script>
   </body>

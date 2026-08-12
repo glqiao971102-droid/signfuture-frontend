@@ -1854,6 +1854,17 @@ body::before {
   white-space: nowrap;
 }
 
+/* Compact "New Mission" action sitting right beside the Settings tab. */
+.nav-new-mission {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 12px;
+  border-width: 1px;
+  border-radius: 7px;
+  box-shadow: none;
+  align-self: center;
+}
+
 .quick-entry-button:hover {
   background: #f8f1ff;
   border-color: #ffffff;
@@ -4926,6 +4937,16 @@ body::before {
   backdrop-filter: blur(14px);
 }
 
+/* Dark-theme fix: the connected-invoice preview chips kept a light-theme white
+   background, so their light text was invisible. Give them a dark chip look. */
+.invoice-preview span {
+  border-color: rgba(74, 134, 255, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cdd8f7;
+  font-size: 12.5px;
+}
+.invoice-preview span strong { color: #ffffff; }
+
 .filter-panel,
 .import-panel {
   position: relative;
@@ -6983,7 +7004,7 @@ html {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-top: 12px;
 }
 
@@ -6991,32 +7012,36 @@ html {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 14px;
+  padding: 11px;
+  /* min-width:0 lets the 1fr columns shrink so a long figure can't push the
+     boxes past the card edge; overflow-wrap breaks the number if needed. */
+  min-width: 0;
+  overflow: hidden;
   border-radius: 13px;
   border: 1px solid rgba(74, 134, 255, 0.22);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .mission-pk-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
-  font-size: 17px;
+  font-size: 15px;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(34, 196, 255, 0.25));
 }
 
-.mission-pk-fig { font-size: 19px; font-weight: 900; }
+.mission-pk-fig { font-size: 15px; font-weight: 900; overflow-wrap: anywhere; min-width: 0; }
 
 .mission-vs {
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-weight: 900;
-  font-size: 14px;
+  font-size: 12px;
   color: #fff;
   background: linear-gradient(135deg, #b12cff, #285bff);
   box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);

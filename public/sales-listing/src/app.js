@@ -20,6 +20,9 @@ let installationMapState = { lat: 4.2, lng: 109.5, zoom: 6 };
 let installationMapDrag = null;
 let installationMapUserAdjusted = false;
 let installationCalendarMonth = "";
+// Month filter for the Installation Jobs LIST (separate from the calendar).
+// "" = show every month.
+let installationJobsMonth = "";
 
 const els = {
   dateFromFilter: document.querySelector("#dateFromFilter"),
@@ -80,6 +83,9 @@ const els = {
   invoiceBody: document.querySelector("#invoiceBody"),
   costBody: document.querySelector("#costBody"),
   installationJobs: document.querySelector("#installationJobs"),
+  installationJobsMonthInput: document.querySelector("#installationJobsMonthInput"),
+  installationJobsMonthClear: document.querySelector("#installationJobsMonthClear"),
+  installationJobsMonthNote: document.querySelector("#installationJobsMonthNote"),
   installationCalendar: document.querySelector("#installationCalendar"),
   installationCalendarMonth: document.querySelector("#installationCalendarMonth"),
   installationCalendarMonthInput: document.querySelector("#installationCalendarMonthInput"),
@@ -217,6 +223,21 @@ function normalizeState(input) {
       statusUpdatedAt: row.statusUpdatedAt || row.statusDate || row.statusAt || "",
       remarks: row.remarks || "",
       importedFrom: row.importedFrom || "",
+    })),
+    // Manually-added installations (Add New Installation) — standalone jobs that
+    // are not tied to an invoice. Shown in the Installation Jobs list + calendar.
+    installations: (input.installations || []).map((it) => ({
+      id: it.id || createId(),
+      manual: true,
+      invoiceNo: it.invoiceNo || "",
+      installerPhone: it.installerPhone || "",
+      customerPhone: it.customerPhone || "",
+      date: it.date || "",
+      startTime: it.startTime || it.time || "",
+      endTime: it.endTime || "",
+      completed: !!it.completed,
+      completedAt: it.completedAt || "",
+      createdAt: it.createdAt || "",
     })),
     settings: {
       logoImage: input.settings?.logoImage || DEFAULT_LOGO_IMAGE,
@@ -774,7 +795,44 @@ function setDefaultDates() {
   if (els.facebookDate) els.facebookDate.value ||= today;
 }
 
+function bindManualInstallationForm() {
+  const form = document.querySelector("#manualInstallationForm");
+  const addBtn = document.querySelector("#addInstallationButton");
+  if (!form || !addBtn) return;
+  addBtn.addEventListener("click", () => {
+    form.hidden = !form.hidden;
+    if (!form.hidden) document.querySelector("#miDate")?.focus();
+  });
+  document.querySelector("#miCancel")?.addEventListener("click", () => {
+    form.reset();
+    form.hidden = true;
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const val = (sel) => (document.querySelector(sel)?.value || "").trim();
+    state.installations = state.installations || [];
+    state.installations.push({
+      id: createId(),
+      manual: true,
+      invoiceNo: val("#miInvNo"),
+      installerPhone: val("#miInstallerPhone"),
+      customerPhone: val("#miCustomerPhone"),
+      date: document.querySelector("#miDate")?.value || "",
+      startTime: document.querySelector("#miStartTime")?.value || "",
+      endTime: document.querySelector("#miEndTime")?.value || "",
+      completed: false,
+      completedAt: "",
+      createdAt: todayInputValue(),
+    });
+    persist();
+    form.reset();
+    form.hidden = true;
+    render();
+  });
+}
+
 function bindEvents() {
+  bindManualInstallationForm();
   document.querySelectorAll(".nav-tab").forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
@@ -864,6 +922,17 @@ function bindEvents() {
   });
   els.installationCalendarPrev?.addEventListener("click", () => shiftInstallationCalendarMonth(-1));
   els.installationCalendarNext?.addEventListener("click", () => shiftInstallationCalendarMonth(1));
+  // Jobs-list month filter (Add-New toolbar): pick a month to see just that
+  // month's jobs and how many are completed vs pending; "All" clears it.
+  els.installationJobsMonthInput?.addEventListener("input", () => {
+    installationJobsMonth = els.installationJobsMonthInput.value;
+    renderInstallationPage();
+  });
+  els.installationJobsMonthClear?.addEventListener("click", () => {
+    installationJobsMonth = "";
+    if (els.installationJobsMonthInput) els.installationJobsMonthInput.value = "";
+    renderInstallationPage();
+  });
   [els.installationStartTime, els.installationEndTime].forEach((input) => {
     input?.addEventListener("change", () => normalizeTimeInputToHalfHour(input));
     input?.addEventListener("blur", () => normalizeTimeInputToHalfHour(input));
@@ -1286,18 +1355,69 @@ function installationInvoices() {
     });
 }
 
+// Manually-added installations, shaped like an installation invoice so they
+// render in the jobs list + calendar alongside invoice-derived jobs.
+function manualInstallationJobs() {
+  return (state.installations || []).map((it) => ({
+    id: it.id,
+    manual: true,
+    invoiceNo: it.invoiceNo || "(no inv)",
+    customer: "",
+    installerPhone: it.installerPhone || "",
+    customerPhone: it.customerPhone || "",
+    jobType: "installation",
+    installation: {
+      date: it.date || "",
+      startTime: it.startTime || "",
+      endTime: it.endTime || "",
+      completed: it.completed,
+      address: "",
+      postcode: "",
+      state: "",
+    },
+  }));
+}
+
 function renderInstallationPage() {
   if (!els.installationJobs) return;
-  const jobs = installationInvoices();
+  const invoiceJobs = installationInvoices();
+  const jobs = invoiceJobs
+    .concat(manualInstallationJobs())
+    .sort((a, b) => (a.installation?.date || "").localeCompare(b.installation?.date || ""));
   const completed = jobs.filter((invoice) => invoice.installation?.completed).length;
   const pending = jobs.length - completed;
   if (els.installationSummary) {
     els.installationSummary.textContent = `${jobs.length} installation jobs · ${pending} pending · ${completed} completed`;
   }
-  if (els.installationJobCount) els.installationJobCount.textContent = `${pending} pending`;
-  if (els.installationEmpty) els.installationEmpty.classList.toggle("active", !jobs.length);
-  els.installationJobs.innerHTML = jobs.map((invoice) => {
+  // Month filter for the jobs LIST only (from the Add-New toolbar). The map and
+  // calendar below keep showing all jobs.
+  const listJobs = installationJobsMonth
+    ? jobs.filter((invoice) => (invoice.installation?.date || "").slice(0, 7) === installationJobsMonth)
+    : jobs;
+  const listCompleted = listJobs.filter((invoice) => invoice.installation?.completed).length;
+  const listPending = listJobs.length - listCompleted;
+  if (els.installationJobsMonthInput && els.installationJobsMonthInput.value !== installationJobsMonth) {
+    els.installationJobsMonthInput.value = installationJobsMonth;
+  }
+  if (els.installationJobsMonthNote) {
+    if (installationJobsMonth) {
+      const label = new Date(`${installationJobsMonth}-01T00:00:00`).toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+      els.installationJobsMonthNote.innerHTML = `${label}: ${listJobs.length} job${listJobs.length === 1 ? "" : "s"} · <b class="done">${listCompleted} completed</b> · <b class="pend">${listPending} pending</b>`;
+      els.installationJobsMonthNote.hidden = false;
+    } else {
+      els.installationJobsMonthNote.hidden = true;
+    }
+  }
+  if (els.installationJobCount) els.installationJobCount.textContent = `${listPending} pending`;
+  if (els.installationEmpty) els.installationEmpty.classList.toggle("active", !listJobs.length);
+  els.installationJobs.innerHTML = listJobs.map((invoice) => {
     const install = invoice.installation || {};
+    const detail = invoice.manual
+      ? `${invoice.installerPhone ? `<small class="installation-job-contact">Installer: ${escapeHtml(invoice.installerPhone)}</small>` : ""}${invoice.customerPhone ? `<small class="installation-job-contact">Customer: ${escapeHtml(invoice.customerPhone)}</small>` : ""}`
+      : `<small>${escapeHtml(installationAddressLine(install))}</small>`;
+    const remove = invoice.manual
+      ? `<button type="button" class="danger-ghost installation-job-delete" title="Delete installation" onclick="deleteManualInstallation('${invoice.id}')">✕</button>`
+      : "";
     return `
       <article class="installation-job ${install.completed ? "completed" : ""}">
         <div class="installation-job-main">
@@ -1305,7 +1425,7 @@ function renderInstallationPage() {
           <div>
             <h4>${escapeHtml(invoice.invoiceNo)}</h4>
             <p>${escapeHtml(invoice.customer || "Installation job")}</p>
-            <small>${escapeHtml(installationAddressLine(install))}</small>
+            ${detail}
           </div>
         </div>
         <div class="installation-job-time">
@@ -1316,10 +1436,11 @@ function renderInstallationPage() {
           <input type="checkbox" ${install.completed ? "checked" : ""} onchange="toggleInstallationComplete('${invoice.id}', this.checked)" />
           <span>&#10003;</span>
         </label>
+        ${remove}
       </article>
     `;
   }).join("");
-  renderInstallationMap(jobs);
+  renderInstallationMap(invoiceJobs);
   renderInstallationCalendar(jobs);
 }
 
@@ -1639,11 +1760,26 @@ function formatInstallationTime(start, end) {
 }
 
 window.toggleInstallationComplete = function toggleInstallationComplete(id, checked) {
+  const manual = (state.installations || []).find((it) => it.id === id);
+  if (manual) {
+    manual.completed = checked;
+    manual.completedAt = checked ? todayInputValue() : "";
+    persist();
+    render();
+    return;
+  }
   const invoice = findInvoice(id);
   if (!invoice) return;
   invoice.installation ||= normalizeInstallation({}, "installation");
   invoice.installation.completed = checked;
   invoice.installation.completedAt = checked ? todayInputValue() : "";
+  persist();
+  render();
+};
+
+window.deleteManualInstallation = function deleteManualInstallation(id) {
+  if (!confirm("Delete this installation?")) return;
+  state.installations = (state.installations || []).filter((it) => it.id !== id);
   persist();
   render();
 };
