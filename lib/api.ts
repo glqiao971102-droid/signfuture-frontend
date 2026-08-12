@@ -592,6 +592,37 @@ export const api = {
     return request<MemberProfile>(`/api/v1/admin/users/${id}`);
   },
 
+  /** Admin: a customer's recorded installations (optionally one year). */
+  adminInstallations(userId: number, year?: string) {
+    const qs = new URLSearchParams({ userId: String(userId) });
+    if (year) qs.set("year", year);
+    return request<{ customer: { id: number; name: string; email: string } | null; data: InstallationRow[] }>(
+      `/api/v1/admin/installations?${qs}`,
+    );
+  },
+
+  /** Admin: record a new installation for a customer. */
+  adminCreateInstallation(body: {
+    userId: number;
+    installDate?: string;
+    startTime?: string;
+    endTime?: string;
+    invoiceNo?: string;
+    customerPhone?: string;
+    installerName?: string;
+    installerPhone?: string;
+  }) {
+    return request<InstallationRow>(`/api/v1/admin/installations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  /** Admin: delete an installation record. */
+  adminDeleteInstallation(id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/installations/${id}`, { method: "DELETE" });
+  },
+
   /** Admin: edit a member's contact details (email / phone / name). */
   adminUpdateUserContact(id: number, patch: { email?: string; phone?: string; name?: string }) {
     return request<{ success: boolean; profile: MemberProfile }>(
@@ -1034,6 +1065,19 @@ export type AdminProductDetail = {
 };
 
 /** A row in the admin users table. */
+export type InstallationRow = {
+  id: number;
+  userId: number;
+  installDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  invoiceNo: string | null;
+  customerPhone: string | null;
+  installerName: string | null;
+  installerPhone: string | null;
+  createdAt: string | null;
+};
+
 export type AdminUserRow = {
   id: number;
   login: string;
