@@ -428,7 +428,7 @@ export const api = {
   myConsultant() {
     return request<{
       consultant: { id: number; name: string; phone: string | null } | null;
-    }>("/api/v1/membership/consultant");
+    }>("/api/v1/membership/consultant", { cache: "no-store" });
   },
 
   /** Tier discount settings (admin). */
