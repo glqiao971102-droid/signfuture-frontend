@@ -8,6 +8,7 @@ import {
   type MemberProfile,
   type OrderSummary,
   type WalletTransaction,
+  type AdminUserRow,
 } from "@/lib/api";
 
 const money = (n: number) =>
@@ -150,6 +151,49 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
     }
   }
 
+  // Change consultant (the member's referrer / upline).
+  const [changingConsultant, setChangingConsultant] = useState(false);
+  const [consultantSearch, setConsultantSearch] = useState("");
+  const [consultantResults, setConsultantResults] = useState<AdminUserRow[]>([]);
+  const [searchingConsultant, setSearchingConsultant] = useState(false);
+  const [savingConsultant, setSavingConsultant] = useState(false);
+  const [consultantMsg, setConsultantMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!changingConsultant) return;
+    const term = consultantSearch.trim();
+    if (!term) {
+      setConsultantResults([]);
+      return;
+    }
+    setSearchingConsultant(true);
+    const t = setTimeout(() => {
+      // Consultants are admins — search the admin pool.
+      api
+        .adminUsers({ search: term, role: "admin", perPage: 10 })
+        .then((r) => setConsultantResults(r.data))
+        .catch(() => setConsultantResults([]))
+        .finally(() => setSearchingConsultant(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [consultantSearch, changingConsultant]);
+
+  async function setConsultant(consultantId: number) {
+    setSavingConsultant(true);
+    setConsultantMsg(null);
+    try {
+      await api.adminSetConsultant(id, consultantId);
+      setChangingConsultant(false);
+      setConsultantSearch("");
+      setConsultantResults([]);
+      await load();
+    } catch (err) {
+      setConsultantMsg(err instanceof Error ? err.message : "Could not change consultant.");
+    } finally {
+      setSavingConsultant(false);
+    }
+  }
+
   if (loading) return <div className="adm-wrap"><p>Loading customer…</p></div>;
   if (error || !profile)
     return (
@@ -196,7 +240,7 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             </div>
           )}
           <div style={{ gridColumn: "1 / -1" }}>
-            <span className="adm-key-label">Upline (referrer)</span>
+            <span className="adm-key-label">My Consultant</span>
             {profile.upline ? (
               <>
                 <Link href={`/admin/users/${profile.upline.id}`} className="adm-edit-link">
@@ -205,7 +249,7 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
                 {profile.upline.phone ? ` · ${profile.upline.phone}` : ""}
               </>
             ) : (
-              <span>— (registered without a referral code)</span>
+              <span>— (no consultant assigned)</span>
             )}
           </div>
         </div>
@@ -258,6 +302,103 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             ))}
           </div>
           {tierMsg && <em className="adm-card-sub">{tierMsg}</em>}
+        </div>
+
+        {/* Change consultant (referrer / upline) */}
+        <div className="adm-tier-control">
+          <span className="adm-key-label">Change consultant</span>
+          {!changingConsultant ? (
+            <div className="adm-cons-current">
+              <span>
+                Current:{" "}
+                <strong>
+                  {profile.upline ? profile.upline.name || `User ${profile.upline.id}` : "— none"}
+                </strong>
+                {profile.upline?.phone ? ` · ${profile.upline.phone}` : ""}
+              </span>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="hero-btn ghost"
+                  onClick={() => {
+                    setChangingConsultant(true);
+                    setConsultantMsg(null);
+                  }}
+                >
+                  ✎ Replace consultant
+                </button>
+                {profile.upline && (
+                  <button
+                    type="button"
+                    className="hero-btn ghost"
+                    disabled={savingConsultant}
+                    onClick={() => {
+                      if (confirm("Remove this member's consultant?")) setConsultant(0);
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 10, maxWidth: 460 }}>
+              <input
+                className="adm-input"
+                type="search"
+                placeholder="Search consultant (admin) by login, email or name…"
+                value={consultantSearch}
+                onChange={(e) => setConsultantSearch(e.target.value)}
+                autoFocus
+              />
+              {consultantSearch.trim() && (
+                <div className="adm-cons-results">
+                  {searchingConsultant && <div className="adm-card-sub">Searching…</div>}
+                  {!searchingConsultant && consultantResults.length === 0 && (
+                    <div className="adm-card-sub">No admins match.</div>
+                  )}
+                  {consultantResults
+                    .filter((c) => c.id !== id)
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="adm-cons-result"
+                        disabled={savingConsultant}
+                        onClick={() => setConsultant(c.id)}
+                      >
+                        <span className="adm-cons-name">{c.login || c.email}</span>
+                        <span className="adm-cons-meta">
+                          {c.email} · #{c.memberNo || c.id}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              )}
+              {consultantMsg && (
+                <em className="adm-card-sub" style={{ color: "#ff8f8f" }}>
+                  {consultantMsg}
+                </em>
+              )}
+              <button
+                type="button"
+                className="hero-btn ghost"
+                disabled={savingConsultant}
+                onClick={() => {
+                  setChangingConsultant(false);
+                  setConsultantSearch("");
+                  setConsultantResults([]);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {consultantMsg && !changingConsultant && (
+            <em className="adm-card-sub" style={{ color: "#ff8f8f" }}>
+              {consultantMsg}
+            </em>
+          )}
         </div>
 
         {/* Referral / admin */}

@@ -773,6 +773,14 @@ export const api = {
     );
   },
 
+  /** Set (consultantId) or clear (0) the member's consultant / referrer. */
+  adminSetConsultant(id: number, consultantId: number) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/users/${id}/consultant`,
+      { method: "PATCH", body: JSON.stringify({ consultantId }) },
+    );
+  },
+
   /** Promotes a member to administrator and returns their new referral code. */
   adminMakeAdmin(id: number) {
     return request<{ success: boolean; isAdmin: boolean; referralCode: string }>(
