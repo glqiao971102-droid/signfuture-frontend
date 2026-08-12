@@ -795,18 +795,22 @@ function setDefaultDates() {
   if (els.facebookDate) els.facebookDate.value ||= today;
 }
 
-// Fill the manual installation form's start/end pickers with 24-hour options in
-// 30-minute steps (00:00, 00:30 … 23:30) — no AM/PM, no per-minute values.
+// Fill the manual installation form's start/end pickers with 12-hour AM/PM
+// options in 30-minute steps (12:00 AM, 12:30 AM … 11:30 PM). The stored value
+// stays 24-hour "HH:MM" so existing data and formatting are unchanged.
 function populateManualTimeOptions() {
   ["#miStartTime", "#miEndTime"].forEach((sel) => {
     const select = document.querySelector(sel);
     if (!select) return;
     const current = select.value;
-    const options = [`<option value="">--:--</option>`];
+    const options = [`<option value="">--:-- --</option>`];
     for (let hour = 0; hour < 24; hour += 1) {
       [0, 30].forEach((minute) => {
         const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-        options.push(`<option value="${value}">${value}</option>`);
+        const hour12 = hour % 12 || 12;
+        const suffix = hour < 12 ? "AM" : "PM";
+        const label = `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+        options.push(`<option value="${value}">${label}</option>`);
       });
     }
     select.innerHTML = options.join("");
