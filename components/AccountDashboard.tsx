@@ -11,7 +11,7 @@ import ReloadList from "@/components/ReloadList";
 import WalletTransactions from "@/components/WalletTransactions";
 import EditDetail from "@/components/EditDetail";
 import VoucherCards from "@/components/VoucherCards";
-import MyInstallation from "@/components/MyInstallation";
+import MyInstallationFrame from "@/components/MyInstallationFrame";
 import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 type SectionKey =
@@ -579,7 +579,7 @@ export default function AccountDashboard() {
       case "installation":
         // The member's own installation records, synced with our database (the
         // same rows admins manage under Admin → Installations).
-        return <MyInstallation />;
+        return <MyInstallationFrame />;
 
       case "installer": {
         const list = INSTALLERS.filter((i) => i.state === installerState);

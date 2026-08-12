@@ -9,6 +9,32 @@ const DEFAULT_SALES_PERSON_IMAGE = "src/sales-person-mascot.jpg";
 const currency = new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" });
 
 let state = loadState();
+
+// Customer embed (?customer=1) runs in DB mode: installations come from the
+// storefront (the member's own records) via postMessage, not localStorage.
+// Add / delete / complete are relayed to the parent, which persists to the DB.
+const DB_MODE =
+  typeof location !== "undefined" && new URLSearchParams(location.search).get("customer") === "1";
+function sfPostToParent(msg) {
+  try {
+    window.parent.postMessage(msg, window.location.origin);
+  } catch (e) {
+    /* not embedded */
+  }
+}
+function initDbInstallationBridge() {
+  if (!DB_MODE) return;
+  state.installations = [];
+  window.addEventListener("message", (ev) => {
+    if (ev.origin !== window.location.origin) return;
+    const d = ev.data;
+    if (!d || d.type !== "sf-inst-data" || !Array.isArray(d.installations)) return;
+    state.installations = d.installations;
+    renderInstallationPage();
+  });
+  sfPostToParent({ type: "sf-inst-ready" });
+}
+
 let activeView = "dashboard";
 let selectionMode = { invoices: false, costs: false };
 let invoiceLedgerSort = "date-desc";
@@ -714,6 +740,7 @@ function init() {
   populateInstallationTimeOptions();
   setDefaultMonth();
   bindEvents();
+  initDbInstallationBridge();
   ensureCostTypeFilterControls();
   refreshInvoiceOptions();
   setDefaultDates();
@@ -834,6 +861,25 @@ function bindManualInstallationForm() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const val = (sel) => (document.querySelector(sel)?.value || "").trim();
+    // Customer/DB mode: hand the new installation to the storefront to save in
+    // the database (it geocodes + persists, then re-sends the list).
+    if (DB_MODE) {
+      sfPostToParent({
+        type: "sf-inst-add",
+        item: {
+          invoiceNo: val("#miInvNo"),
+          installerPhone: val("#miInstallerPhone"),
+          customerPhone: val("#miCustomerPhone"),
+          address: val("#miAddress"),
+          date: document.querySelector("#miDate")?.value || "",
+          startTime: document.querySelector("#miStartTime")?.value || "",
+          endTime: document.querySelector("#miEndTime")?.value || "",
+        },
+      });
+      form.reset();
+      form.hidden = true;
+      return;
+    }
     state.installations = state.installations || [];
     state.installations.push({
       id: createId(),
@@ -864,6 +910,7 @@ function bindManualInstallationForm() {
 // re-renders the map when done. Fails quietly — the keyword fallback still works.
 let geocodingInFlight = false;
 async function geocodeInstallations() {
+  if (DB_MODE) return; // the storefront geocodes + stores coordinates in DB mode
   if (geocodingInFlight) return;
   const pending = (state.installations || []).filter(
     (it) => it.address && it.address.trim() && it.geocodedFor !== it.address.trim()
@@ -1452,7 +1499,9 @@ function manualInstallationJobs() {
 
 function renderInstallationPage() {
   if (!els.installationJobs) return;
-  const invoiceJobs = installationInvoices();
+  // In customer/DB mode only the member's own DB installations are shown — never
+  // the Sales Ledger's invoice-derived jobs.
+  const invoiceJobs = DB_MODE ? [] : installationInvoices();
   const jobs = invoiceJobs
     .concat(manualInstallationJobs())
     .sort((a, b) => (a.installation?.date || "").localeCompare(b.installation?.date || ""));
@@ -1841,6 +1890,10 @@ function formatInstallationTime(start, end) {
 }
 
 window.toggleInstallationComplete = function toggleInstallationComplete(id, checked) {
+  if (DB_MODE) {
+    sfPostToParent({ type: "sf-inst-complete", id, completed: checked });
+    return;
+  }
   const manual = (state.installations || []).find((it) => it.id === id);
   if (manual) {
     manual.completed = checked;
@@ -1860,6 +1913,10 @@ window.toggleInstallationComplete = function toggleInstallationComplete(id, chec
 
 window.deleteManualInstallation = function deleteManualInstallation(id) {
   if (!confirm("Delete this installation?")) return;
+  if (DB_MODE) {
+    sfPostToParent({ type: "sf-inst-delete", id });
+    return;
+  }
   state.installations = (state.installations || []).filter((it) => it.id !== id);
   persist();
   render();
