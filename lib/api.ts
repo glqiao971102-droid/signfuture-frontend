@@ -609,16 +609,7 @@ export const api = {
   },
 
   /** Admin: record a new installation for a customer. */
-  adminCreateInstallation(body: {
-    userId: number;
-    installDate?: string;
-    startTime?: string;
-    endTime?: string;
-    invoiceNo?: string;
-    customerPhone?: string;
-    installerName?: string;
-    installerPhone?: string;
-  }) {
+  adminCreateInstallation(body: InstallationInput & { userId: number }) {
     return request<InstallationRow>(`/api/v1/admin/installations`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -628,6 +619,23 @@ export const api = {
   /** Admin: delete an installation record. */
   adminDeleteInstallation(id: number) {
     return request<{ success: boolean }>(`/api/v1/admin/installations/${id}`, { method: "DELETE" });
+  },
+
+  /** The signed-in member's own installation records (My Installation). */
+  myInstallations() {
+    return request<{ data: InstallationRow[] }>("/api/v1/installations/mine");
+  },
+  addMyInstallation(body: InstallationInput) {
+    return request<InstallationRow>("/api/v1/installations", { method: "POST", body: JSON.stringify(body) });
+  },
+  completeMyInstallation(id: number, completed: boolean) {
+    return request<{ success: boolean }>(`/api/v1/installations/${id}/complete`, {
+      method: "PATCH",
+      body: JSON.stringify({ completed }),
+    });
+  },
+  deleteMyInstallation(id: number) {
+    return request<{ success: boolean }>(`/api/v1/installations/${id}`, { method: "DELETE" });
   },
 
   /** Admin: edit a member's contact details (email / phone / name). */
@@ -1090,7 +1098,24 @@ export type InstallationRow = {
   customerPhone: string | null;
   installerName: string | null;
   installerPhone: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  completed: boolean;
   createdAt: string | null;
+};
+
+export type InstallationInput = {
+  installDate?: string;
+  startTime?: string;
+  endTime?: string;
+  invoiceNo?: string;
+  customerPhone?: string;
+  installerName?: string;
+  installerPhone?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
 };
 
 export type AdminUserRow = {

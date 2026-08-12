@@ -11,6 +11,7 @@ import ReloadList from "@/components/ReloadList";
 import WalletTransactions from "@/components/WalletTransactions";
 import EditDetail from "@/components/EditDetail";
 import VoucherCards from "@/components/VoucherCards";
+import MyInstallation from "@/components/MyInstallation";
 import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 type SectionKey =
@@ -576,28 +577,9 @@ export default function AccountDashboard() {
         );
 
       case "installation":
-        return (
-          <section className="acct-card acct-section-card">
-            <div className="acct-card-head">
-              <h2>My Installation</h2>
-              <span>Your installation calendar, Malaysia map and jobs.</span>
-            </div>
-            <iframe
-              // Served from the storefront's own domain (public/sales-listing),
-              // so My Installation stays up on live regardless of any local dev
-              // server — no dependency on :3200.
-              src="/sales-listing/index.html?view=installation&customer=1"
-              title="My Installation"
-              style={{
-                width: "100%",
-                height: "1900px",
-                border: "0",
-                borderRadius: "12px",
-                background: "#0b1220",
-              }}
-            />
-          </section>
-        );
+        // The member's own installation records, synced with our database (the
+        // same rows admins manage under Admin → Installations).
+        return <MyInstallation />;
 
       case "installer": {
         const list = INSTALLERS.filter((i) => i.state === installerState);

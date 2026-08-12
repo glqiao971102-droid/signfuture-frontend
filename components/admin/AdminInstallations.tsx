@@ -50,7 +50,24 @@ const EMPTY_FORM = {
   customerPhone: "",
   installerName: "",
   installerPhone: "",
+  address: "",
 };
+
+async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const res = await fetch(
+      "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=my&q=" +
+        encodeURIComponent(address),
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const arr = await res.json();
+    if (arr?.[0]?.lat && arr[0].lon) return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 export default function AdminInstallations() {
   const [picked, setPicked] = useState<{ id: number; name: string } | null>(null);
@@ -146,6 +163,7 @@ export default function AdminInstallations() {
     if (!picked || saving) return;
     setSaving(true);
     try {
+      const geo = form.address.trim() ? await geocode(form.address.trim()) : null;
       await api.adminCreateInstallation({
         userId: picked.id,
         installDate: form.installDate || undefined,
@@ -155,6 +173,9 @@ export default function AdminInstallations() {
         customerPhone: form.customerPhone || undefined,
         installerName: form.installerName || undefined,
         installerPhone: form.installerPhone || undefined,
+        address: form.address || undefined,
+        lat: geo?.lat,
+        lng: geo?.lng,
       });
       setForm({ ...EMPTY_FORM });
       setShowForm(false);
@@ -367,6 +388,15 @@ export default function AdminInstallations() {
                   ))}
                 </select>
               </span>
+            </label>
+            <label className="inst-full">
+              Installation address
+              <input
+                type="text"
+                placeholder="Street, area, postcode, state (for the customer's map pin)"
+                value={form.address}
+                onChange={(e) => setField("address", e.target.value)}
+              />
             </label>
             <label>
               Invoice No / Job

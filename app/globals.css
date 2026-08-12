@@ -4535,6 +4535,37 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-cons-result:hover:not(:disabled) { background: rgba(57, 151, 255, 0.12); border-color: rgba(57, 151, 255, 0.4); }
 .adm-cons-name { font-weight: 800; font-size: 13.5px; }
 .adm-cons-meta { font-size: 12px; color: var(--muted); }
+
+/* ---- Customer My Installation (DB-backed) ---- */
+.myinst-map { position: relative; width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--line-soft); background: #0b1220; margin-bottom: 16px; }
+.myinst-tile { position: absolute; width: 256px; height: 256px; }
+.myinst-pin { position: absolute; transform: translate(-50%, -100%); font-size: 22px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+.myinst-pin.is-done { opacity: 0.5; }
+.myinst-map-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #9fb4d0; font-size: 14px; }
+.myinst-map-credit { position: absolute; right: 8px; bottom: 8px; font-size: 10px; color: #cbd8ec; background: rgba(3, 15, 31, 0.7); padding: 2px 6px; border-radius: 5px; }
+.myinst-jobs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 12px; }
+.myinst-jobs-head h3 { margin: 0; font-size: 16px; }
+.myinst-list { display: flex; flex-direction: column; gap: 10px; }
+.myinst-job { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: 12px; background: rgba(11, 23, 48, 0.4); }
+.myinst-job.is-done { opacity: 0.72; }
+.myinst-job-icon { font-size: 22px; }
+.myinst-job-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.myinst-job-main strong { font-size: 14px; }
+.myinst-job-addr { font-size: 12.5px; color: var(--text); }
+.myinst-job-sub { font-size: 12px; color: var(--muted); }
+.myinst-job-time { text-align: right; }
+.myinst-job-time strong { display: block; font-size: 13px; }
+.myinst-job-time span { font-size: 12px; color: var(--muted); }
+.myinst-check { display: inline-flex; align-items: center; }
+.myinst-check input { display: none; }
+.myinst-check span { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--line-soft); display: grid; place-items: center; color: transparent; cursor: pointer; }
+.myinst-check input:checked + span { background: #22c55e; border-color: #22c55e; color: #fff; }
+.myinst-del { width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.12); color: #fca5a5; cursor: pointer; font-weight: 800; }
+.myinst-del:hover { background: rgba(239, 68, 68, 0.22); }
+@media (max-width: 640px) {
+  .myinst-job { grid-template-columns: auto 1fr auto; }
+  .myinst-job-time { grid-column: 2 / 3; text-align: left; }
+}
 @media (max-width: 640px) { .inst-form-grid { grid-template-columns: 1fr; } }
 /* Line items: no scroll — fit the drawer width and wrap so every row shows. */
 .adm-lineitems { border: 1px solid var(--line-soft); border-radius: 12px; overflow: visible; }
