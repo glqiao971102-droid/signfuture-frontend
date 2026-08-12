@@ -4562,6 +4562,24 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .myinst-check input:checked + span { background: #22c55e; border-color: #22c55e; color: #fff; }
 .myinst-del { width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.12); color: #fca5a5; cursor: pointer; font-weight: 800; }
 .myinst-del:hover { background: rgba(239, 68, 68, 0.22); }
+/* Calendar */
+.myinst-cal { border: 1px solid var(--line-soft); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; background: rgba(11, 23, 48, 0.4); }
+.myinst-cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 10px; font-size: 15px; }
+.myinst-cal-nav { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-soft); background: rgba(3, 15, 31, 0.5); color: var(--text); cursor: pointer; font-size: 18px; line-height: 1; }
+.myinst-cal-nav:hover { border-color: var(--cyan); }
+.myinst-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.myinst-cal-dow { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding-bottom: 4px; text-transform: uppercase; }
+.myinst-cal-cell { min-height: 46px; border-radius: 8px; border: 1px solid transparent; padding: 4px 5px; display: flex; flex-direction: column; gap: 2px; }
+.myinst-cal-cell.is-empty { border: none; }
+.myinst-cal-cell.has-jobs { border-color: rgba(57, 151, 255, 0.5); background: rgba(57, 151, 255, 0.12); }
+.myinst-cal-day { font-size: 12px; color: var(--muted); font-weight: 700; }
+.myinst-cal-cell.has-jobs .myinst-cal-day { color: var(--text); }
+.myinst-cal-dot { font-size: 11px; font-weight: 800; color: #8fd0ff; }
+/* Map zoom controls */
+.myinst-map-zoom { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
+.myinst-map-zoom button { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line-soft); background: rgba(3, 15, 31, 0.85); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.myinst-map-zoom button:hover { border-color: var(--cyan); background: rgba(3, 15, 31, 0.95); }
+@media (max-width: 640px) { .myinst-cal-cell { min-height: 40px; } }
 @media (max-width: 640px) {
   .myinst-job { grid-template-columns: auto 1fr auto; }
   .myinst-job-time { grid-column: 2 / 3; text-align: left; }

@@ -33,6 +33,25 @@ function latLngToPixel(lat: number, lng: number, zoom: number) {
     y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale,
   };
 }
+function pixelToLatLng(x: number, y: number, zoom: number) {
+  const scale = 256 * 2 ** zoom;
+  const lng = (x / scale) * 360 - 180;
+  const n = Math.PI - (2 * Math.PI * y) / scale;
+  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  return { lat, lng };
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  return new Date(y, m - 1, 1).toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+}
+function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 type Pt = { lat: number; lng: number };
 function fitView(points: Pt[], w: number, h: number): { lat: number; lng: number; zoom: number } {
@@ -100,6 +119,36 @@ export default function MyInstallation() {
   }, []);
   useEffect(() => load(), [load]);
 
+  // ---- Calendar ----
+  const [calMonth, setCalMonth] = useState<string>("");
+  useEffect(() => {
+    if (calMonth) return;
+    const dates = (rows.map((r) => r.installDate).filter(Boolean) as string[]).sort();
+    const now = new Date();
+    setCalMonth(
+      dates[dates.length - 1]?.slice(0, 7) ||
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    );
+  }, [rows, calMonth]);
+
+  const calCells = useMemo(() => {
+    if (!calMonth) return [] as ({ day: number; jobs: InstallationRow[] } | null)[];
+    const [y, m] = calMonth.split("-").map(Number);
+    const startDow = new Date(y, m - 1, 1).getDay();
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const byDay: Record<number, InstallationRow[]> = {};
+    rows.forEach((r) => {
+      if ((r.installDate || "").startsWith(calMonth)) {
+        const d = Number((r.installDate as string).slice(8, 10));
+        (byDay[d] = byDay[d] || []).push(r);
+      }
+    });
+    const cells: ({ day: number; jobs: InstallationRow[] } | null)[] = [];
+    for (let i = 0; i < startDow; i += 1) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d += 1) cells.push({ day: d, jobs: byDay[d] || [] });
+    return cells;
+  }, [calMonth, rows]);
+
   // ---- Add form ----
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -157,10 +206,11 @@ export default function MyInstallation() {
     }
   };
 
-  // ---- Map ----
+  // ---- Map (fit-to-bounds by default; the user can zoom / drag to override) ----
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapW, setMapW] = useState(0);
   const mapH = 360;
+  const [manualView, setManualView] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
   useEffect(() => {
     const el = mapRef.current;
     if (!el) return;
@@ -178,9 +228,33 @@ export default function MyInstallation() {
     [rows],
   );
 
+  const view = manualView ?? (mapW ? fitView(pins, mapW, mapH) : { lat: 4.2, lng: 108, zoom: 6 });
+
+  const zoomBy = (d: number) =>
+    setManualView((v) => {
+      const base = v ?? (mapW ? fitView(pins, mapW, mapH) : { lat: 4.2, lng: 108, zoom: 6 });
+      return { ...base, zoom: Math.max(3, Math.min(18, base.zoom + d)) };
+    });
+
+  const drag = useRef<{ x: number; y: number; lat: number; lng: number; zoom: number } | null>(null);
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { x: e.clientX, y: e.clientY, lat: view.lat, lng: view.lng, zoom: view.zoom };
+    mapRef.current?.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const c = latLngToPixel(d.lat, d.lng, d.zoom);
+    const nl = pixelToLatLng(c.x - (e.clientX - d.x), c.y - (e.clientY - d.y), d.zoom);
+    setManualView({ lat: nl.lat, lng: nl.lng, zoom: d.zoom });
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    drag.current = null;
+    mapRef.current?.releasePointerCapture(e.pointerId);
+  };
+
   const tilesAndMarkers = useMemo(() => {
     if (!mapW) return null;
-    const view = fitView(pins, mapW, mapH);
     const center = latLngToPixel(view.lat, view.lng, view.zoom);
     const maxTile = 2 ** view.zoom;
     const tiles: { key: string; left: number; top: number; src: string }[] = [];
@@ -211,7 +285,8 @@ export default function MyInstallation() {
       };
     });
     return { tiles, markers };
-  }, [pins, mapW]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pins, mapW, view.lat, view.lng, view.zoom]);
 
   return (
     <section className="acct-card acct-section-card">
@@ -220,11 +295,61 @@ export default function MyInstallation() {
         <span>Your installation calendar pins and jobs — kept in sync with our records.</span>
       </div>
 
+      {/* Calendar */}
+      <div className="myinst-cal">
+        <div className="myinst-cal-head">
+          <button type="button" className="myinst-cal-nav" onClick={() => setCalMonth((mth) => shiftMonth(mth, -1))} aria-label="Previous month">
+            ‹
+          </button>
+          <strong>{calMonth ? monthLabel(calMonth) : ""}</strong>
+          <button type="button" className="myinst-cal-nav" onClick={() => setCalMonth((mth) => shiftMonth(mth, 1))} aria-label="Next month">
+            ›
+          </button>
+        </div>
+        <div className="myinst-cal-grid">
+          {WEEKDAYS.map((w) => (
+            <span key={w} className="myinst-cal-dow">
+              {w}
+            </span>
+          ))}
+          {calCells.map((c, i) =>
+            c === null ? (
+              <span key={`e${i}`} className="myinst-cal-cell is-empty" />
+            ) : (
+              <span
+                key={c.day}
+                className={`myinst-cal-cell${c.jobs.length ? " has-jobs" : ""}`}
+                title={c.jobs.map((j) => j.invoiceNo || "Installation").join(", ")}
+              >
+                <span className="myinst-cal-day">{c.day}</span>
+                {c.jobs.length > 0 && <span className="myinst-cal-dot">🚚 {c.jobs.length}</span>}
+              </span>
+            ),
+          )}
+        </div>
+      </div>
+
       {/* Map */}
-      <div ref={mapRef} className="myinst-map" style={{ height: mapH }}>
+      <div
+        ref={mapRef}
+        className="myinst-map"
+        style={{ height: mapH, cursor: drag.current ? "grabbing" : "grab" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {tilesAndMarkers?.tiles.map((t) => (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={t.key} className="myinst-tile" src={t.src} alt="" loading="lazy" style={{ left: t.left, top: t.top }} />
+          <img
+            key={t.key}
+            className="myinst-tile"
+            src={t.src}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            style={{ left: t.left, top: t.top }}
+          />
         ))}
         {tilesAndMarkers?.markers.map((m) => (
           <span
@@ -237,6 +362,19 @@ export default function MyInstallation() {
           </span>
         ))}
         {pins.length === 0 && <div className="myinst-map-empty">No mapped addresses yet</div>}
+        <div className="myinst-map-zoom">
+          <button type="button" onClick={() => zoomBy(1)} aria-label="Zoom in">
+            +
+          </button>
+          <button type="button" onClick={() => zoomBy(-1)} aria-label="Zoom out">
+            −
+          </button>
+          {manualView && (
+            <button type="button" onClick={() => setManualView(null)} title="Reset view" aria-label="Reset view">
+              ⤾
+            </button>
+          )}
+        </div>
         <span className="myinst-map-credit">OpenStreetMap</span>
       </div>
 
