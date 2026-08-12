@@ -795,10 +795,30 @@ function setDefaultDates() {
   if (els.facebookDate) els.facebookDate.value ||= today;
 }
 
+// Fill the manual installation form's start/end pickers with 24-hour options in
+// 30-minute steps (00:00, 00:30 … 23:30) — no AM/PM, no per-minute values.
+function populateManualTimeOptions() {
+  ["#miStartTime", "#miEndTime"].forEach((sel) => {
+    const select = document.querySelector(sel);
+    if (!select) return;
+    const current = select.value;
+    const options = [`<option value="">--:--</option>`];
+    for (let hour = 0; hour < 24; hour += 1) {
+      [0, 30].forEach((minute) => {
+        const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        options.push(`<option value="${value}">${value}</option>`);
+      });
+    }
+    select.innerHTML = options.join("");
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+  });
+}
+
 function bindManualInstallationForm() {
   const form = document.querySelector("#manualInstallationForm");
   const addBtn = document.querySelector("#addInstallationButton");
   if (!form || !addBtn) return;
+  populateManualTimeOptions();
   addBtn.addEventListener("click", () => {
     form.hidden = !form.hidden;
     if (!form.hidden) document.querySelector("#miDate")?.focus();
