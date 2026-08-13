@@ -47,6 +47,24 @@ const NAV: NavItem[] = [
   },
 ];
 
+// Which permission section a given admin path belongs to. Returns null for
+// pages every admin may open (the /admin root redirect, Launch Tests).
+function sectionForPath(path: string): string | null {
+  if (path.startsWith("/admin/orders")) return "orders";
+  if (path.startsWith("/admin/users")) return "customers";
+  if (path.startsWith("/admin/wallet")) return "wallet";
+  if (path.startsWith("/admin/invoices")) return "invoices";
+  if (path.startsWith("/admin/coupons")) return "coupons";
+  if (path.startsWith("/admin/vouchers")) return "vouchers";
+  if (path.startsWith("/admin/tiers")) return "tiers";
+  if (path.startsWith("/admin/agent-logins")) return "agent-logins";
+  if (path.startsWith("/admin/installations")) return "installations";
+  if (path.startsWith("/admin/products") || path.startsWith("/admin/product-pricing")) return "products";
+  if (path.startsWith("/admin/sales-listing")) return "sales-listing";
+  if (path.startsWith("/admin/dashboard")) return "dashboard";
+  return null;
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, openLogin, logout } = useAuth();
   const pathname = usePathname();
@@ -66,6 +84,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Launch QA checklist — available to every admin.
   nav.push({ href: "/admin/launch-tests", label: "Launch Tests", icon: "🚀", section: "launch-tests" });
   if (isSuper) nav.push({ href: "/admin/permissions", label: "Permissions", icon: "⚙", section: "permissions" });
+
+  // Gate the current page: a non-super admin may only open sections they were
+  // granted (Orders + Customers by default). Permissions is super-only.
+  const currentSection = sectionForPath(pathname);
+  const pageAllowed =
+    isSuper ||
+    (!pathname.startsWith("/admin/permissions") &&
+      (currentSection == null || perms.includes(currentSection)));
 
   // Gate states get the full-screen centred treatment, without the sidebar.
   if (loading || !user || !user.isAdmin) {
@@ -194,7 +220,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             pathname.startsWith("/admin/sales-listing") ? " adm-content-full" : ""
           }`}
         >
-          {children}
+          {pageAllowed ? (
+            children
+          ) : (
+            <div className="adm-page-head">
+              <h1>No access</h1>
+              <p className="adm-page-sub">
+                Your admin account doesn’t have access to this section. Please
+                use Orders or Customers, or ask a Super Admin to grant access.
+              </p>
+              <Link href="/admin/orders" className="hero-btn primary" style={{ marginTop: 12 }}>
+                Go to Orders
+              </Link>
+            </div>
+          )}
         </main>
       </div>
     </div>
