@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type NativeOrderRow } from "@/lib/api";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
 import QuotationBrowser from "@/components/QuotationBrowser";
 import OrderStatusList from "@/components/OrderStatusList";
@@ -107,16 +107,6 @@ function initialsOf(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "★";
 }
 
-// Net amount paid per month at the member's current tier (RM).
-const MONTHLY = [
-  { m: "Jan", v: 620 },
-  { m: "Feb", v: 410 },
-  { m: "Mar", v: 980 },
-  { m: "Apr", v: 750 },
-  { m: "May", v: 1130 },
-  { m: "Jun", v: 1187.5 },
-];
-
 // Items waiting for the member's action (Pending List tab).
 const PENDING = [
   {
@@ -150,7 +140,6 @@ const TIER_RATE: Record<MemberTier, number> = {
   Diamond: 0.2,
 };
 const TIER_ORDER: MemberTier[] = ["Silver", "Gold", "Diamond"];
-const THIS_MONTH_GROSS = 1250;
 
 const rm = (n: number) =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -168,6 +157,16 @@ export default function AccountDashboard() {
       .myConsultant()
       .then((r) => setConsultant(r.consultant))
       .catch(() => {});
+  }, []);
+
+  // Real orders — used to build "This Month" + "Sales Performance" from actual
+  // spend (no hardcoded numbers). null = still loading, [] = loaded but empty.
+  const [nativeOrders, setNativeOrders] = useState<NativeOrderRow[] | null>(null);
+  useEffect(() => {
+    api
+      .myNativeOrders()
+      .then((r) => setNativeOrders(r.data ?? []))
+      .catch(() => setNativeOrders([]));
   }, []);
 
   // Member without a consultant can enter an agent's referral code to join.
@@ -200,11 +199,43 @@ export default function AccountDashboard() {
     );
   }
 
-  const max = Math.max(...MONTHLY.map((d) => d.v));
   // A plain WordPress `customer` carries no membership role, so there is no
   // tier and no member discount — they pay list price until they top up.
   const currentRate = user.tier ? TIER_RATE[user.tier] : 0;
-  const currentPrice = THIS_MONTH_GROSS * (1 - currentRate);
+
+  // ---- Real spend, aggregated from the member's own orders ----
+  // Build the last 6 calendar months (oldest → newest) and drop each order's
+  // total into its month. Cancelled/refunded orders don't count as spend.
+  const ordersLoading = nativeOrders === null;
+  const now = new Date();
+  const monthly = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      m: d.toLocaleString("en-US", { month: "short" }),
+      v: 0,
+    };
+  });
+  const monthIndex = new Map(monthly.map((mm, i) => [mm.key, i]));
+  const thisKey = `${now.getFullYear()}-${now.getMonth()}`;
+  let thisMonthSpent = 0;
+  for (const o of nativeOrders ?? []) {
+    if (!o.date || /cancel|refund/i.test(o.status)) continue;
+    const d = new Date(o.date);
+    if (Number.isNaN(d.getTime())) continue;
+    const k = `${d.getFullYear()}-${d.getMonth()}`;
+    const amt = o.total || 0;
+    const idx = monthIndex.get(k);
+    if (idx != null) monthly[idx].v += amt;
+    if (k === thisKey) thisMonthSpent += amt;
+  }
+  const max = Math.max(1, ...monthly.map((d) => d.v));
+  const hasMonthlyData = monthly.some((d) => d.v > 0);
+
+  // What the member actually paid this month (net, at their current tier), and
+  // the implied list price so the tier-upsell rows can compare.
+  const currentPrice = thisMonthSpent;
+  const thisMonthGross = currentRate < 1 ? thisMonthSpent / (1 - currentRate) : thisMonthSpent;
   const activeLabel = SIDE.find((s) => s.key === active)?.label ?? "";
   const tierClass = (user.tier ?? "member").toLowerCase();
   const tierLabel = user.tier ? `${user.tier.toUpperCase()} MEMBER` : "MEMBER";
@@ -218,46 +249,57 @@ export default function AccountDashboard() {
         <h2>This Month</h2>
         <span>{user.tier ? `${user.tier} member rate applied` : "List price — no member rate"}</span>
       </div>
-      <div className="acct-month-total">
-        <span>You ordered</span>
-        <strong>RM {rm(currentPrice)}</strong>
-        <span className="acct-month-sub">
-          {user.tier
-            ? `List RM ${rm(THIS_MONTH_GROSS)} · ${user.tier} saves ${Math.round(currentRate * 100)}%`
-            : `List RM ${rm(THIS_MONTH_GROSS)} · top up to unlock member savings`}
-        </span>
-      </div>
 
-      <p className="acct-upsell-label">If you were a higher tier:</p>
-      <div className="acct-tier-rows">
-        {TIER_ORDER.map((tier) => {
-          const price = THIS_MONTH_GROSS * (1 - TIER_RATE[tier]);
-          const save = currentPrice - price;
-          const isCurrent = tier === user.tier;
-          return (
-            <div
-              key={tier}
-              className={`acct-tier-row tier-${tier.toLowerCase()}${
-                isCurrent ? " is-current" : ""
-              }`}
-            >
-              <span className="acct-tier-name">
-                <span className="acct-tier-dot" />
-                {tier}
-                {isCurrent && <em> · your tier</em>}
-              </span>
-              <span className="acct-tier-price">RM {rm(price)}</span>
-              <span className="acct-tier-save">
-                {isCurrent
-                  ? "—"
-                  : save > 0
-                    ? `save RM ${rm(save)}`
-                    : `+RM ${rm(-save)}`}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      {ordersLoading ? (
+        <p className="acct-card-sub" style={{ padding: "8px 0" }}>Loading…</p>
+      ) : thisMonthSpent <= 0 ? (
+        <p className="acct-card-sub" style={{ padding: "8px 0" }}>
+          No orders this month yet.
+        </p>
+      ) : (
+        <>
+          <div className="acct-month-total">
+            <span>You ordered</span>
+            <strong>RM {rm(currentPrice)}</strong>
+            <span className="acct-month-sub">
+              {user.tier
+                ? `List RM ${rm(thisMonthGross)} · ${user.tier} saves ${Math.round(currentRate * 100)}%`
+                : `List RM ${rm(thisMonthGross)} · top up to unlock member savings`}
+            </span>
+          </div>
+
+          <p className="acct-upsell-label">If you were a higher tier:</p>
+          <div className="acct-tier-rows">
+            {TIER_ORDER.map((tier) => {
+              const price = thisMonthGross * (1 - TIER_RATE[tier]);
+              const save = currentPrice - price;
+              const isCurrent = tier === user.tier;
+              return (
+                <div
+                  key={tier}
+                  className={`acct-tier-row tier-${tier.toLowerCase()}${
+                    isCurrent ? " is-current" : ""
+                  }`}
+                >
+                  <span className="acct-tier-name">
+                    <span className="acct-tier-dot" />
+                    {tier}
+                    {isCurrent && <em> · your tier</em>}
+                  </span>
+                  <span className="acct-tier-price">RM {rm(price)}</span>
+                  <span className="acct-tier-save">
+                    {isCurrent
+                      ? "—"
+                      : save > 0
+                        ? `save RM ${rm(save)}`
+                        : `+RM ${rm(-save)}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {user.tier !== "Diamond" && (
         <Link href="/package" className="hero-btn primary acct-upgrade-btn">
@@ -273,15 +315,25 @@ export default function AccountDashboard() {
         <h2>Sales Performance</h2>
         <span>Amount spent per month (RM)</span>
       </div>
+      {ordersLoading ? (
+        <p className="acct-card-sub" style={{ padding: "24px 0", textAlign: "center" }}>
+          Loading…
+        </p>
+      ) : !hasMonthlyData ? (
+        <p className="acct-card-sub" style={{ padding: "24px 0", textAlign: "center" }}>
+          No data yet — your monthly spend will appear here once you place an order.
+        </p>
+      ) : (
       <div className="acct-chart">
-        {MONTHLY.map((d) => (
-          <div key={d.m} className="acct-chart-col">
+        {monthly.map((d) => (
+          <div key={d.key} className="acct-chart-col">
             <span className="acct-chart-val">{rm(d.v)}</span>
             <div className="acct-chart-bar" style={{ height: `${(d.v / max) * 100}%` }} />
             <span className="acct-chart-month">{d.m}</span>
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 
