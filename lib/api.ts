@@ -118,6 +118,25 @@ export type OrderSummary = {
   shippingMethod: string | null;
 };
 
+/** A customer's native order (current checkout) with per-line submitted spec. */
+export type AdminUserNativeOrder = {
+  id: number;
+  ref: string;
+  status: string;
+  statusLabel: string;
+  date: string | null;
+  total: number;
+  currency: string;
+  lines: {
+    name: string;
+    quantity: number;
+    total: number;
+    options: { label: string; value: string }[];
+    artworkUrl: string | null;
+    statusLabel: string;
+  }[];
+};
+
 export type OrderLine = {
   id: number;
   name: string;
@@ -765,6 +784,13 @@ export const api = {
   adminUserOrders(id: number, page = 1) {
     return request<{ data: OrderSummary[]; meta: PagedMeta }>(
       `/api/v1/admin/users/${id}/orders?page=${page}`,
+    );
+  },
+
+  /** A customer's native orders with each line's full submitted spec. */
+  adminUserNativeOrders(id: number) {
+    return request<{ data: AdminUserNativeOrder[] }>(
+      `/api/v1/admin/users/${id}/native-orders`,
     );
   },
 

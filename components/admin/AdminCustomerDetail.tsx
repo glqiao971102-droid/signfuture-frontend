@@ -9,6 +9,7 @@ import {
   type OrderSummary,
   type WalletTransaction,
   type AdminUserRow,
+  type AdminUserNativeOrder,
 } from "@/lib/api";
 
 const money = (n: number) =>
@@ -26,6 +27,7 @@ const SETTABLE = ["Diamond", "Gold", "Silver", "customer"] as const;
 export default function AdminCustomerDetail({ id }: { id: number }) {
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [nativeOrders, setNativeOrders] = useState<AdminUserNativeOrder[]>([]);
   const [wallet, setWallet] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,13 +95,15 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
     setLoading(true);
     setError(null);
     try {
-      const [p, o, w] = await Promise.all([
+      const [p, o, n, w] = await Promise.all([
         api.adminUser(id),
         api.adminUserOrders(id).catch(() => ({ data: [], meta: null as never })),
+        api.adminUserNativeOrders(id).catch(() => ({ data: [] })),
         api.adminUserWallet(id).catch(() => ({ data: [], meta: null as never })),
       ]);
       setProfile(p);
       setOrders(o.data);
+      setNativeOrders(n.data);
       setWallet(w.data);
       // Admins have a downline; load it.
       if (p.isAdmin) {
@@ -512,6 +516,60 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
       )}
 
       <div className="adm-two-col">
+        {nativeOrders.length > 0 && (
+          <div className="adm-card">
+            <div className="adm-card-head-row">
+              <h2>Orders &amp; item details</h2>
+              <span className="adm-card-sub">Full spec submitted at checkout</span>
+            </div>
+            <div className="adm-native-orders" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {nativeOrders.map((o) => (
+                <div
+                  key={o.id}
+                  style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px" }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <Link href={`/admin/orders?ref=${o.ref}`} className="adm-edit-link" style={{ fontWeight: 700 }}>
+                      #{o.ref}
+                    </Link>
+                    <span style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: "#6b7280" }}>
+                      <span>{o.statusLabel}</span>
+                      <span>{formatDate(o.date)}</span>
+                      <strong style={{ color: "#111" }}>RM {money(o.total)}</strong>
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {o.lines.map((l, li) => (
+                      <div key={li} style={{ borderTop: "1px dashed #eee", paddingTop: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                          <strong style={{ fontSize: 14 }}>
+                            {l.name} <span style={{ color: "#6b7280", fontWeight: 400 }}>×{l.quantity}</span>
+                          </strong>
+                          <span style={{ display: "flex", gap: 10, alignItems: "center", whiteSpace: "nowrap" }}>
+                            {l.artworkUrl && (
+                              <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
+                            )}
+                            <span style={{ color: "#111" }}>RM {money(l.total)}</span>
+                          </span>
+                        </div>
+                        {l.options.length > 0 && (
+                          <div style={{ marginTop: 4, fontSize: 12.5, color: "#4b5563", lineHeight: 1.6 }}>
+                            {l.options.map((op, oi) => (
+                              <span key={oi} style={{ marginRight: 14 }}>
+                                <span style={{ color: "#9ca3af" }}>{op.label}:</span> {op.value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="adm-card">
           <div className="adm-card-head-row">
             <h2>Recent orders</h2>
