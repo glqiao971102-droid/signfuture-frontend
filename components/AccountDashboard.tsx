@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, ApiError, type NativeOrderRow } from "@/lib/api";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
-import QuotationBrowser from "@/components/QuotationBrowser";
 import OrderStatusList from "@/components/OrderStatusList";
 import InvoiceList from "@/components/InvoiceList";
 import ReloadList from "@/components/ReloadList";
@@ -12,7 +11,6 @@ import WalletTransactions from "@/components/WalletTransactions";
 import EditDetail from "@/components/EditDetail";
 import VoucherCards from "@/components/VoucherCards";
 import MyInstallationFrame from "@/components/MyInstallationFrame";
-import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 type SectionKey =
   | "consultant"
@@ -72,14 +70,6 @@ const INSTALLERS: Installer[] = [
   { name: "Ipoh Sign Crew", state: "Perak", phone: "011-2233 4455", areas: "Ipoh, Taiping" },
 ];
 
-// Order pipeline counts (top status cards).
-const STATUS = [
-  { label: "New Orders", value: 0, glyph: "▤", cls: "st-blue" },
-  { label: "Pending", value: 0, glyph: "⧗", cls: "st-amber" },
-  { label: "Print", value: 0, glyph: "⎙", cls: "st-purple" },
-  { label: "Delivery", value: 2, glyph: "⛟", cls: "st-green" },
-];
-
 // The member's assigned consultant.
 // Default consultant, used when the member has no referrer on file / isn't
 // signed in to the backend. Real members show their own referrer (the admin
@@ -107,32 +97,6 @@ function initialsOf(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "★";
 }
 
-// Items waiting for the member's action (Pending List tab).
-const PENDING = [
-  {
-    ref: "Q65821",
-    date: "2026-06-18",
-    product: "Loose Sheet 210x297mm · 500 pcs",
-    need: "Quotation ready — confirm to place order",
-    action: { label: "Review Quote", key: "quotation" as SectionKey },
-  },
-  {
-    ref: "INV-2026-0518",
-    date: "2026-05-18",
-    product: "PVC Banner 3m x 1.2m · 5 pcs",
-    need: "Invoice unpaid — payment required",
-    action: { label: "Pay Now", key: "wallet" as SectionKey },
-  },
-  {
-    ref: "ART-2026-0610",
-    date: "2026-06-10",
-    product: "3D LED Box Up — Frontlit",
-    need: "Artwork approval needed before printing",
-    action: { label: "Review Artwork", key: "orders" as SectionKey },
-  },
-];
-
-// Top-up packages (mirrors the /package promo) — shown in the My Wallet tab.
 
 const TIER_RATE: Record<MemberTier, number> = {
   Silver: 0.05,
@@ -236,6 +200,39 @@ export default function AccountDashboard() {
   // the implied list price so the tier-upsell rows can compare.
   const currentPrice = thisMonthSpent;
   const thisMonthGross = currentRate < 1 ? thisMonthSpent / (1 - currentRate) : thisMonthSpent;
+
+  // ---- Order pipeline counts (top status cards), from real orders ----
+  const statusCount = { new: 0, pending: 0, print: 0, delivery: 0 };
+  for (const o of nativeOrders ?? []) {
+    const s = o.status;
+    if (s === "waiting") statusCount.new += 1;
+    else if (s === "pending_confirmation" || s === "on_hold") statusCount.pending += 1;
+    else if (s === "processing") statusCount.print += 1;
+    else if (s === "ready" || s === "shipped") statusCount.delivery += 1;
+  }
+  const statusCards = [
+    { label: "New Orders", value: statusCount.new, glyph: "▤", cls: "st-blue" },
+    { label: "Pending", value: statusCount.pending, glyph: "⧗", cls: "st-amber" },
+    { label: "Print", value: statusCount.print, glyph: "⎙", cls: "st-purple" },
+    { label: "Delivery", value: statusCount.delivery, glyph: "⛟", cls: "st-green" },
+  ];
+
+  // ---- Pending List: real orders that need the member's action ----
+  // pending_confirmation → confirm to proceed; ready → collect.
+  const pendingItems = (nativeOrders ?? [])
+    .filter((o) => o.status === "pending_confirmation" || o.status === "ready")
+    .map((o) => ({
+      ref: o.ref,
+      date: o.date ? o.date.slice(0, 10) : "",
+      product:
+        o.items.length > 1
+          ? `${o.items[0]?.name ?? "Order"} +${o.items.length - 1} more`
+          : o.items[0]?.name ?? "Order",
+      need:
+        o.status === "pending_confirmation"
+          ? "Awaiting your confirmation to proceed."
+          : "Ready — available for collection.",
+    }));
   const activeLabel = SIDE.find((s) => s.key === active)?.label ?? "";
   const tierClass = (user.tier ?? "member").toLowerCase();
   const tierLabel = user.tier ? `${user.tier.toUpperCase()} MEMBER` : "MEMBER";
@@ -531,7 +528,9 @@ export default function AccountDashboard() {
               <h2>My Quotation</h2>
               <span>Filter by product, ref., date or status — then place your order.</span>
             </div>
-            <QuotationBrowser quotes={SAMPLE_QUOTES} />
+            <p className="acct-card-sub" style={{ padding: "8px 0" }}>
+              No quotations yet. Your saved quotes will appear here.
+            </p>
           </section>
         );
 
@@ -601,30 +600,38 @@ export default function AccountDashboard() {
               <h2>Pending List</h2>
               <span>Items waiting for your action.</span>
             </div>
-            <div className="rec-list">
-              {PENDING.map((p) => (
-                <article key={p.ref} className="rec-card">
-                  <div className="rec-main">
-                    <div className="rec-top">
-                      <strong className="rec-ref">{p.ref}</strong>
-                      <span className="rec-status rs-pending">Action Needed</span>
+            {ordersLoading ? (
+              <p className="acct-card-sub" style={{ padding: "8px 0" }}>Loading…</p>
+            ) : pendingItems.length === 0 ? (
+              <p className="acct-card-sub" style={{ padding: "8px 0" }}>
+                Nothing needs your action right now.
+              </p>
+            ) : (
+              <div className="rec-list">
+                {pendingItems.map((p) => (
+                  <article key={p.ref} className="rec-card">
+                    <div className="rec-main">
+                      <div className="rec-top">
+                        <strong className="rec-ref">{p.ref}</strong>
+                        <span className="rec-status rs-pending">Action Needed</span>
+                      </div>
+                      {p.date && <span className="rec-date">{p.date}</span>}
+                      <p className="rec-desc">{p.product}</p>
+                      <p className="rec-need">{p.need}</p>
                     </div>
-                    <span className="rec-date">{p.date}</span>
-                    <p className="rec-desc">{p.product}</p>
-                    <p className="rec-need">{p.need}</p>
-                  </div>
-                  <div className="rec-side">
-                    <button
-                      type="button"
-                      className="hero-btn primary rec-btn"
-                      onClick={() => setActive(p.action.key)}
-                    >
-                      {p.action.label}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+                    <div className="rec-side">
+                      <button
+                        type="button"
+                        className="hero-btn primary rec-btn"
+                        onClick={() => setActive("orders")}
+                      >
+                        View Order
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         );
 
@@ -752,7 +759,7 @@ export default function AccountDashboard() {
             </div>
 
             <div className="acct-status">
-              {STATUS.map((s) => (
+              {statusCards.map((s) => (
                 <div key={s.label} className={`acct-status-card ${s.cls}`}>
                   <div>
                     <span className="acct-status-label">{s.label}</span>

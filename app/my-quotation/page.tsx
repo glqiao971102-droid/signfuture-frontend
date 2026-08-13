@@ -1,7 +1,5 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
-import QuotationBrowser from "@/components/QuotationBrowser";
-import { SAMPLE_QUOTES } from "@/lib/sampleQuotes";
 
 export const metadata = { title: "My Quotation — Sign Studio" };
 
@@ -25,7 +23,9 @@ export default function MyQuotationPage() {
         </section>
 
         <section className="home-section" style={{ marginTop: 18 }}>
-          <QuotationBrowser quotes={SAMPLE_QUOTES} />
+          <p className="quote-empty">
+            No quotations yet. Your saved quotes will appear here.
+          </p>
         </section>
       </main>
       <Footer />
