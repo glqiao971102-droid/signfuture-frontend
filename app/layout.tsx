@@ -23,12 +23,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <CartProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <CartProvider>
             <AgentBanner />
             {children}
-          </AuthProvider>
-        </CartProvider>
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

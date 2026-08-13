@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 export type CartItem = {
   id: string;
@@ -44,7 +45,12 @@ type CartContextValue = {
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
-const STORAGE_KEY = "sign-studio-cart";
+
+// The cart is stored per identity so one person's cart never leaks to another
+// on a shared browser. Guests use the base key; a signed-in member uses a
+// key scoped to their user id.
+const GUEST_KEY = "sign-studio-cart";
+const keyFor = (uid: number | null) => (uid == null ? GUEST_KEY : `${GUEST_KEY}:u${uid}`);
 
 // A line is identified by its full configuration (product + spec/meta + price),
 // so two banners of DIFFERENT sizes are separate lines, while re-adding the exact
@@ -52,41 +58,93 @@ const STORAGE_KEY = "sign-studio-cart";
 const signatureOf = (i: { href: string; meta?: string; price?: number }) =>
   `${i.href}|${i.meta ?? ""}|${i.price ?? 0}`;
 
+// Parse a stored cart payload into well-formed CartItems (tolerant of old data).
+function normalizeItems(raw: string | null): CartItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Partial<CartItem>[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((i) => {
+      const base = {
+        label: i.label ?? "Item",
+        href: i.href ?? "#",
+        qty: i.qty ?? 1,
+        price: typeof i.price === "number" ? i.price : 0,
+        image: i.image,
+        meta: i.meta,
+        deliverable: i.deliverable,
+        tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
+        spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
+        artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
+        requiresConfirmation: i.requiresConfirmation || undefined,
+      };
+      return { id: i.id ?? signatureOf(base), ...base };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// Merge a guest cart into the signed-in member's cart on login (same line → sum
+// quantities), so items added before signing in aren't lost.
+function mergeCarts(base: CartItem[], extra: CartItem[]): CartItem[] {
+  const out = base.map((i) => ({ ...i }));
+  for (const it of extra) {
+    const existing = out.find((x) => x.id === it.id);
+    if (existing) existing.qty += it.qty;
+    else out.push({ ...it });
+  }
+  return out;
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const uid = user?.id ?? null;
   const [items, setItems] = useState<CartItem[]>([]);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<CartItem>[];
-        setItems(
-          parsed.map((i) => {
-            const base = {
-              label: i.label ?? "Item",
-              href: i.href ?? "#",
-              qty: i.qty ?? 1,
-              price: typeof i.price === "number" ? i.price : 0,
-              image: i.image,
-              meta: i.meta,
-              deliverable: i.deliverable,
-              tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
-              spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
-              artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
-              requiresConfirmation: i.requiresConfirmation || undefined,
-            };
-            return { id: i.id ?? signatureOf(base), ...base };
-          })
-        );
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  // The identity whose cart is currently loaded. `undefined` until the first
+  // load runs. `justLoaded` suppresses the immediate persist that would
+  // otherwise write the pre-load (stale) items back under the new identity.
+  const identityRef = useRef<number | null | undefined>(undefined);
+  const justLoadedRef = useRef(false);
 
+  // Load / switch the cart whenever the signed-in identity changes (initial
+  // mount, login, logout, or account switch).
   useEffect(() => {
+    if (identityRef.current === uid) return;
+    const prev = identityRef.current;
+    const curKey = keyFor(uid);
+
+    if (prev !== undefined && prev == null && uid != null) {
+      // Guest → signed in: fold the guest cart into this member's own cart,
+      // then clear the guest cart so it can't reappear for the next person.
+      const merged = mergeCarts(normalizeItems(localStorage.getItem(curKey)), normalizeItems(localStorage.getItem(GUEST_KEY)));
+      setItems(merged);
+      try {
+        localStorage.setItem(curKey, JSON.stringify(merged));
+        localStorage.removeItem(GUEST_KEY);
+      } catch {
+        /* ignore */
+      }
+    } else {
+      // First load, logout, or switching accounts: show that identity's cart.
+      setItems(normalizeItems(localStorage.getItem(curKey)));
+    }
+
+    identityRef.current = uid;
+    justLoadedRef.current = true;
+  }, [uid]);
+
+  // Persist the cart under the current identity — but skip the render that just
+  // loaded it (items still hold the previous identity's data at that point).
+  useEffect(() => {
+    if (identityRef.current === undefined) return;
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(keyFor(identityRef.current), JSON.stringify(items));
     } catch {
       /* ignore */
     }
