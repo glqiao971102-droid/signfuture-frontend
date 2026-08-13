@@ -443,7 +443,7 @@ export default function StraightBackdropProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/straight-backdrop-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/straight-backdrop-hero.png", meta: `Material: ${MATERIAL} · Finishing: ${finishing} · Side: ${side} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

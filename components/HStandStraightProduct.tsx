@@ -37,7 +37,7 @@ export default function HStandStraightProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "H Stand (Straight)", href: "/catalog/h-stand-straight", price: total, image: "/products/h-stand-straight-hero.png" });
+    add({ label: "H Stand (Straight)", href: "/catalog/h-stand-straight", price: total, image: "/products/h-stand-straight-hero.png", meta: `Finishing: ${finishing} · Qty: ${qty} · Remark: ${remark.trim() || "—"}` });
     setAdded(true);
   };
 

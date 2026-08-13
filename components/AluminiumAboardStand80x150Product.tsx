@@ -122,7 +122,7 @@ export default function AluminiumAboardStand80x150Product() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Aluminium Aboard Stand 80cm x 150cm", href: "/catalog/aluminium-aboard-stand-80x150", price: total, image: "/products/aluminium-aboard-stand-80x150-hero.png" });
+    add({ label: "Aluminium Aboard Stand 80cm x 150cm", href: "/catalog/aluminium-aboard-stand-80x150", price: total, image: "/products/aluminium-aboard-stand-80x150-hero.png", meta: `Finishing: ${finishing}${standOnly ? "" : ` · Material: ${MATERIAL} · Printing: ${tech} · Side: ${side} · Material Finishing: ${sideOpt.finish}`} · Qty: ${qty}${standOnly ? "" : ` · ${collectOpt.label}`}` });
     setAdded(true);
   };
 

@@ -121,7 +121,7 @@ export default function TowerObliqueProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tower-oblique-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tower-oblique-hero.png", meta: `Finishing: ${finishing} · Material: ${MATERIAL} · Size: ${size} · Sewing Type: ${sewing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

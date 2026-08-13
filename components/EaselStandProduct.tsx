@@ -37,7 +37,7 @@ export default function EaselStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Easel Stand", href: "/catalog/easel-stand", price: total, image: "/products/easel-stand-hero.png" });
+    add({ label: "Easel Stand", href: "/catalog/easel-stand", price: total, image: "/products/easel-stand-hero.png", meta: `Finishing: ${finishing} · Qty: ${qty} · Remark: ${remark.trim() || "—"}` });
     setAdded(true);
   };
 

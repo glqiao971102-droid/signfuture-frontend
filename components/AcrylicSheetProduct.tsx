@@ -148,7 +148,7 @@ export default function AcrylicSheetProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sheet-hero.png", tierPrices: tierTotals, spec: { pricer: "lookup", key: "acrylic-sheet", path: [finishKey, groupKey, sizeKey], collect, qty } });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sheet-hero.png", tierPrices: tierTotals, spec: { pricer: "lookup", key: "acrylic-sheet", path: [finishKey, groupKey, sizeKey], collect, qty }, meta: `Material: ${material} · Finishing: ${finishing} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

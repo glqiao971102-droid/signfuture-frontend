@@ -37,7 +37,7 @@ export default function WoodenEaselStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Wooden Easel Stand", href: "/catalog/wooden-easel-stand", price: total, image: "/products/wooden-easel-stand-hero.png" });
+    add({ label: "Wooden Easel Stand", href: "/catalog/wooden-easel-stand", price: total, image: "/products/wooden-easel-stand-hero.png", meta: `Finishing: ${finishing} · Qty: ${qty} · Remark: ${remark.trim() || "—"}` });
     setAdded(true);
   };
 

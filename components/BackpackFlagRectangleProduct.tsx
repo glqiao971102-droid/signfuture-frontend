@@ -122,7 +122,7 @@ export default function BackpackFlagRectangleProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/backpack-flag-rectangle-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/backpack-flag-rectangle-hero.png", meta: `Finishing: ${finishing} · Material: ${standOnly ? "Stand only" : MATERIAL} · Size: ${size} · Qty: ${qty}${standOnly ? "" : ` · ${collectOpt.label}`}` });
     setAdded(true);
   };
 

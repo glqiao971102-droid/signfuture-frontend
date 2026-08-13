@@ -200,7 +200,7 @@ export default function CurveBackdropProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/curve-backdrop-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/curve-backdrop-hero.png", meta: `Finishing: ${finishing}${standOnly ? "" : ` · Printing: ${side} · Material: ${MATERIAL}`} · Size: ${size} · Sewing: ${sewing} · Qty: ${qty}${standOnly ? "" : ` · ${collectOpt.label}`}` });
     setAdded(true);
   };
 

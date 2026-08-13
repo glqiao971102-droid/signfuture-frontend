@@ -135,7 +135,7 @@ export default function PopUpBackdropStraightProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Pop Up Backdrop Display (Straight)", href: "/catalog/pop-up-backdrop-display-straight", price: total, image: "/products/pop-up-backdrop-straight-hero.png" });
+    add({ label: "Pop Up Backdrop Display (Straight)", href: "/catalog/pop-up-backdrop-display-straight", price: total, image: "/products/pop-up-backdrop-straight-hero.png", meta: `Material: ${MATERIAL} · Finishing: ${finishing} · Size: ${sizeOpt.label} · Lamination: ${lam} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

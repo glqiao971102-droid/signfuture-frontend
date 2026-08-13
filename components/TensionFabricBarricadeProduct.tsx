@@ -200,7 +200,7 @@ export default function TensionFabricBarricadeProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tension-fabric-barricade-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tension-fabric-barricade-hero.png", meta: `Finishing: ${finishing} · Printing: ${tech} · Side: ${side} · Material: ${MATERIAL} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

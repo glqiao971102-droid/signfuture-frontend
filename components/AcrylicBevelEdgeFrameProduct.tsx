@@ -179,7 +179,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

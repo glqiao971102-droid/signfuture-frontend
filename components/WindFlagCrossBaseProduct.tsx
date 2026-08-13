@@ -381,7 +381,7 @@ export default function WindFlagCrossBaseProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-hero.png", meta: `Finishing: ${finishing} · Printing: ${tech} · Side: ${side} · Material: ${material} · Sewing Type: ${sewing} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

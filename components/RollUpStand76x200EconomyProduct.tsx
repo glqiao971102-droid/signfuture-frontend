@@ -125,7 +125,7 @@ export default function RollUpStand76x200EconomyProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Roll Up Stand 76cm x 200cm (Economy)", href: "/catalog/roll-up-stand-76x200-economy", price: total, image: "/products/roll-up-stand-76x200-economy-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-76x200-economy", finishing, tech, lam, collect, qty } });
+    add({ label: "Roll Up Stand 76cm x 200cm (Economy)", href: "/catalog/roll-up-stand-76x200-economy", price: total, image: "/products/roll-up-stand-76x200-economy-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-76x200-economy", finishing, tech, lam, collect, qty }, meta: `Material: Synthetic Paper 180 Micron · Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

@@ -37,7 +37,7 @@ export default function HStandSlantedProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "H Stand (Slanted)", href: "/catalog/h-stand-slanted", price: total, image: "/products/h-stand-slanted-hero.png" });
+    add({ label: "H Stand (Slanted)", href: "/catalog/h-stand-slanted", price: total, image: "/products/h-stand-slanted-hero.png", meta: `Finishing: ${finishing} · Qty: ${qty} · Remark: ${remark.trim() || "—"}` });
     setAdded(true);
   };
 

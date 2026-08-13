@@ -124,7 +124,7 @@ export default function PaperFoamboardProduct() {
   const addToCart = () => {
     if (!agreed) return;
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "paper-foamboard", path: [finishKey, sizeKey], collect, qty } });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "paper-foamboard", path: [finishKey, sizeKey], collect, qty }, meta: `Material: Paper Foamboard · Finishing: ${finishing} · Thickness: ${thickness} · Size: ${sizeLabel} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

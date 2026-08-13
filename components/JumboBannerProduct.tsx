@@ -134,6 +134,7 @@ export default function JumboBannerProduct() {
       href: "/catalog/jumbo-banner",
       price: total,
       image: "/products/jumbo-banner-hero.png",
+      meta: `Material: ${material} · Printing: ${tech} · Size: ${size} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}`,
     });
     setAdded(true);
   };

@@ -181,6 +181,7 @@ export default function HumanStandProduct() {
       href: "/catalog/human-stand",
       price: total,
       image: "/products/human-stand-hero.png",
+      meta: `Finishing: ${finishing} · Standee: ${standee}${standOnly ? "" : ` · Material: ${materialLabel} · Surface: ${surface}`} · Size: ${size} · Qty: ${qty}${standOnly ? "" : ` · ${collectOpt.label}`}`,
     });
     setAdded(true);
   };

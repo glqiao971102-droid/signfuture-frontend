@@ -37,7 +37,7 @@ export default function HandUpPosterProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Hand Up Poster", href: "/catalog/hand-up-poster", price: total, image: "/products/hand-up-poster-hero.png" });
+    add({ label: "Hand Up Poster", href: "/catalog/hand-up-poster", price: total, image: "/products/hand-up-poster-hero.png", meta: `Finishing: ${finishing} · Qty: ${qty} · Remark: ${remark.trim() || "—"}` });
     setAdded(true);
   };
 

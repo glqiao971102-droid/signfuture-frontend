@@ -16,6 +16,25 @@ const COLLECT_OPTIONS = [
   "Urgent (Next Working Day)",
 ];
 
+// Turn a product's readable spec summary into structured option rows so the
+// admin order view lists every submitted field (Material, Size, Qty, …). The
+// summary is a "·"- or newline-separated list of "Label: Value" pairs; any
+// piece without a colon is kept whole as a "Specification" row.
+function metaToOptions(meta?: string): { label: string; value: string }[] {
+  if (!meta || !meta.trim()) return [];
+  return meta
+    .split(/·|\n|;/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((piece) => {
+      const idx = piece.indexOf(":");
+      if (idx === -1) return { label: "Specification", value: piece };
+      const label = piece.slice(0, idx).trim();
+      const value = piece.slice(idx + 1).trim();
+      return label && value ? { label, value } : { label: "Specification", value: piece };
+    });
+}
+
 type Artwork = { url: string; name: string };
 type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[]; requiresConfirmation?: boolean };
 type Address = {
@@ -92,7 +111,9 @@ export default function CheckoutPage() {
         productName: it.label,
         qty: it.qty,
         unitPrice: it.price,
-        options: it.meta ? [{ label: "Specification", value: it.meta }] : [],
+        // Break the readable spec summary ("Material: X · Size: Y · Qty: Z")
+        // into one option row per field so admins see every submitted detail.
+        options: metaToOptions(it.meta),
         // Structured spec → server recomputes the authoritative price.
         spec: it.spec as Record<string, unknown> | undefined,
         // This line's own artwork (first one attached to the line for back-compat).

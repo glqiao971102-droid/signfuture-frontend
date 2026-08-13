@@ -268,7 +268,7 @@ export default function DoorBuntingStandFabricProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/door-bunting-stand-fabric-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/door-bunting-stand-fabric-hero.png", meta: `Finishing: ${finishing}${standOnly ? "" : ` · Side: ${side} · Material: ${MATERIAL}`} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

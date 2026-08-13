@@ -125,7 +125,7 @@ export default function RollUpStand120x200LuxuryProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Roll Up Stand 120cm x 200cm (Luxury)", href: "/catalog/roll-up-stand-120x200-luxury", price: total, image: "/products/roll-up-stand-120x200-luxury-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-120x200-luxury", finishing, tech, lam, collect, qty } });
+    add({ label: "Roll Up Stand 120cm x 200cm (Luxury)", href: "/catalog/roll-up-stand-120x200-luxury", price: total, image: "/products/roll-up-stand-120x200-luxury-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "roll-up-120x200-luxury", finishing, tech, lam, collect, qty }, meta: `Material: Synthetic Paper 180 Micron · Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

@@ -135,7 +135,7 @@ export default function PopUpBackdropCurveProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Pop Up Backdrop Display (Curve)", href: "/catalog/pop-up-backdrop-display-curve", price: total, image: "/products/pop-up-backdrop-curve-hero.png" });
+    add({ label: "Pop Up Backdrop Display (Curve)", href: "/catalog/pop-up-backdrop-display-curve", price: total, image: "/products/pop-up-backdrop-curve-hero.png", meta: `Material: ${MATERIAL} · Finishing: ${finishing} · Size: ${sizeOpt.label} · Lamination: ${lam} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

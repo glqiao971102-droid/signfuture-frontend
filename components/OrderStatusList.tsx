@@ -342,6 +342,18 @@ export default function OrderStatusList() {
                               <span className="order-line-qty">×{l.qty}</span>
                               <span className="order-line-total">RM {money(l.total)}</span>
                             </div>
+                            {Array.isArray(l.options) && l.options.length > 0 && (
+                              <div
+                                className="order-line-spec"
+                                style={{ fontSize: 12, color: "#7c8aa0", margin: "2px 0 6px", lineHeight: 1.5 }}
+                              >
+                                {l.options.map((o, oi) => (
+                                  <span key={oi} style={{ marginRight: 12 }}>
+                                    <span style={{ color: "#9fb0c6" }}>{o.label}:</span> {o.value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             <JobSteps status={l.status ?? o.status} />
                           </div>
                         ))}

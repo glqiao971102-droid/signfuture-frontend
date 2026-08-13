@@ -151,7 +151,7 @@ export default function TBarStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "T Bar Stand", href: "/catalog/t-bar-stand", price: total, image: "/products/t-bar-stand-hero.png" });
+    add({ label: "T Bar Stand", href: "/catalog/t-bar-stand", price: total, image: "/products/t-bar-stand-hero.png", meta: `Material: Synthetic Paper 180 Micron · Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

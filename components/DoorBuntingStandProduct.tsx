@@ -125,7 +125,7 @@ export default function DoorBuntingStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Door Bunting Stand", href: "/catalog/door-bunting-stand", price: total, image: "/products/door-bunting-stand-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "door-bunting-stand", finishing, tech, lam, collect, qty } });
+    add({ label: "Door Bunting Stand", href: "/catalog/door-bunting-stand", price: total, image: "/products/door-bunting-stand-hero.png", tierPrices: tierTotals, spec: { pricer: "stand", key: "door-bunting-stand", finishing, tech, lam, collect, qty }, meta: `Finishing: ${finishing}${standOnly ? "" : ` · Printing: ${tech} · Lamination: ${lam} · Size: ${size}`} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

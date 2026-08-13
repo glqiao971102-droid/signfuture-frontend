@@ -119,7 +119,7 @@ export default function AirDancerProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/air-dancer-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/air-dancer-hero.png", meta: `Finishing: ${finishing} · Material: ${standOnly ? "Stand only" : MATERIAL} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

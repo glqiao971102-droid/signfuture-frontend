@@ -117,7 +117,7 @@ export default function PromotionCounterProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Promotion Counter", href: "/catalog/promotion-counter", price: total, image: "/products/promotion-counter-hero.png" });
+    add({ label: "Promotion Counter", href: "/catalog/promotion-counter", price: total, image: "/products/promotion-counter-hero.png", meta: `Material: ${MATERIAL} · Finishing: ${finishing} · Lamination: ${lam} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

@@ -253,7 +253,7 @@ export default function GiantWindFlagProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/giant-wind-flag-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/giant-wind-flag-hero.png", meta: `Finishing: ${finishing}${standOnly ? "" : ` · Printing: ${tech} · Side: ${side} · Material: ${material}`} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

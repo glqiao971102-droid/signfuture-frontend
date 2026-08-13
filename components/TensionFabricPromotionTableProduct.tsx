@@ -121,7 +121,7 @@ export default function TensionFabricPromotionTableProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tension-fabric-promotion-table-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tension-fabric-promotion-table-hero.png", meta: `Finishing: ${finishing} · Material: ${MATERIAL} · Size: ${size} · Sewing Type: ${sewing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

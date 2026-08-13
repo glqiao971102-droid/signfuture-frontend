@@ -121,7 +121,7 @@ export default function PvcFoamboardProduct() {
   const addToCart = () => {
     if (!agreed) return;
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/pvc-foamboard-hero.png", deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pvc-foamboard", path: [finishKey, thickKey, sizeKey], collect, qty } });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/pvc-foamboard-hero.png", deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pvc-foamboard", path: [finishKey, thickKey, sizeKey], collect, qty }, meta: `Material: PVC Foamboard · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

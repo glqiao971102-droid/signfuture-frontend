@@ -124,7 +124,7 @@ export default function PpSheetProduct() {
   const addToCart = () => {
     if (!agreed) return;
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pp-sheet", path: [finishKey, thickKey, sizeKey], collect, qty } });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "pp-sheet", path: [finishKey, thickKey, sizeKey], collect, qty }, meta: `Material: PP Sheet · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

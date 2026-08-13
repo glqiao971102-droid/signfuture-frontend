@@ -121,7 +121,7 @@ export default function TowerCurveProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tower-curve-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/tower-curve-hero.png", meta: `Finishing: ${finishing} · Material: ${MATERIAL} · Size: ${size} · Sewing Type: ${sewing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

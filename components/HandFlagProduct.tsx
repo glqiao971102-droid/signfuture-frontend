@@ -120,7 +120,7 @@ export default function HandFlagProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/hand-flag-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/hand-flag-hero.png", meta: `Finishing: ${finishing}${standOnly ? "" : ` · Material: ${MATERIAL}`} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

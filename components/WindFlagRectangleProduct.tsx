@@ -497,7 +497,7 @@ export default function WindFlagRectangleProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-rectangle-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-rectangle-hero.png", meta: `Finishing: ${finishing} · Printing: ${tech} · Side: ${side} · Material: ${material} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

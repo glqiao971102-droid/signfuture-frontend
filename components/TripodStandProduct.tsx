@@ -151,7 +151,7 @@ export default function TripodStandProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: "Tripod Stand", href: "/catalog/tripod-stand", price: total, image: "/products/tripod-stand-hero.png" });
+    add({ label: "Tripod Stand", href: "/catalog/tripod-stand", price: total, image: "/products/tripod-stand-hero.png", meta: `Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

@@ -381,7 +381,7 @@ export default function WindFlagWaterBaseProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-water-base-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/wind-flag-water-base-hero.png", meta: `Finishing: ${finishing} · Printing: ${tech} · Side: ${side} · Material: ${material} · Sewing Type: ${sewing} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

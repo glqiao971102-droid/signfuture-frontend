@@ -170,7 +170,7 @@ export default function AcrylicSandwichFrameProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sandwich-frame-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-sandwich-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 

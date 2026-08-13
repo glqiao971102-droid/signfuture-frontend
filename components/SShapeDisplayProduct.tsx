@@ -121,7 +121,7 @@ export default function SShapeDisplayProduct() {
 
   const addToCart = () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/s-shape-display-hero.png" });
+    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/s-shape-display-hero.png", meta: `Material: ${MATERIAL} · Finishing: ${finishing} · Size: ${size} · Sewing: ${sewing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 
