@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { api } from "@/lib/api";
 
 const MATERIAL = ["Tarpaulin 380gsm"];
 
@@ -83,6 +84,7 @@ export default function JumboBannerProduct() {
   const [qty, setQty] = useState(1);
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [added, setAdded] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string | null>(null);
   const [collectDates, setCollectDates] = useState<Record<string, string>>({});
@@ -127,9 +129,17 @@ export default function JumboBannerProduct() {
   const hasSize = area > 0;
   const canOrder = agreed && hasSize && !!artwork;
 
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!canOrder) return;
+    let artworks: { url: string; name: string }[] | undefined;
+    if (artworkFile) {
+      try {
+        const __up = await api.uploadArtwork(artworkFile);
+        artworks = [{ url: __up.url, name: artworkFile.name }];
+      } catch { /* keep going; artwork can be re-attached later */ }
+    }
     add({
+      artworks,
       label: "Jumbo Banner",
       href: "/catalog/jumbo-banner",
       price: total,
@@ -205,7 +215,7 @@ export default function JumboBannerProduct() {
             <input
               type="file"
               accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; setArtworkFile(f); setArtwork(f?.name ?? ""); }}
             />
             {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
           </label>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { api } from "@/lib/api";
 
 const FINISHING = ["Printing with Stand", "Printing Only", "Stand Only"];
 const PRINT_TECH = ["UV Ink 1200dpi", "Eco Solvent 1400dpi"];
@@ -94,6 +95,7 @@ export default function TBarStandProduct() {
   const [qty, setQty] = useState(1);
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [added, setAdded] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string | null>(null);
   const [collectDates, setCollectDates] = useState<Record<string, string>>({});
@@ -149,9 +151,16 @@ export default function TBarStandProduct() {
     { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!agreed) return;
-    add({ label: "T Bar Stand", href: "/catalog/t-bar-stand", price: total, image: "/products/t-bar-stand-hero.png", meta: `Material: Synthetic Paper 180 Micron · Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
+    let artworks: { url: string; name: string }[] | undefined;
+    if (artworkFile) {
+      try {
+        const __up = await api.uploadArtwork(artworkFile);
+        artworks = [{ url: __up.url, name: artworkFile.name }];
+      } catch { /* keep going; artwork can be re-attached later */ }
+    }
+    add({ artworks, label: "T Bar Stand", href: "/catalog/t-bar-stand", price: total, image: "/products/t-bar-stand-hero.png", meta: `Material: Synthetic Paper 180 Micron · Finishing: ${finishing} · Printing: ${tech} · Lamination: ${lam} · Size: ${size} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 
@@ -235,7 +244,7 @@ export default function TBarStandProduct() {
                 <input
                   type="file"
                   accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-                  onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+                  onChange={(e) => { const f = e.target.files?.[0] ?? null; setArtworkFile(f); setArtwork(f?.name ?? ""); }}
                 />
                 {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
               </label>

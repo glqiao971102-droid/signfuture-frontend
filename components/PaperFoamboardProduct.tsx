@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useCart } from "@/components/CartProvider";
+import { api } from "@/lib/api";
 import { tierIndex } from "@/lib/tier";
 import { PAPER_PRICE } from "@/lib/paperFoamboardPrices";
 
@@ -83,6 +84,7 @@ export default function PaperFoamboardProduct() {
   const [qty, setQty] = useState(1);
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [added, setAdded] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string | null>(null);
   const [collectDates, setCollectDates] = useState<Record<string, string>>({});
@@ -121,10 +123,17 @@ export default function PaperFoamboardProduct() {
     { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!agreed) return;
+    let artworks: { url: string; name: string }[] | undefined;
+    if (artworkFile) {
+      try {
+        const __up = await api.uploadArtwork(artworkFile);
+        artworks = [{ url: __up.url, name: artworkFile.name }];
+      } catch { /* keep going; artwork can be re-attached later */ }
+    }
     // Made-to-order CNC-cut product — deliverable, even though cross-listed under Materials.
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "paper-foamboard", path: [finishKey, sizeKey], collect, qty }, meta: `Material: Paper Foamboard · Finishing: ${finishing} · Thickness: ${thickness} · Size: ${sizeLabel} · Qty: ${qty} · ${collectOpt.label}` });
+    add({ artworks, label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: HERO_IMAGE, deliverable: true, tierPrices: tierTotals, spec: { pricer: "lookup", key: "paper-foamboard", path: [finishKey, sizeKey], collect, qty }, meta: `Material: Paper Foamboard · Finishing: ${finishing} · Thickness: ${thickness} · Size: ${sizeLabel} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 
@@ -179,7 +188,7 @@ export default function PaperFoamboardProduct() {
             <input
               type="file"
               accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; setArtworkFile(f); setArtwork(f?.name ?? ""); }}
             />
             {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
           </label>

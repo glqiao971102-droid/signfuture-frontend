@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import { api } from "@/lib/api";
 import { BEVEL_PRICE } from "@/lib/acrylicBevelPrices";
 
 const PRODUCT_NAME = "Acrylic Bevel Edge Frame (with Boltnut)";
@@ -134,6 +135,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
   const [qty, setQty] = useState(1);
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [added, setAdded] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string | null>(null);
   const [collectDates, setCollectDates] = useState<Record<string, string>>({});
@@ -177,9 +179,16 @@ export default function AcrylicBevelEdgeFrameProduct() {
     { name: "Diamond Agent Price", price: tierTotals[3] },
   ];
 
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!agreed) return;
-    add({ label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
+    let artworks: { url: string; name: string }[] | undefined;
+    if (artworkFile) {
+      try {
+        const __up = await api.uploadArtwork(artworkFile);
+        artworks = [{ url: __up.url, name: artworkFile.name }];
+      } catch { /* keep going; artwork can be re-attached later */ }
+    }
+    add({ artworks, label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
     setAdded(true);
   };
 
@@ -276,7 +285,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
             <input
               type="file"
               accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => setArtwork(e.target.files?.[0]?.name ?? "")}
+              onChange={(e) => { const f = e.target.files?.[0] ?? null; setArtworkFile(f); setArtwork(f?.name ?? ""); }}
             />
             {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
           </label>
