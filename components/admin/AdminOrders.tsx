@@ -50,14 +50,24 @@ function collectWorkingDays(value: string, orderDate: string | null | undefined)
 /** Pulls the "N working days" production time out of a line item's spec/options. */
 function workingDaysOf(options: { label: string; value: string }[], orderDate?: string | null): string {
   for (const o of options) {
-    const m = /(\d+)\s*working\s*days?/i.exec(`${o.value} ${o.label}`);
+    const text = `${o.value} ${o.label}`;
+    if (/next\s*working\s*days?/i.test(text)) return "next working days";
+    const m = /(\d+)\s*working\s*days?/i.exec(text);
     if (m) return `${m[1]} working days`;
   }
   for (const o of options) {
     const n = collectWorkingDays(o.value, orderDate);
-    if (n != null) return `${n} working days`;
+    if (n != null) return n === 1 ? "next working days" : `${n} working days`;
   }
   return "—";
+}
+
+// Colour the collect lead-time by urgency: 7 white, 4 light-purple, 3 orange,
+// 2 yellow, next/1-day red.
+function workingDaysColor(wd: string): string | undefined {
+  if (/next/i.test(wd)) return "#f87171"; // red
+  const n = parseInt(wd, 10);
+  return { 7: "#ffffff", 4: "#c4b5fd", 3: "#fb923c", 2: "#fbbf24", 1: "#f87171" }[n];
 }
 
 /** Display an option value, rewriting a stored "collect <date>" as working days. */
@@ -352,11 +362,15 @@ export default function AdminOrders() {
               <div><span className="adm-key-label">Payment</span>{nativeDetail.paymentMethod}{nativeDetail.paidAt ? " (paid)" : ""}</div>
               <div><span className="adm-key-label">Delivery</span>{nativeDetail.deliveryMethod ?? "—"}</div>
               <div><span className="adm-key-label">Collect</span>
-                {nativeDetail.lines.map((l, i) => (
-                  <span key={l.id} style={{ display: "block" }}>
-                    {nativeDetail.ref}-{i + 1} ({workingDaysOf(l.options, nativeDetail.date)})
-                  </span>
-                ))}
+                {nativeDetail.lines.map((l, i) => {
+                  const wd = workingDaysOf(l.options, nativeDetail.date);
+                  return (
+                    <span key={l.id} style={{ display: "block" }}>
+                      {nativeDetail.ref}-{i + 1} (
+                      <span style={{ color: workingDaysColor(wd), fontWeight: 700 }}>{wd}</span>)
+                    </span>
+                  );
+                })}
               </div>
               {nativeDetail.customerId ? (
                 <div><span className="adm-key-label">Customer</span>
