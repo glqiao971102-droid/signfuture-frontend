@@ -45,22 +45,30 @@ export default function EditDetail() {
 
   useEffect(() => {
     try {
-      // Carry the account's Company / Email / Phone (from My Details) into the
-      // matching fields. Any saved edits win, but whenever a field is still
-      // empty — including old saved data that predates the Email field — we
-      // fall back to the account value so it "transfers over" automatically.
+      // Seed every Edit Detail field from THIS member's own account (the same
+      // registration data shown in My Details): Company, Email, Phone, Address,
+      // Postcode, City, State. Any saved edit wins, but whenever a field is
+      // still empty — including old saved data that predates a field — we fall
+      // back to the account value so it transfers over automatically.
+      const b: Record<string, string | null> = user?.billing || {};
+      const acctAddress = [b.address_1, b.address_2].filter(Boolean).join(", ");
+
       const c = JSON.parse(localStorage.getItem(COMPANY_KEY) || "null");
       setCompany({
         ...EMPTY_COMPANY,
         ...(c || {}),
-        name: (c && c.name) || user?.billing?.company || "",
+        name: (c && c.name) || b.company || "",
       });
       const k = JSON.parse(localStorage.getItem(CONTACT_KEY) || "null");
       setContact({
         ...EMPTY_CONTACT,
         ...(k || {}),
         email: (k && k.email) || user?.email || "",
-        mobile: (k && k.mobile) || user?.phone || "",
+        mobile: (k && k.mobile) || user?.phone || b.phone || "",
+        address: (k && k.address) || acctAddress || "",
+        postcode: (k && k.postcode) || b.postcode || "",
+        city: (k && k.city) || b.city || "",
+        state: (k && k.state) || b.state || "",
       });
     } catch {
       /* ignore malformed storage */
