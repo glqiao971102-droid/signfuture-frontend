@@ -45,19 +45,23 @@ export default function EditDetail() {
 
   useEffect(() => {
     try {
+      // Carry the account's Company / Email / Phone (from My Details) into the
+      // matching fields. Any saved edits win, but whenever a field is still
+      // empty — including old saved data that predates the Email field — we
+      // fall back to the account value so it "transfers over" automatically.
       const c = JSON.parse(localStorage.getItem(COMPANY_KEY) || "null");
-      if (c) setCompany(c);
-      // Seed Company Name from the member's account company (My Details).
-      else setCompany((prev) => ({ ...prev, name: user?.billing?.company || "" }));
+      setCompany({
+        ...EMPTY_COMPANY,
+        ...(c || {}),
+        name: (c && c.name) || user?.billing?.company || "",
+      });
       const k = JSON.parse(localStorage.getItem(CONTACT_KEY) || "null");
-      if (k) setContact(k);
-      // Seed Phone + Email from the member's account.
-      else
-        setContact((prev) => ({
-          ...prev,
-          mobile: user?.phone || "",
-          email: user?.email || "",
-        }));
+      setContact({
+        ...EMPTY_CONTACT,
+        ...(k || {}),
+        email: (k && k.email) || user?.email || "",
+        mobile: (k && k.mobile) || user?.phone || "",
+      });
     } catch {
       /* ignore malformed storage */
     }
