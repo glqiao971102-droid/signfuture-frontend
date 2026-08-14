@@ -28,12 +28,12 @@ const STATES = [
 ];
 
 type Company = { name: string; regNo: string; tin: string; confirmed: boolean };
-type Contact = { address: string; postcode: string; city: string; state: string; mobile: string };
+type Contact = { email: string; address: string; postcode: string; city: string; state: string; mobile: string };
 
 const COMPANY_KEY = "sf.editDetail.company";
 const CONTACT_KEY = "sf.editDetail.contact";
 const EMPTY_COMPANY: Company = { name: "", regNo: "", tin: "", confirmed: false };
-const EMPTY_CONTACT: Contact = { address: "", postcode: "", city: "", state: "", mobile: "" };
+const EMPTY_CONTACT: Contact = { email: "", address: "", postcode: "", city: "", state: "", mobile: "" };
 
 export default function EditDetail() {
   const { user } = useAuth();
@@ -47,9 +47,17 @@ export default function EditDetail() {
     try {
       const c = JSON.parse(localStorage.getItem(COMPANY_KEY) || "null");
       if (c) setCompany(c);
+      // Seed Company Name from the member's account company (My Details).
+      else setCompany((prev) => ({ ...prev, name: user?.billing?.company || "" }));
       const k = JSON.parse(localStorage.getItem(CONTACT_KEY) || "null");
       if (k) setContact(k);
-      else setContact((prev) => ({ ...prev, mobile: user?.phone || "" }));
+      // Seed Phone + Email from the member's account.
+      else
+        setContact((prev) => ({
+          ...prev,
+          mobile: user?.phone || "",
+          email: user?.email || "",
+        }));
     } catch {
       /* ignore malformed storage */
     }
@@ -174,6 +182,15 @@ export default function EditDetail() {
           <h3>Contact &amp; Login</h3>
         </div>
         <div className="edit-detail-grid">
+          <label className="span-2">
+            Email
+            <input
+              type="email"
+              value={contact.email}
+              placeholder="you@example.com"
+              onChange={(e) => setContact({ ...contact, email: e.target.value })}
+            />
+          </label>
           <label className="span-2">
             Address
             <input
