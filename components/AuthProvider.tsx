@@ -273,6 +273,7 @@ function LoginModal({
     setError(null);
 
     if (!regName.trim()) return setError("Please enter your name.");
+    if (regPhone.replace(/\D/g, "").length < 7) return setError("Please enter a valid phone number.");
     if (!regReferral.trim()) return setError("A referral code is required.");
     if (password.length < MIN_PASSWORD) {
       return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
@@ -528,13 +529,14 @@ function LoginModal({
                 />
               </label>
               <label>
-                Phone <span className="login-optional">(optional)</span>
+                Phone
                 <input
                   type="tel"
                   autoComplete="tel"
                   placeholder="01x-xxx xxxx"
                   value={regPhone}
                   onChange={(e) => setRegPhone(e.target.value)}
+                  required
                 />
               </label>
               <label>
