@@ -5,9 +5,12 @@ import { useAuth } from "@/components/AuthProvider";
 import { api, type InvoiceRow, type OrderDetail, type NativeOrderRow } from "@/lib/api";
 import {
   buildInvoicePdf,
+  buildOrderInvoicePdf,
   downloadBlob,
+  ringgitInWords,
   type InvoiceData,
   type EInvoiceItem,
+  type OrderInvoiceData,
 } from "@/lib/invoicePdf";
 import { DEV_PREVIEW } from "@/lib/preview";
 import { invoiceReady, invoiceTotal } from "@/lib/nativeInvoice";
@@ -21,6 +24,40 @@ function formatDate(value: string): string {
   const d = new Date(value.includes("T") ? value : value.replace(" ", "T"));
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const CANCELLED_JOBS = ["cancelled", "refunded", "failed"];
+
+/**
+ * Builds the styled order-invoice PDF payload from a native order. Only active
+ * (non-cancelled) jobs are billed, and every job's options are written out in
+ * full as the line's spec (material / size / working days / …).
+ */
+function toOrderInvoiceData(o: NativeOrderRow, billing: string[]): OrderInvoiceData {
+  const items = o.items
+    .filter((l) => !CANCELLED_JOBS.includes(l.status ?? o.status))
+    .map((l) => ({
+      name: l.name,
+      spec: l.options
+        .filter((op) => op.value != null && String(op.value).trim() !== "")
+        .map((op) => `${op.label}: ${op.value}`)
+        .join("   ·   "),
+      qty: String(l.qty),
+      unitPrice: money(Number(l.unitPrice) || 0),
+      amount: money(Number(l.total) || 0),
+    }));
+  const t = invoiceTotal(o);
+  return {
+    invoiceNo: `INV-${o.ref}`,
+    date: o.date ? formatDate(o.date) : "—",
+    status: o.statusLabel || "Processing",
+    payment: "Wallet",
+    billingTo: billing,
+    items,
+    totals: [{ label: "Subtotal", value: money(t) }],
+    total: money(t),
+    amountInWords: ringgitInWords(t),
+  };
 }
 
 // Sample invoices shown in the preview (no backend). Each carries its own PDF
@@ -205,6 +242,25 @@ export default function InvoiceList() {
     }
   }
 
+  /** Builds the styled invoice for a native order entirely on the client. */
+  async function downloadNative(o: NativeOrderRow) {
+    if (busyId) return;
+    setBusyId(o.id);
+    try {
+      const billing = [
+        user?.name?.trim() || "Customer",
+        user?.email?.trim() || "",
+        user?.phone?.trim() || "",
+      ].filter(Boolean);
+      const blob = await buildOrderInvoicePdf(toOrderInvoiceData(o, billing));
+      downloadBlob(blob, `INV-${o.ref}.pdf`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not build the invoice PDF");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   // Show the member's real invoices; only fall back to samples in local dev.
   const shown = rows.length > 0 ? rows : DEV_PREVIEW ? SAMPLE_INVOICES.map((s) => s.row) : [];
 
@@ -239,11 +295,10 @@ export default function InvoiceList() {
                   <button
                     type="button"
                     className="hero-btn primary rec-btn"
-                    onClick={() =>
-                      api.openNativeInvoice(o.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))
-                    }
+                    disabled={busyId === o.id}
+                    onClick={() => void downloadNative(o)}
                   >
-                    ⤓ Download PDF
+                    {busyId === o.id ? "Building…" : "⤓ Download PDF"}
                   </button>
                 </div>
               </article>

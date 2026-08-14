@@ -115,10 +115,30 @@ const esc = (s: string) =>
 // Rough Helvetica advance width (em) for right-aligned numbers/labels.
 const approxWidth = (s: string, size: number) => esc(s).length * size * 0.5;
 
+// Word-wrap a string into lines that fit `maxW` at the given font size.
+function wrapLines(s: string, size: number, maxW: number): string[] {
+  const words = String(s ?? "").split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w;
+    if (approxWidth(test, size) > maxW && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 // ---- byte-accurate PDF assembly (supports one embedded JPEG image) ----
 type EmbeddedImage = { jpeg: Uint8Array; w: number; h: number };
 
-function assemblePdf(stream: string, image?: EmbeddedImage | null): Blob {
+function assemblePdf(stream: string | string[], image?: EmbeddedImage | null): Blob {
+  const pages = Array.isArray(stream) ? stream : [stream];
+  const N = Math.max(1, pages.length);
   const enc = new TextEncoder();
   const chunks: Uint8Array[] = [];
   let length = 0;
@@ -127,36 +147,44 @@ function assemblePdf(stream: string, image?: EmbeddedImage | null): Blob {
     chunks.push(u);
     length += u.length;
   };
+  const offsets: number[] = [];
+  const writeObj = (num: number, body: string) => {
+    offsets[num] = length;
+    push(`${num} 0 obj\n${body}\nendobj\n`);
+  };
 
   const hasImg = !!image;
-  const xobjRes = hasImg ? " /XObject <</Im0 7 0 R>>" : "";
-  const objDefs = [
-    "<</Type /Catalog /Pages 2 0 R>>",
-    "<</Type /Pages /Kids [3 0 R] /Count 1>>",
-    `<</Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources <</Font <</F1 4 0 R /F2 5 0 R>>${xobjRes}>> /Contents 6 0 R>>`,
-    "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>",
-    "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold>>",
-  ];
+  // Object plan: 1 Catalog · 2 Pages · 3 F1 · 4 F2 · [5 .. 5+N-1] Page objects ·
+  // [5+N .. 5+2N-1] Content streams · optional image last.
+  const pageStart = 5;
+  const contentStart = 5 + N;
+  const imgObj = hasImg ? 5 + 2 * N : 0;
+  const total = hasImg ? 5 + 2 * N : 5 + 2 * N - 1;
+  const xobjRes = hasImg ? ` /XObject <</Im0 ${imgObj} 0 R>>` : "";
+  const kids = Array.from({ length: N }, (_, i) => `${pageStart + i} 0 R`).join(" ");
 
-  const offsets: number[] = [];
   push("%PDF-1.4\n");
-  for (let i = 0; i < 5; i++) {
-    offsets[i + 1] = length;
-    push(`${i + 1} 0 obj\n${objDefs[i]}\nendobj\n`);
+  writeObj(1, "<</Type /Catalog /Pages 2 0 R>>");
+  writeObj(2, `<</Type /Pages /Kids [${kids}] /Count ${N}>>`);
+  writeObj(3, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>");
+  writeObj(4, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold>>");
+  for (let i = 0; i < N; i++) {
+    writeObj(
+      pageStart + i,
+      `<</Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources <</Font <</F1 3 0 R /F2 4 0 R>>${xobjRes}>> /Contents ${contentStart + i} 0 R>>`,
+    );
   }
-  // object 6 — content stream
-  const streamBytes = enc.encode(stream);
-  offsets[6] = length;
-  push(`6 0 obj\n<</Length ${streamBytes.length}>>\nstream\n`);
-  push(streamBytes);
-  push("\nendstream\nendobj\n");
-
-  let count = 6;
+  for (let i = 0; i < N; i++) {
+    const sb = enc.encode(pages[i] ?? "");
+    offsets[contentStart + i] = length;
+    push(`${contentStart + i} 0 obj\n<</Length ${sb.length}>>\nstream\n`);
+    push(sb);
+    push("\nendstream\nendobj\n");
+  }
   if (hasImg) {
-    count = 7;
-    offsets[7] = length;
+    offsets[imgObj] = length;
     push(
-      `7 0 obj\n<</Type /XObject /Subtype /Image /Width ${image!.w} /Height ${image!.h} ` +
+      `${imgObj} 0 obj\n<</Type /XObject /Subtype /Image /Width ${image!.w} /Height ${image!.h} ` +
         `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image!.jpeg.length}>>\nstream\n`,
     );
     push(image!.jpeg);
@@ -164,10 +192,10 @@ function assemblePdf(stream: string, image?: EmbeddedImage | null): Blob {
   }
 
   const xrefStart = length;
-  let xref = `xref\n0 ${count + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= count; i++) xref += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+  let xref = `xref\n0 ${total + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= total; i++) xref += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
   push(xref);
-  push(`trailer\n<</Size ${count + 1} /Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`);
+  push(`trailer\n<</Size ${total + 1} /Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`);
 
   return new Blob(chunks as BlobPart[], { type: "application/pdf" });
 }
@@ -576,6 +604,166 @@ export async function buildReloadSlipPdf(d: ReloadSlipData): Promise<Blob> {
 
   footer(ops, "This is a computer-generated slip. No signature is required.");
   return assemblePdf(ops.join("\n"), logo);
+}
+
+// =====================================================================
+//  ORDER INVOICE (styled like the Reload slip; paginates over many items)
+// =====================================================================
+export type OrderInvoiceData = {
+  invoiceNo: string;
+  date: string;
+  status?: string;
+  payment?: string;
+  billingTo: string[];
+  items: {
+    name: string;
+    spec: string;
+    qty: string;
+    unitPrice: string;
+    amount: string;
+    cancelled?: boolean;
+  }[];
+  totals: { label: string; value: string }[];
+  total: string;
+  amountInWords: string;
+};
+
+export async function buildOrderInvoicePdf(d: OrderInvoiceData): Promise<Blob> {
+  const logo = await getBrandLogo();
+  const sup = SIGN_FUTURE_SUPPLIER;
+  const L = 40;
+  const R = 555;
+  const cNo = L + 6;
+  const cDesc = 76;
+  const cQty = 402;
+  const cUnit = 474;
+  const cAmt = R - 6;
+  const DESC_W = 348 - cDesc;
+  const TOP = 768;
+  const BOTTOM = 96;
+  const NOTE = "This is a computer-generated invoice. No signature is required.";
+
+  const pages: string[] = [];
+  let ops: string[] = [];
+  let p = pen(ops);
+  let y = 0;
+
+  const drawTableHead = () => {
+    p.box(L, y - 4, R - L, 16, NAVY);
+    p.text(cNo, y, 7.5, "F2", "No.", WHITE);
+    p.text(cDesc, y, 7.5, "F2", "DESCRIPTION", WHITE);
+    p.textR(cQty, y, 7.5, "F2", "Qty", WHITE);
+    p.textR(cUnit, y, 7.5, "F2", "Unit", WHITE);
+    p.textR(cAmt, y, 7.5, "F2", "Amount", WHITE);
+    y -= 22;
+  };
+  const startPage = () => {
+    ops = [];
+    p = pen(ops);
+    header(ops, logo, "INVOICE");
+    y = TOP;
+  };
+  const endPage = () => {
+    footer(ops, NOTE);
+    pages.push(ops.join("\n"));
+  };
+
+  startPage();
+
+  // meta (right)
+  let my = TOP;
+  const meta: [string, string][] = [
+    ["Invoice No.", d.invoiceNo],
+    ["Date", d.date],
+    ["Status", d.status ?? "—"],
+    ["Payment", d.payment ?? "—"],
+  ];
+  for (const [k, v] of meta) {
+    p.textR(R - approxWidth(v, 9) - 8, my, 7.5, "F1", k, MUTED);
+    p.textR(R, my, 9, "F2", v);
+    my -= 15;
+  }
+  // company (left)
+  let ly = TOP;
+  p.text(L, ly, 11, "F2", sup.name, NAVY);
+  ly -= 13;
+  for (const line of wrapLines(sup.address ?? "", 8.5, 250)) {
+    p.text(L, ly, 8.5, "F1", line, MUTED);
+    ly -= 11;
+  }
+  p.text(L, ly, 8.5, "F1", `TEL: ${sup.contact ?? ""}`, MUTED);
+  ly -= 11;
+  p.text(L, ly, 8.5, "F1", `EMAIL: ${sup.email ?? ""}`, MUTED);
+  ly -= 11;
+  // billing to
+  let by = Math.min(ly, my) - 12;
+  p.text(L, by, 8.5, "F2", "BILLING TO", CYAN);
+  by -= 15;
+  d.billingTo.forEach((ln, i) => {
+    p.text(L, by, i === 0 ? 10 : 8.5, i === 0 ? "F2" : "F1", ln, i === 0 ? INK : MUTED);
+    by -= i === 0 ? 13 : 11;
+  });
+
+  y = by - 16;
+  drawTableHead();
+
+  // items
+  d.items.forEach((it, idx) => {
+    const specLines = it.spec ? wrapLines(it.spec, 8, DESC_W) : [];
+    const rowH = 13 + specLines.length * 10 + 8;
+    if (y - rowH < BOTTOM) {
+      endPage();
+      startPage();
+      drawTableHead();
+    }
+    if (idx % 2 === 1) p.box(L, y - rowH + 11, R - L, rowH, "0.97 0.98 0.995");
+    const col = it.cancelled ? MUTED : INK;
+    p.text(cNo, y, 8, "F2", `${idx + 1}.`, CYAN);
+    p.text(cDesc, y, 9.5, "F2", it.cancelled ? `${it.name} (cancelled)` : it.name, col);
+    p.textR(cQty, y, 8.5, "F1", it.qty, col);
+    p.textR(cUnit, y, 8.5, "F1", it.unitPrice, col);
+    p.textR(cAmt, y, 8.5, "F1", it.amount, col);
+    let dy = y - 12;
+    for (const line of specLines) {
+      p.text(cDesc, dy, 8, "F1", line, MUTED);
+      dy -= 10;
+    }
+    y = dy - 8;
+    p.rule(L, y + 4, R, RULE, 0.4);
+  });
+
+  // totals + amount in words
+  const boxH = d.totals.length * 15 + 30;
+  if (y - (boxH + 30) < BOTTOM) {
+    endPage();
+    startPage();
+    y = TOP;
+  }
+  y -= 10;
+  const totalsTop = y;
+  const boxX = 320;
+  const boxW = R - boxX;
+  p.box(boxX, totalsTop - boxH + 14, boxW, boxH, BOXBG);
+  let ty = totalsTop;
+  for (const r of d.totals) {
+    p.text(boxX + 10, ty, 8.5, "F1", r.label, MUTED);
+    p.textR(R - 10, ty, 8.5, "F1", r.value);
+    ty -= 15;
+  }
+  p.rule(boxX + 10, ty + 6, R - 10, RULE, 0.5);
+  ty -= 4;
+  p.text(boxX + 10, ty, 11, "F2", "Total", NAVY);
+  p.textR(R - 10, ty, 12, "F2", d.total, NAVY);
+  // amount in words (left)
+  p.text(L, totalsTop + 2, 7.5, "F1", "Amount in words", MUTED);
+  let aw = totalsTop - 12;
+  for (const line of wrapLines(d.amountInWords, 9.5, 260)) {
+    p.text(L, aw, 9.5, "F2", line, INK);
+    aw -= 12;
+  }
+
+  endPage();
+  return assemblePdf(pages, logo);
 }
 
 // =====================================================================
