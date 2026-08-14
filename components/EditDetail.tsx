@@ -30,8 +30,14 @@ const STATES = [
 type Company = { name: string; regNo: string; tin: string; confirmed: boolean };
 type Contact = { email: string; address: string; postcode: string; city: string; state: string; mobile: string };
 
-const COMPANY_KEY = "sf.editDetail.company";
-const CONTACT_KEY = "sf.editDetail.contact";
+// Legacy GLOBAL keys (not namespaced per user). They leaked one member's draft
+// into every other member on the same device, so we purge them on mount and no
+// longer read/write them — drafts now live under the per-user keys below.
+const LEGACY_COMPANY_KEY = "sf.editDetail.company";
+const LEGACY_CONTACT_KEY = "sf.editDetail.contact";
+// Per-user draft keys so one account's Edit Detail never bleeds into another's.
+const companyKeyFor = (id: number | undefined | null) => `sf.editDetail.company.${id ?? "anon"}`;
+const contactKeyFor = (id: number | undefined | null) => `sf.editDetail.contact.${id ?? "anon"}`;
 const EMPTY_COMPANY: Company = { name: "", regNo: "", tin: "", confirmed: false };
 const EMPTY_CONTACT: Contact = { email: "", address: "", postcode: "", city: "", state: "", mobile: "" };
 
@@ -42,24 +48,30 @@ export default function EditDetail() {
   const [pw, setPw] = useState({ next: "", confirm: "" });
   const [companyMsg, setCompanyMsg] = useState("");
   const [contactMsg, setContactMsg] = useState("");
+  const companyKey = companyKeyFor(user?.id);
+  const contactKey = contactKeyFor(user?.id);
 
   useEffect(() => {
     try {
+      // Purge the old GLOBAL drafts that leaked one member's data into another.
+      localStorage.removeItem(LEGACY_COMPANY_KEY);
+      localStorage.removeItem(LEGACY_CONTACT_KEY);
+
       // Seed every Edit Detail field from THIS member's own account (the same
       // registration data shown in My Details): Company, Email, Phone, Address,
-      // Postcode, City, State. Any saved edit wins, but whenever a field is
-      // still empty — including old saved data that predates a field — we fall
-      // back to the account value so it transfers over automatically.
+      // Postcode, City, State. A draft this SAME member saved wins, but whenever
+      // a field is still empty we fall back to the account value so it transfers
+      // over automatically.
       const b: Record<string, string | null> = user?.billing || {};
       const acctAddress = [b.address_1, b.address_2].filter(Boolean).join(", ");
 
-      const c = JSON.parse(localStorage.getItem(COMPANY_KEY) || "null");
+      const c = JSON.parse(localStorage.getItem(companyKey) || "null");
       setCompany({
         ...EMPTY_COMPANY,
         ...(c || {}),
         name: (c && c.name) || b.company || "",
       });
-      const k = JSON.parse(localStorage.getItem(CONTACT_KEY) || "null");
+      const k = JSON.parse(localStorage.getItem(contactKey) || "null");
       setContact({
         ...EMPTY_CONTACT,
         ...(k || {}),
@@ -73,7 +85,7 @@ export default function EditDetail() {
     } catch {
       /* ignore malformed storage */
     }
-  }, [user]);
+  }, [user, companyKey, contactKey]);
 
   const companyComplete =
     company.name.trim() !== "" && company.regNo.trim() !== "" && company.tin.trim() !== "";
@@ -86,7 +98,7 @@ export default function EditDetail() {
     const next = { ...company, confirmed: true };
     setCompany(next);
     try {
-      localStorage.setItem(COMPANY_KEY, JSON.stringify(next));
+      localStorage.setItem(companyKey, JSON.stringify(next));
     } catch {
       /* ignore */
     }
@@ -181,7 +193,7 @@ export default function EditDetail() {
             return;
           }
           try {
-            localStorage.setItem(CONTACT_KEY, JSON.stringify(contact));
+            localStorage.setItem(contactKey, JSON.stringify(contact));
           } catch {
             /* ignore */
           }
