@@ -1764,7 +1764,7 @@
     const addToCart = () => {
       const q = quote();
       const collectDate = formatDate(addWorkingDays(q.collect.days));
-      const details = `${q.printing.label}, ${q.material.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${collectDate}`;
+      const details = `${q.printing.label}, ${q.material.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${(q.collect && q.collect.label) || collectDate}`;
       $("#cartPrice").textContent = money(q.total);
       $("#cartDetails").textContent = details;
       $("#cartDrawer").classList.add("is-visible");

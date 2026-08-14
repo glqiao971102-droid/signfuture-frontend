@@ -1897,7 +1897,7 @@
       const q = quote();
       const collectDate = formatDate(addWorkingDays(q.collect.days));
       const lam = q.lamination ? `, ${q.lamination.label}` : "";
-      const details = `${q.printing.label}, ${q.material.label}${lam}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${collectDate}`;
+      const details = `${q.printing.label}, ${q.material.label}${lam}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${(q.collect && q.collect.label) || collectDate}`;
       $("#cartPrice").textContent = money(q.total);
       $("#cartDetails").textContent = details;
       $("#cartDrawer").classList.add("is-visible");

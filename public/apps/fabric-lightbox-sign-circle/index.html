@@ -1819,7 +1819,7 @@
     const addToCart = () => {
       const q = quote();
       const collectDate = formatDate(addWorkingDays(q.collect.days));
-      const details = `${q.printing.label}, ${q.material.label}, Box Up ${q.boxUpSize.label}, LED ${q.led.label} (${q.ledFinishing.label}), ${q.finishing.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${collectDate}`;
+      const details = `${q.printing.label}, ${q.material.label}, Box Up ${q.boxUpSize.label}, LED ${q.led.label} (${q.ledFinishing.label}), ${q.finishing.label}, ${q.height} x ${q.width} in, ${q.quantity} pcs, ${q.artworkQty} artwork, collect ${(q.collect && q.collect.label) || collectDate}`;
       $("#cartPrice").textContent = money(q.total);
       $("#cartDetails").textContent = details;
       $("#cartDrawer").classList.add("is-visible");
