@@ -27,6 +27,44 @@ const STATES = [
   "Sabah", "Sarawak", "Selangor", "Terengganu",
 ];
 
+// Malaysian postcodes are allocated by state; the first two digits pick it out.
+// Built as a lookup on the 2-digit prefix (e.g. 46700 -> 46 -> Selangor).
+const POSTCODE_PREFIX_STATE: Record<number, string> = (() => {
+  const map: Record<number, string> = {};
+  const add = (from: number, to: number, state: string) => {
+    for (let i = from; i <= to; i++) map[i] = state;
+  };
+  add(1, 2, "Perlis");
+  add(5, 9, "Kedah");
+  add(10, 14, "Penang");
+  add(15, 18, "Kelantan");
+  add(20, 24, "Terengganu");
+  add(25, 28, "Pahang");
+  add(30, 36, "Perak");
+  map[39] = "Pahang"; // Cameron Highlands
+  add(40, 48, "Selangor");
+  map[49] = "Pahang"; // Genting Highlands (Bentong)
+  add(50, 60, "Kuala Lumpur");
+  map[62] = "Putrajaya";
+  add(63, 64, "Selangor"); // Cyberjaya
+  map[68] = "Selangor"; // Ampang / Batu Caves
+  map[69] = "Pahang"; // Genting Highlands
+  add(70, 73, "Negeri Sembilan");
+  add(75, 78, "Melaka");
+  add(79, 86, "Johor");
+  map[87] = "Labuan";
+  add(88, 91, "Sabah");
+  add(93, 98, "Sarawak");
+  return map;
+})();
+
+/** Resolves a Malaysian state from a (full, 5-digit) postcode, or "" if unknown. */
+function stateFromPostcode(postcode: string): string {
+  const digits = (postcode || "").replace(/\D/g, "");
+  if (digits.length < 5) return "";
+  return POSTCODE_PREFIX_STATE[Math.floor(parseInt(digits.slice(0, 5), 10) / 1000)] || "";
+}
+
 type Company = { name: string; regNo: string; tin: string; confirmed: boolean };
 type Contact = { email: string; address: string; postcode: string; city: string; state: string; mobile: string };
 
@@ -72,15 +110,18 @@ export default function EditDetail() {
         name: (c && c.name) || b.company || "",
       });
       const k = JSON.parse(localStorage.getItem(contactKey) || "null");
+      const seededPostcode = (k && k.postcode) || b.postcode || "";
       setContact({
         ...EMPTY_CONTACT,
         ...(k || {}),
         email: (k && k.email) || user?.email || "",
         mobile: (k && k.mobile) || user?.phone || b.phone || "",
         address: (k && k.address) || acctAddress || "",
-        postcode: (k && k.postcode) || b.postcode || "",
+        postcode: seededPostcode,
         city: (k && k.city) || b.city || "",
-        state: (k && k.state) || b.state || "",
+        // State follows the postcode; fall back to any stored state only when
+        // the postcode can't resolve one.
+        state: stateFromPostcode(seededPostcode) || (k && k.state) || b.state || "",
       });
     } catch {
       /* ignore malformed storage */
@@ -230,7 +271,13 @@ export default function EditDetail() {
               inputMode="numeric"
               maxLength={5}
               placeholder="e.g. 47500"
-              onChange={(e) => setContact({ ...contact, postcode: e.target.value.replace(/\D/g, "") })}
+              onChange={(e) => {
+                const postcode = e.target.value.replace(/\D/g, "");
+                // Auto-fill State from the postcode; keep the current state when
+                // the postcode is still incomplete / unrecognised.
+                const state = stateFromPostcode(postcode);
+                setContact((prev) => ({ ...prev, postcode, state: state || prev.state }));
+              }}
             />
           </label>
           <label>
