@@ -47,17 +47,26 @@ function collectWorkingDays(value: string, orderDate: string | null | undefined)
   return snapWorkingDays(businessDaysBetween(od, cd));
 }
 
-/** Pulls the "N working days" production time out of a line item's spec/options. */
+// The ONLY valid collect lead-times. Any day-count is normalised to one of
+// these, so the admin always shows exactly: 7 / 4 / 3 / 2 / next working days.
+function workingDaysLabel(n: number): string {
+  if (n <= 1) return "next working days";
+  const snapped = [2, 3, 4, 7].reduce((best, v) => (Math.abs(v - n) < Math.abs(best - n) ? v : best), 2);
+  return `${snapped} working days`;
+}
+
+/** Pulls the collect lead-time out of a line item's spec/options, as one of the
+ *  five valid labels (7 / 4 / 3 / 2 / next working days), or "—" if none. */
 function workingDaysOf(options: { label: string; value: string }[], orderDate?: string | null): string {
   for (const o of options) {
     const text = `${o.value} ${o.label}`;
     if (/next\s*working\s*days?/i.test(text)) return "next working days";
     const m = /(\d+)\s*working\s*days?/i.exec(text);
-    if (m) return `${m[1]} working days`;
+    if (m) return workingDaysLabel(parseInt(m[1], 10));
   }
   for (const o of options) {
     const n = collectWorkingDays(o.value, orderDate);
-    if (n != null) return n === 1 ? "next working days" : `${n} working days`;
+    if (n != null) return workingDaysLabel(n);
   }
   return "—";
 }
