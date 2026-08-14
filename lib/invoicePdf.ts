@@ -84,8 +84,8 @@ export const SIGN_FUTURE_SUPPLIER: Party = {
   tourismTax: "N/A",
   msic: "18110",
   activity: "Printing Company",
-  address: "No 9, Jalan Ida 2, Kawasan Perindustrian Desa Aman, 47000 Sungai Buloh, Selangor",
-  email: "syprinting@yahoo.com",
+  address: "9, Jalan Industri USJ 1/7, Taman Perindustrian Usj 1, 47600 Subang Jaya, Selangor",
+  email: "signfuture.industry@gmail.com",
   contact: "012-6977 362 (Whatsapp Only)",
 };
 
