@@ -16,13 +16,57 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Valid collect lead-times (working days). Older orders sometimes stored the
+// resolved collect DATE ("collect Wed, 19 Aug 2026") instead of "N working
+// days" — we derive the number from the order date → collect date, and snap it
+// to one of these so the admin always shows working days.
+const COLLECT_DAYS = [1, 2, 3, 4, 7];
+function snapWorkingDays(n: number): number {
+  return COLLECT_DAYS.reduce((best, v) => (Math.abs(v - n) < Math.abs(best - n) ? v : best), COLLECT_DAYS[0]);
+}
+// Working days (Mon–Sat; Sundays excluded) strictly after `from`, up to `to`.
+function businessDaysBetween(from: Date, to: Date): number {
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  let count = 0;
+  const d = new Date(a);
+  while (d < b) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0) count += 1;
+  }
+  return count;
+}
+/** Working days derived from a "collect <date>" in a value, or null. */
+function collectWorkingDays(value: string, orderDate: string | null | undefined): number | null {
+  const m = /collect\s+(.+)$/i.exec(value.trim());
+  if (!m) return null;
+  const od = orderDate ? new Date(orderDate) : null;
+  if (!od || Number.isNaN(od.getTime())) return null;
+  const cd = new Date(m[1].replace(/^[A-Za-z]{3,},\s*/, "").trim()); // drop leading "Wed, "
+  if (Number.isNaN(cd.getTime())) return null;
+  return snapWorkingDays(businessDaysBetween(od, cd));
+}
+
 /** Pulls the "N working days" production time out of a line item's spec/options. */
-function workingDaysOf(options: { label: string; value: string }[]): string {
+function workingDaysOf(options: { label: string; value: string }[], orderDate?: string | null): string {
   for (const o of options) {
     const m = /(\d+)\s*working\s*days?/i.exec(`${o.value} ${o.label}`);
     if (m) return `${m[1]} working days`;
   }
+  for (const o of options) {
+    const n = collectWorkingDays(o.value, orderDate);
+    if (n != null) return `${n} working days`;
+  }
   return "—";
+}
+
+/** Display an option value, rewriting a stored "collect <date>" as working days. */
+function displayOptionValue(value: string, orderDate: string | null | undefined): string {
+  if (/\d+\s*working\s*days?/i.test(value)) return value;
+  const m = /^(.*?)collect\s+.+$/i.exec(value);
+  if (!m) return value;
+  const n = collectWorkingDays(value, orderDate);
+  return n != null ? `${m[1]}collect ${n} working days` : value;
 }
 
 // Fallback labels + display order for the per-job status summary shown in the
@@ -310,7 +354,7 @@ export default function AdminOrders() {
               <div><span className="adm-key-label">Collect</span>
                 {nativeDetail.lines.map((l, i) => (
                   <span key={l.id} style={{ display: "block" }}>
-                    {nativeDetail.ref}-{i + 1} ({workingDaysOf(l.options)})
+                    {nativeDetail.ref}-{i + 1} ({workingDaysOf(l.options, nativeDetail.date)})
                   </span>
                 ))}
               </div>
@@ -359,7 +403,7 @@ export default function AdminOrders() {
                         {l.name}
                         {l.options.length > 0 && (
                           <div className="adm-line-opts">
-                            {l.options.map((o) => <span key={o.label}>{o.label}: {o.value}</span>)}
+                            {l.options.map((o) => <span key={o.label}>{o.label}: {displayOptionValue(o.value, nativeDetail.date)}</span>)}
                           </div>
                         )}
                         {l.artworkUrl && (
