@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { api, type ProfileUpdate } from "@/lib/api";
 
 /**
  * Edit Detail — the customer's registration details.
@@ -10,12 +11,12 @@ import { useAuth } from "@/components/AuthProvider";
  *   • Company (Name / Register No / TIN) — editable until the member confirms
  *     them; after that they are LOCKED and changing them needs a request
  *     (WhatsApp to the consultant).
- *   • Contact & login (password, address, postcode, city, state, mobile) —
- *     directly editable at any time.
+ *   • Contact & login (password, email, address, postcode, city, state, mobile)
+ *     — directly editable at any time.
  *
- * Demo persistence: values are stored in localStorage so the flow works without
- * a backend. Wire the two save handlers to real profile endpoints for
- * production (the password field never persists locally).
+ * Everything is persisted to the member's own account via PATCH /api/v1/profile
+ * (WordPress users + usermeta). There is NO browser-local storage, so the data
+ * is the single source of truth and follows the member across every device.
  */
 
 // "Request to change" for the locked company details goes to the consultant.
@@ -68,82 +69,81 @@ function stateFromPostcode(postcode: string): string {
 type Company = { name: string; regNo: string; tin: string; confirmed: boolean };
 type Contact = { email: string; address: string; postcode: string; city: string; state: string; mobile: string };
 
-// Legacy GLOBAL keys (not namespaced per user). They leaked one member's draft
-// into every other member on the same device, so we purge them on mount and no
-// longer read/write them — drafts now live under the per-user keys below.
-const LEGACY_COMPANY_KEY = "sf.editDetail.company";
-const LEGACY_CONTACT_KEY = "sf.editDetail.contact";
-// Per-user draft keys so one account's Edit Detail never bleeds into another's.
-const companyKeyFor = (id: number | undefined | null) => `sf.editDetail.company.${id ?? "anon"}`;
-const contactKeyFor = (id: number | undefined | null) => `sf.editDetail.contact.${id ?? "anon"}`;
 const EMPTY_COMPANY: Company = { name: "", regNo: "", tin: "", confirmed: false };
 const EMPTY_CONTACT: Contact = { email: "", address: "", postcode: "", city: "", state: "", mobile: "" };
 
 export default function EditDetail() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [company, setCompany] = useState<Company>(EMPTY_COMPANY);
   const [contact, setContact] = useState<Contact>(EMPTY_CONTACT);
   const [pw, setPw] = useState({ next: "", confirm: "" });
   const [companyMsg, setCompanyMsg] = useState("");
   const [contactMsg, setContactMsg] = useState("");
-  const companyKey = companyKeyFor(user?.id);
-  const contactKey = contactKeyFor(user?.id);
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
 
+  // One-time cleanup: remove any drafts left by the old localStorage version so
+  // no stale (or previously-leaked) local data lingers on the device.
   useEffect(() => {
     try {
-      // Purge the old GLOBAL drafts that leaked one member's data into another.
-      localStorage.removeItem(LEGACY_COMPANY_KEY);
-      localStorage.removeItem(LEGACY_CONTACT_KEY);
-
-      // Seed every Edit Detail field from THIS member's own account (the same
-      // registration data shown in My Details): Company, Email, Phone, Address,
-      // Postcode, City, State. A draft this SAME member saved wins, but whenever
-      // a field is still empty we fall back to the account value so it transfers
-      // over automatically.
-      const b: Record<string, string | null> = user?.billing || {};
-      const acctAddress = [b.address_1, b.address_2].filter(Boolean).join(", ");
-
-      const c = JSON.parse(localStorage.getItem(companyKey) || "null");
-      setCompany({
-        ...EMPTY_COMPANY,
-        ...(c || {}),
-        name: (c && c.name) || b.company || "",
-      });
-      const k = JSON.parse(localStorage.getItem(contactKey) || "null");
-      const seededPostcode = (k && k.postcode) || b.postcode || "";
-      setContact({
-        ...EMPTY_CONTACT,
-        ...(k || {}),
-        email: (k && k.email) || user?.email || "",
-        mobile: (k && k.mobile) || user?.phone || b.phone || "",
-        address: (k && k.address) || acctAddress || "",
-        postcode: seededPostcode,
-        city: (k && k.city) || b.city || "",
-        // State follows the postcode; fall back to any stored state only when
-        // the postcode can't resolve one.
-        state: stateFromPostcode(seededPostcode) || (k && k.state) || b.state || "",
-      });
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("sf.editDetail"))
+        .forEach((k) => localStorage.removeItem(k));
     } catch {
-      /* ignore malformed storage */
+      /* ignore */
     }
-  }, [user, companyKey, contactKey]);
+  }, []);
+
+  // Seed every field from THIS member's own account (the single source of
+  // truth). Re-runs after a save refreshes `user`, so the form reflects what
+  // was actually stored.
+  useEffect(() => {
+    const b: Record<string, string | null> = user?.billing || {};
+    const acctAddress = [b.address_1, b.address_2].filter(Boolean).join(", ");
+    const postcode = b.postcode || "";
+    setCompany({
+      name: b.company || "",
+      regNo: user?.company?.regNo || "",
+      tin: user?.company?.tin || "",
+      confirmed: !!user?.company?.confirmed,
+    });
+    setContact({
+      email: user?.email || "",
+      address: acctAddress,
+      postcode,
+      city: b.city || "",
+      // State follows the postcode; fall back to the stored state when the
+      // postcode can't resolve one.
+      state: stateFromPostcode(postcode) || b.state || "",
+      mobile: user?.phone || b.phone || "",
+    });
+  }, [user]);
 
   const companyComplete =
     company.name.trim() !== "" && company.regNo.trim() !== "" && company.tin.trim() !== "";
 
-  function confirmCompany() {
+  async function confirmCompany() {
     if (!companyComplete) {
       setCompanyMsg("Please fill in all company fields first.");
       return;
     }
-    const next = { ...company, confirmed: true };
-    setCompany(next);
+    setSavingCompany(true);
+    setCompanyMsg("");
     try {
-      localStorage.setItem(companyKey, JSON.stringify(next));
-    } catch {
-      /* ignore */
+      await api.updateProfile({
+        companyName: company.name.trim(),
+        companyRegNo: company.regNo.trim(),
+        companyTin: company.tin.trim(),
+        companyConfirmed: true,
+      });
+      await refresh();
+      setCompany((c) => ({ ...c, confirmed: true }));
+      setCompanyMsg("Company details confirmed and locked.");
+    } catch (err) {
+      setCompanyMsg(err instanceof Error ? err.message : "Could not save company details.");
+    } finally {
+      setSavingCompany(false);
     }
-    setCompanyMsg("Company details confirmed and locked.");
   }
 
   function requestCompanyChange() {
@@ -151,6 +151,44 @@ export default function EditDetail() {
       `Hi, I'm member ${user?.memberNo ?? ""}. I'd like to request a change to my company details (Name / Register No / TIN).`,
     );
     window.open(`https://api.whatsapp.com/send?phone=${CONSULTANT_WA}&text=${text}`, "_blank", "noopener");
+  }
+
+  async function saveContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contact.email.trim()) {
+      setContactMsg("Email can't be empty.");
+      return;
+    }
+    if (pw.next && pw.next.length < 6) {
+      setContactMsg("Password must be at least 6 characters.");
+      return;
+    }
+    if (pw.next && pw.next !== pw.confirm) {
+      setContactMsg("Passwords do not match.");
+      return;
+    }
+    setSavingContact(true);
+    setContactMsg("");
+    try {
+      const patch: ProfileUpdate = {
+        email: contact.email.trim(),
+        phone: contact.mobile.trim(),
+        address: contact.address.trim(),
+        postcode: contact.postcode.trim(),
+        city: contact.city.trim(),
+        state: contact.state.trim(),
+      };
+      if (pw.next) patch.password = pw.next;
+      await api.updateProfile(patch);
+      await refresh();
+      const hadPw = pw.next.length > 0;
+      setPw({ next: "", confirm: "" });
+      setContactMsg(hadPw ? "Details and password updated." : "Details updated.");
+    } catch (err) {
+      setContactMsg(err instanceof Error ? err.message : "Could not save your details.");
+    } finally {
+      setSavingContact(false);
+    }
   }
 
   return (
@@ -213,10 +251,10 @@ export default function EditDetail() {
               <button
                 type="button"
                 className="hero-btn primary"
-                disabled={!companyComplete}
+                disabled={!companyComplete || savingCompany}
                 onClick={confirmCompany}
               >
-                Confirm company details
+                {savingCompany ? "Saving…" : "Confirm company details"}
               </button>
             </>
           )}
@@ -225,24 +263,7 @@ export default function EditDetail() {
       </div>
 
       {/* Contact & login — directly editable */}
-      <form
-        className="edit-detail-block"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (pw.next && pw.next !== pw.confirm) {
-            setContactMsg("Passwords do not match.");
-            return;
-          }
-          try {
-            localStorage.setItem(contactKey, JSON.stringify(contact));
-          } catch {
-            /* ignore */
-          }
-          const hadPw = pw.next.length > 0;
-          setPw({ next: "", confirm: "" });
-          setContactMsg(hadPw ? "Details and password updated." : "Details updated.");
-        }}
-      >
+      <form className="edit-detail-block" onSubmit={saveContact}>
         <div className="edit-detail-block-head">
           <h3>Contact &amp; Login</h3>
         </div>
@@ -330,8 +351,8 @@ export default function EditDetail() {
           </label>
         </div>
         <div className="edit-detail-actions">
-          <button type="submit" className="hero-btn primary">
-            Save changes
+          <button type="submit" className="hero-btn primary" disabled={savingContact}>
+            {savingContact ? "Saving…" : "Save changes"}
           </button>
           {contactMsg && <p className="edit-detail-msg">{contactMsg}</p>}
         </div>

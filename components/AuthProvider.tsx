@@ -71,6 +71,7 @@ const PREVIEW_USER: Member = {
   phone: "+60 12-345 6789",
   billing: {},
   shipping: {},
+  company: { regNo: null, tin: null, confirmed: false },
   stats: { orderCount: 12, totalSpent: 8500 },
   referralCode: null,
   referredBy: null,

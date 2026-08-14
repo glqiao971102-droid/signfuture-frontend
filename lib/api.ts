@@ -38,6 +38,8 @@ export type MemberProfile = {
   phone: string | null;
   billing: Record<string, string | null>;
   shipping: Record<string, string | null>;
+  /** Company registration details shown on Edit Detail (locked once confirmed). */
+  company: { regNo: string | null; tin: string | null; confirmed: boolean };
   /** Lifetime order count and spend; null for members who never ordered. */
   stats: { orderCount: number; totalSpent: number } | null;
   /** This account's own referral code (admins only), else null. */
@@ -48,6 +50,21 @@ export type MemberProfile = {
   upline?: { id: number; name: string; phone: string | null } | null;
   /** Trades the member selected at sign-up (may be empty). */
   professions: string[];
+};
+
+/** Partial member self-update (Edit Detail). Only provided fields are saved. */
+export type ProfileUpdate = {
+  email?: string;
+  phone?: string;
+  address?: string;
+  postcode?: string;
+  city?: string;
+  state?: string;
+  companyName?: string;
+  companyRegNo?: string;
+  companyTin?: string;
+  companyConfirmed?: boolean;
+  password?: string;
 };
 
 /** Trades offered at registration (mirrors the backend PROFESSIONS list). */
@@ -376,6 +393,18 @@ export const api = {
 
   me() {
     return request<MemberProfile>("/api/v1/auth/me");
+  },
+
+  /**
+   * Updates the signed-in member's own Edit Detail. Only the provided fields
+   * are written; returns the fresh profile. Persisted to the account, so it
+   * follows the member across every device.
+   */
+  updateProfile(patch: ProfileUpdate) {
+    return request<MemberProfile>("/api/v1/profile", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
   },
 
   // ----- Agent (proxy) login -----
