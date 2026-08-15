@@ -899,15 +899,20 @@ export const api = {
   },
 
   adminAdjustWallet(body: {
-    userId: number;
+    email?: string;
+    userId?: number;
     amount: number;
     type: "credit" | "debit";
     reason: string;
   }) {
-    return request<{ success: boolean; transactionId: number; balance: number }>(
-      "/api/v1/admin/wallet/adjust",
-      { method: "POST", body: JSON.stringify(body) },
-    );
+    return request<{
+      success: boolean;
+      transactionId: number;
+      balance: number;
+      userId: number;
+      email: string;
+      name: string;
+    }>("/api/v1/admin/wallet/adjust", { method: "POST", body: JSON.stringify(body) });
   },
 
   // ----- Admin: invoices, coupons -----

@@ -25,8 +25,8 @@ export default function AdminWallet() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Adjustment form
-  const [userId, setUserId] = useState("");
+  // Adjustment form — target the customer by email.
+  const [email, setEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"credit" | "debit">("credit");
   const [reason, setReason] = useState("");
@@ -54,17 +54,17 @@ export default function AdminWallet() {
     e.preventDefault();
     setResult(null);
     setFormError(null);
-    const uid = Number(userId);
+    const mail = email.trim();
     const amt = Number(amount);
-    if (!Number.isInteger(uid) || uid <= 0) return setFormError("Enter a valid user ID.");
+    if (!mail || !mail.includes("@")) return setFormError("Enter a valid customer email.");
     if (!(amt > 0)) return setFormError("Amount must be greater than 0.");
     if (!reason.trim()) return setFormError("A reason is required for the audit trail.");
 
     setSubmitting(true);
     try {
-      const r = await api.adminAdjustWallet({ userId: uid, amount: amt, type, reason: reason.trim() });
+      const r = await api.adminAdjustWallet({ email: mail, amount: amt, type, reason: reason.trim() });
       setResult(
-        `${type === "credit" ? "Credited" : "Debited"} RM ${money(amt)} to user #${uid}. New balance: RM ${money(r.balance)}.`,
+        `${type === "credit" ? "Credited" : "Debited"} RM ${money(amt)} to ${r.name} (${r.email}). New balance: RM ${money(r.balance)}.`,
       );
       setAmount("");
       setReason("");
@@ -109,13 +109,14 @@ export default function AdminWallet() {
           </p>
           <form onSubmit={submitAdjust} className="adm-adjust-form">
             <label className="adm-modal-field">
-              <span>User ID</span>
+              <span>Customer email</span>
               <input
-                type="number"
-                min={1}
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="e.g. 12"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. customer@email.com"
+                autoCapitalize="none"
+                autoCorrect="off"
               />
             </label>
             <label className="adm-modal-field">
