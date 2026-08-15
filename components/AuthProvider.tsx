@@ -425,9 +425,11 @@ function LoginModal({
     }
   }
 
+  // Clicking the dark backdrop must NOT close the dialog — users were losing a
+  // half-filled form by mis-clicking outside. Only the × button closes it.
   return (
-    <div className="login-overlay" onClick={onClose}>
-      <div className="login-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="login-overlay">
+      <div className="login-modal">
         <button type="button" className="login-close" onClick={onClose} aria-label="Close">
           ×
         </button>
