@@ -33,7 +33,13 @@ const ADDR_KEY = "sign-studio-addresses";
 export default function CartPage() {
   const router = useRouter();
   const { items, count, setQty, setArtworks, remove, clear } = useCart();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
+
+  // Pull the member's CURRENT tier on entry so prices track their live tier.
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The customer always pays their OWN member tier's price — no choosing a
   // different tier at checkout. Tier index: Agent 0 (guests) … Diamond 3.

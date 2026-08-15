@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import { useCart, formatRM } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { api, ApiError } from "@/lib/api";
+import { tierIndex } from "@/lib/tier";
 
 const CHECKOUT_KEY = "sign-studio-checkout";
 
@@ -78,6 +79,10 @@ export default function CheckoutPage() {
       /* ignore */
     }
     setLoaded(true);
+    // Pull the member's CURRENT tier so checkout always prices at their live
+    // tier — not a stale value cached when the cart was built.
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const MIN_ORDER = 15; // RM — minimum spend per order
@@ -141,7 +146,9 @@ export default function CheckoutPage() {
         collectDate,
         paymentMethod,
         voucherCode: voucherCode || undefined,
-        tier: order.tier,
+        // Always the member's LIVE tier (server also clamps to what they
+        // actually qualify for), so the price follows their current tier.
+        tier: tierIndex(user.tier),
         // Order-level artwork = every line's files, so staff can review them all.
         artworks: artworks.length ? artworks : undefined,
       });
