@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { api, ApiError, submitToGateway, type PaymentProvider } from "@/lib/api";
+import { api, ApiError, submitToGateway, type PaymentProvider, type MemberTier } from "@/lib/api";
+import { tierIndex } from "@/lib/tier";
 
-// Highest qualifying tier first.
+// Highest qualifying tier first. `min` matches the backend thresholds; a top-up
+// below Silver drops the member to Agent (no tier / base price).
 const TIERS = [
   { name: "Diamond", min: 10000, save: "80%" },
   { name: "Gold", min: 5000, save: "60%" },
-  { name: "Silver", min: 1000, save: "50%" },
+  { name: "Silver", min: 2000, save: "50%" },
 ];
 
 /** iPay88's own minimum test transaction is MYR 1.00. */
@@ -46,6 +48,20 @@ export default function CustomTopUp() {
     if (num < MIN_TOPUP) {
       setError(`Please enter at least RM ${MIN_TOPUP.toFixed(2)}.`);
       return;
+    }
+
+    // Your tier follows this top-up: warn before a top-up that would LOWER it
+    // (e.g. a Diamond topping up below RM10,000). A locked tier is protected,
+    // so no warning while a lock is active.
+    const newName = (TIERS.find((t) => num >= t.min)?.name ?? null) as MemberTier | null;
+    if (!user.tierLock && tierIndex(newName) < tierIndex(user.tier)) {
+      const to = newName ?? "Agent (no tier — base price)";
+      const ok = window.confirm(
+        `Heads up: your membership is currently ${user.tier}.\n\n` +
+          `Topping up RM ${num.toLocaleString("en-MY")} will lower it to ${to}, ` +
+          `because your tier follows your latest top-up.\n\nContinue with this top-up?`,
+      );
+      if (!ok) return;
     }
 
     setBusy(true);
@@ -94,7 +110,7 @@ export default function CustomTopUp() {
           </>
         ) : (
           <>
-            <strong>RM {num.toLocaleString("en-MY")}</strong> — top up RM 1,000 or more
+            <strong>RM {num.toLocaleString("en-MY")}</strong> — top up RM 2,000 or more
             to unlock <strong>Silver</strong> tier benefits.
           </>
         )}
