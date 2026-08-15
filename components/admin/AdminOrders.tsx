@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type AdminOrderRow, type OrderDetail, type NativeOrderDetail } from "@/lib/api";
+import AdminReloads from "@/components/admin/AdminReloads";
 
 const PER_PAGE = 25;
 
@@ -112,6 +113,7 @@ function stageClass(stage: string): string {
 }
 
 export default function AdminOrders() {
+  const [view, setView] = useState<"orders" | "reloads">("orders");
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [statuses, setStatuses] = useState<{ value: string; label: string }[]>([]);
   const [page, setPage] = useState(1);
@@ -233,8 +235,37 @@ export default function AdminOrders() {
     }
   }
 
+  const viewTabs = (
+    <div className="adm-radio-row" style={{ marginBottom: 12 }}>
+      <button
+        type="button"
+        className={`adm-filter${view === "orders" ? " is-active" : ""}`}
+        onClick={() => setView("orders")}
+      >
+        Orders
+      </button>
+      <button
+        type="button"
+        className={`adm-filter${view === "reloads" ? " is-active" : ""}`}
+        onClick={() => setView("reloads")}
+      >
+        Reloads
+      </button>
+    </div>
+  );
+
+  if (view === "reloads") {
+    return (
+      <div className="adm-wrap">
+        {viewTabs}
+        <AdminReloads />
+      </div>
+    );
+  }
+
   return (
     <div className="adm-wrap">
+      {viewTabs}
       <div className="adm-toolbar">
         <input
           className="adm-search"

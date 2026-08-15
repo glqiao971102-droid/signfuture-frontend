@@ -773,6 +773,26 @@ export const api = {
     );
   },
 
+  /** Reload (top-up) reconciliation list — Pending Confirmation → Collected. */
+  adminReloads(
+    opts: { page?: number; perPage?: number; status?: "pending" | "collected"; search?: string } = {},
+  ) {
+    const qs = new URLSearchParams();
+    if (opts.page) qs.set("page", String(opts.page));
+    if (opts.perPage) qs.set("perPage", String(opts.perPage));
+    if (opts.status) qs.set("status", opts.status);
+    if (opts.search) qs.set("search", opts.search);
+    return request<{ data: AdminReloadRow[]; meta: PagedMeta }>(`/api/v1/admin/reloads?${qs}`);
+  },
+
+  /** Mark a reload Collected (money verified in the bank), or undo it. */
+  adminSetReloadCollected(id: number, collected: boolean) {
+    return request<{ success: boolean; collected: boolean; status: string }>(
+      `/api/v1/admin/reloads/${id}/collect`,
+      { method: "PATCH", body: JSON.stringify({ collected }) },
+    );
+  },
+
   adminNativeStatuses() {
     return request<{ data: { value: string; label: string }[] }>(
       "/api/v1/admin/orders/native/statuses",
@@ -1000,6 +1020,23 @@ export type AdminOrderRow = OrderSummary & {
   ref?: string;
   /** Per-job statuses (native orders) so the list can show the mix. */
   jobStatuses?: string[];
+};
+
+/** A reload (top-up) slip in the admin reconciliation list. */
+export type AdminReloadRow = {
+  id: number;
+  refNo: string;
+  userId: number;
+  customer: string;
+  email: string | null;
+  amount: number;
+  currency: string;
+  provider: string;
+  date: string | null;
+  collected: boolean;
+  collectedAt: string | null;
+  status: string;
+  statusLabel: string;
 };
 
 export type NativeOrderRow = {
