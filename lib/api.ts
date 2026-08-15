@@ -40,6 +40,8 @@ export type MemberProfile = {
   shipping: Record<string, string | null>;
   /** Company registration details shown on Edit Detail (locked once confirmed). */
   company: { regNo: string | null; tin: string | null; confirmed: boolean };
+  /** Admin-locked tier held until a date (yyyy-MM-dd), overriding top-ups. */
+  tierLock: { tier: string; until: string | null } | null;
   /** Lifetime order count and spend; null for members who never ordered. */
   stats: { orderCount: number; totalSpent: number } | null;
   /** This account's own referral code (admins only), else null. */
@@ -829,10 +831,19 @@ export const api = {
     );
   },
 
-  adminUpdateUserTier(id: number, tier: "Silver" | "Gold" | "Diamond" | "customer") {
+  /**
+   * Change a member's tier. Pass `until` (yyyy-MM-dd) to LOCK the tier until
+   * that date (top-ups can't change it); omit it for a plain change the
+   * member's next qualifying top-up can override.
+   */
+  adminUpdateUserTier(
+    id: number,
+    tier: "Silver" | "Gold" | "Diamond" | "customer",
+    until?: string,
+  ) {
     return request<{ success: boolean; tier: string | null }>(
       `/api/v1/admin/users/${id}/tier`,
-      { method: "PATCH", body: JSON.stringify({ tier }) },
+      { method: "PATCH", body: JSON.stringify(until ? { tier, until } : { tier }) },
     );
   },
 

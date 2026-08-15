@@ -34,6 +34,8 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
 
   const [savingTier, setSavingTier] = useState(false);
   const [tierMsg, setTierMsg] = useState<string | null>(null);
+  // Optional "keep this tier until" date — locks the tier over top-ups.
+  const [lockUntil, setLockUntil] = useState("");
 
   // Editable contact details (name / email / phone).
   const [editing, setEditing] = useState(false);
@@ -145,8 +147,16 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
     setSavingTier(true);
     setTierMsg(null);
     try {
-      const r = await api.adminUpdateUserTier(id, tier);
-      setTierMsg(`Updated to ${r.tier ?? "no tier"}.`);
+      // A date locks the tier until then (top-ups can't change it); no date is a
+      // plain change the member's next qualifying top-up can override.
+      const until = tier !== "customer" && lockUntil ? lockUntil : undefined;
+      const r = await api.adminUpdateUserTier(id, tier, until);
+      setTierMsg(
+        until
+          ? `Locked at ${r.tier ?? "no tier"} until ${until}.`
+          : `Updated to ${r.tier ?? "no tier"}. (Their next top-up can change this.)`,
+      );
+      setLockUntil("");
       await load();
     } catch (err) {
       setTierMsg(err instanceof Error ? err.message : "Could not change tier");
@@ -305,6 +315,25 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
               </button>
             ))}
           </div>
+          <label className="adm-tier-lock">
+            <span>Keep this tier until (optional)</span>
+            <input
+              type="date"
+              value={lockUntil}
+              disabled={savingTier}
+              onChange={(e) => setLockUntil(e.target.value)}
+            />
+          </label>
+          <em className="adm-card-sub">
+            With a date, the tier is locked until then — top-ups can’t change it. Without a date,
+            the member’s next qualifying top-up (RM2,000 Silver / RM5,000 Gold / RM10,000 Diamond) sets their tier.
+          </em>
+          {profile.tierLock && (
+            <em className="adm-card-sub">
+              🔒 Currently locked at <strong>{profile.tierLock.tier}</strong>
+              {profile.tierLock.until ? ` until ${profile.tierLock.until}` : ""}.
+            </em>
+          )}
           {tierMsg && <em className="adm-card-sub">{tierMsg}</em>}
         </div>
 

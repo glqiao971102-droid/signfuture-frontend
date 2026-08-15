@@ -9,7 +9,7 @@ import type { MemberTier } from "@/lib/api";
 export const TIER_LABELS = ["Agent", "Silver", "Gold", "Diamond"] as const;
 
 /** Top-up needed to REACH each tier (matches the backend membership thresholds). */
-export const TIER_THRESHOLD: Record<string, number> = { Silver: 1000, Gold: 5000, Diamond: 10000 };
+export const TIER_THRESHOLD: Record<string, number> = { Silver: 2000, Gold: 5000, Diamond: 10000 };
 
 export function tierIndex(tier: MemberTier | null | undefined): number {
   if (tier === "Silver") return 1;

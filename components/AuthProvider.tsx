@@ -72,6 +72,7 @@ const PREVIEW_USER: Member = {
   billing: {},
   shipping: {},
   company: { regNo: null, tin: null, confirmed: false },
+  tierLock: null,
   stats: { orderCount: 12, totalSpent: 8500 },
   referralCode: null,
   referredBy: null,
