@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type AdminOrderRow, type OrderDetail, type NativeOrderDetail } from "@/lib/api";
-import AdminReloads from "@/components/admin/AdminReloads";
 
 const PER_PAGE = 25;
 
@@ -113,8 +112,8 @@ function stageClass(stage: string): string {
 }
 
 export default function AdminOrders() {
-  const [view, setView] = useState<"orders" | "reloads">("orders");
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
+  const [savingReloadId, setSavingReloadId] = useState<number | null>(null);
   const [statuses, setStatuses] = useState<{ value: string; label: string }[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -235,37 +234,34 @@ export default function AdminOrders() {
     }
   }
 
-  const viewTabs = (
-    <div className="adm-radio-row" style={{ marginBottom: 12 }}>
-      <button
-        type="button"
-        className={`adm-filter${view === "orders" ? " is-active" : ""}`}
-        onClick={() => setView("orders")}
-      >
-        Orders
-      </button>
-      <button
-        type="button"
-        className={`adm-filter${view === "reloads" ? " is-active" : ""}`}
-        onClick={() => setView("reloads")}
-      >
-        Reloads
-      </button>
-    </div>
-  );
-
-  if (view === "reloads") {
-    return (
-      <div className="adm-wrap">
-        {viewTabs}
-        <AdminReloads />
-      </div>
-    );
+  // Reload rows: toggle Collected (bookkeeping only — the wallet is untouched).
+  async function collectReload(o: AdminOrderRow) {
+    if (savingReloadId) return;
+    setSavingReloadId(o.id);
+    try {
+      const next = !o.collected;
+      await api.adminSetReloadCollected(o.id, next);
+      setRows((rs) =>
+        rs.map((x) =>
+          x.source === "reload" && x.id === o.id
+            ? {
+                ...x,
+                collected: next,
+                status: next ? "collection" : "pending_confirmation",
+                statusLabel: next ? "Collected" : "Pending Confirmation",
+              }
+            : x,
+        ),
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update the reload");
+    } finally {
+      setSavingReloadId(null);
+    }
   }
 
   return (
     <div className="adm-wrap">
-      {viewTabs}
       <div className="adm-toolbar">
         <input
           className="adm-search"
@@ -325,8 +321,9 @@ export default function AdminOrders() {
             {rows.map((o) => (
               <tr key={`${o.source ?? "legacy"}-${o.id}`}>
                 <td className="adm-mono">
-                  {o.source === "native" ? o.ref : `#${o.id}`}
+                  {o.source === "reload" ? `RL-${o.id}` : o.source === "native" ? o.ref : `#${o.id}`}
                   {o.source === "native" && <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span>}
+                  {o.source === "reload" && <span className="adm-chip adm-chip-member adm-new-badge">RELOAD</span>}
                 </td>
                 <td>
                   {o.customerId ? (
@@ -345,18 +342,37 @@ export default function AdminOrders() {
                         .join(" · ")}
                     </span>
                   ) : (
-                    <span className={o.source === "native" ? "adm-chip adm-chip-member" : stageClass(o.stage)}>
+                    <span
+                      className={
+                        o.source === "reload"
+                          ? `adm-chip ${o.collected ? "adm-stage-completed" : "adm-chip-member"}`
+                          : o.source === "native"
+                            ? "adm-chip adm-chip-member"
+                            : stageClass(o.stage)
+                      }
+                    >
                       {o.statusLabel}
                     </span>
                   )}
                 </td>
                 <td className="adm-num adm-mono">{money(o.total)}</td>
-                <td className="adm-num">{o.itemCount}</td>
+                <td className="adm-num">{o.source === "reload" ? "—" : o.itemCount}</td>
                 <td className="adm-date">{formatDate(o.date)}</td>
                 <td>
-                  <button type="button" className="adm-edit-link" onClick={() => openDetail(o)}>
-                    View →
-                  </button>
+                  {o.source === "reload" ? (
+                    <button
+                      type="button"
+                      className={`adm-filter${o.collected ? "" : " is-active"}`}
+                      disabled={savingReloadId === o.id}
+                      onClick={() => collectReload(o)}
+                    >
+                      {savingReloadId === o.id ? "Saving…" : o.collected ? "Undo" : "✓ Collected"}
+                    </button>
+                  ) : (
+                    <button type="button" className="adm-edit-link" onClick={() => openDetail(o)}>
+                      View →
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

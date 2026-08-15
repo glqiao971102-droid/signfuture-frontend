@@ -1016,10 +1016,12 @@ export const api = {
 export type AdminOrderRow = OrderSummary & {
   customer: string;
   customerId: number | null;
-  source?: "native" | "legacy";
+  source?: "native" | "legacy" | "reload";
   ref?: string;
   /** Per-job statuses (native orders) so the list can show the mix. */
   jobStatuses?: string[];
+  /** Reload rows only: whether the top-up has been marked Collected. */
+  collected?: boolean;
 };
 
 /** A reload (top-up) slip in the admin reconciliation list. */
