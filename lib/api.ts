@@ -1128,6 +1128,13 @@ export type AdminStats = {
   range?: { from: string | null; to: string | null };
   /** Membership tier headcount, ordered high → low. */
   tiers: { tier: string; members: number }[];
+  /** Wallet reloads (member top-ups) in the range + the biggest reloaders. */
+  reloads: {
+    users: number;
+    count: number;
+    amount: number;
+    top: { name: string; email: string | null; reloads: number; amount: number }[];
+  };
 };
 
 export type AdminProductRow = {

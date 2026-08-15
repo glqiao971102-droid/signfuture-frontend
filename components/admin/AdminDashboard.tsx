@@ -161,6 +161,11 @@ export default function AdminDashboard() {
         <Kpi label="Items sold" value={k.itemsSold.toLocaleString()} />
         <Kpi label="Customers" value={k.customers.toLocaleString()} />
         <Kpi
+          label="Users reloaded"
+          value={(data.reloads?.users ?? 0).toLocaleString()}
+          hint="Members who topped up in this range"
+        />
+        <Kpi
           label="Wallet balances owed"
           value={rm(k.walletLiability)}
           hint="Outstanding member wallet credit"
@@ -257,6 +262,42 @@ export default function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {/* ---- Reloads (wallet top-ups) ---- */}
+        <section className="adm-card">
+          <h2>Reloads (top-ups)</h2>
+          <div className="dash-status-list">
+            <div className="dash-status-row">
+              <span className="dash-status-name">Users reloaded</span>
+              <span className="dash-status-count">{(data.reloads?.users ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="dash-status-row">
+              <span className="dash-status-name">Reloads</span>
+              <span className="dash-status-count">{(data.reloads?.count ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="dash-status-row">
+              <span className="dash-status-name">Total reloaded</span>
+              <span className="dash-status-rev">{rm(data.reloads?.amount ?? 0)}</span>
+            </div>
+          </div>
+          {data.reloads?.top?.length ? (
+            <div className="dash-rank" style={{ marginTop: 12 }}>
+              {data.reloads.top.map((c, i) => (
+                <div className="dash-rank-row" key={i}>
+                  <div className="dash-rank-main">
+                    <span className="dash-rank-name">{c.name}</span>
+                    <span className="dash-rank-sub">
+                      {c.reloads.toLocaleString()} reload{c.reloads === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <span className="dash-rank-value">{rm(c.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="adm-card-sub" style={{ marginTop: 8 }}>No reloads in this range.</p>
+          )}
+        </section>
 
         {/* ---- Recent orders ---- */}
         <section className="adm-card dash-recent">
