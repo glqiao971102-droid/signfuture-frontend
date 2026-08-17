@@ -24,6 +24,8 @@ export type CartItem = {
   spec?: Record<string, unknown>;
   /** Artwork files the customer attached to this line (saved on the server). */
   artworks?: { url: string; name: string }[];
+  /** True for stock items (e.g. Materials) that don't need an artwork upload. */
+  noArtwork?: boolean;
   /**
    * True when this line is a special request (e.g. an express collect date) that
    * needs sales approval — it becomes a Pending Confirmation job at checkout.
@@ -31,7 +33,7 @@ export type CartItem = {
   requiresConfirmation?: boolean;
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[]; requiresConfirmation?: boolean };
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[]; noArtwork?: boolean; requiresConfirmation?: boolean };
 
 type CartContextValue = {
   items: CartItem[];
@@ -76,6 +78,7 @@ function normalizeItems(raw: string | null): CartItem[] {
         tierPrices: Array.isArray(i.tierPrices) ? i.tierPrices : undefined,
         spec: i.spec && typeof i.spec === "object" ? i.spec : undefined,
         artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
+        noArtwork: i.noArtwork || undefined,
         requiresConfirmation: i.requiresConfirmation || undefined,
       };
       return { id: i.id ?? signatureOf(base), ...base };
@@ -173,6 +176,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           tierPrices: Array.isArray(item.tierPrices) ? item.tierPrices : undefined,
           spec: item.spec && typeof item.spec === "object" ? item.spec : undefined,
           artworks,
+          noArtwork: item.noArtwork || undefined,
           requiresConfirmation: item.requiresConfirmation || undefined,
         },
       ];

@@ -321,6 +321,7 @@ export default function CartPage() {
                       <Link href={item.href} className="cart-prod-title">{item.label}</Link>
                       {item.meta && <span className="cart-prod-meta">{item.meta}</span>}
 
+                      {!item.noArtwork && (
                       <div className="cart-art">
                         {item.artworks && item.artworks.length > 0 ? (
                           <>
@@ -349,6 +350,7 @@ export default function CartPage() {
                           </>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
 

@@ -49,6 +49,7 @@ export default function PowerSupplyProduct() {
       image: HERO_IMAGE,
       deliverable: true,
       tierPrices: tierTotals,
+      noArtwork: true,
       meta: `Material: Power Supply · Type: ${typeLabel} · Qty: ${qty}`,
     });
     setAdded(true);
