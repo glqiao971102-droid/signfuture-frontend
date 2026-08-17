@@ -363,7 +363,7 @@ export const PRODUCT_MENU: ProductMenuItem[] = [
       { label: "6mm Neon Silicone Rubber (Roll)", href: "/catalog/6mm-neon-silicone-rubber-roll", available: false },
       { label: "Neon Cutter", href: "/catalog/neon-cutter", available: false },
       { label: "Router Bit & Collet", href: "/catalog/router-bit-collet", available: false },
-      { label: "Power Supply", href: "/catalog/power-supply", available: false },
+      { label: "Power Supply", href: "/catalog/power-supply", available: true },
     ],
   },
 ];
