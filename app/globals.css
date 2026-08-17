@@ -5227,6 +5227,23 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-stage-completed  { background: rgba(122, 224, 164, 0.16); color: var(--green); }
 .adm-stage-cancelled  { background: rgba(255, 120, 120, 0.16); color: #ff9b9b; }
 
+/* Native job-status chips — one chip per distinct status, coloured per status
+   so the list is scannable (Waiting / Processing / Cancelled …). */
+.adm-jstats { display: flex; flex-wrap: wrap; gap: 4px; }
+.adm-jstat-waiting              { background: rgba(255, 209, 102, 0.18); color: var(--amber); }
+.adm-jstat-pending_confirmation { background: rgba(185, 140, 255, 0.18); color: #c4a4ff; }
+.adm-jstat-on_hold              { background: rgba(255, 154, 95, 0.18);  color: #ffb083; }
+.adm-jstat-processing           { background: rgba(53, 216, 255, 0.14);  color: var(--cyan); }
+.adm-jstat-production           { background: rgba(122, 162, 255, 0.16); color: var(--blue); }
+.adm-jstat-ready                { background: rgba(63, 224, 200, 0.16);  color: #56e6cd; }
+.adm-jstat-collection           { background: rgba(122, 224, 164, 0.16); color: var(--green); }
+.adm-jstat-delivery             { background: rgba(236, 130, 255, 0.16); color: #f08cff; }
+.adm-jstat-delivered            { background: rgba(122, 224, 164, 0.16); color: var(--green); }
+.adm-jstat-completed            { background: rgba(122, 224, 164, 0.16); color: var(--green); }
+.adm-jstat-cancelled            { background: rgba(255, 120, 120, 0.16); color: #ff9b9b; }
+.adm-jstat-refunded             { background: rgba(255, 120, 120, 0.16); color: #ff9b9b; }
+.adm-jstat-failed               { background: rgba(255, 120, 120, 0.16); color: #ff9b9b; }
+
 /* Two-column card layout that collapses on narrow screens. */
 .adm-two-col {
   display: grid;

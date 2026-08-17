@@ -111,6 +111,11 @@ function stageClass(stage: string): string {
   return `adm-chip adm-stage-${stage}`;
 }
 
+/** Chip colour for a native/reload status value (see .adm-jstat-* in globals.css). */
+function jobStatusClass(status: string): string {
+  return `adm-chip adm-jstat-${status}`;
+}
+
 export default function AdminOrders() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [savingReloadId, setSavingReloadId] = useState<number | null>(null);
@@ -336,18 +341,20 @@ export default function AdminOrders() {
                 </td>
                 <td>
                   {o.source === "native" && o.jobStatuses && o.jobStatuses.length > 0 ? (
-                    <span className="adm-chip adm-chip-member">
-                      {distinctStatuses(o.jobStatuses)
-                        .map((v) => nativeStatuses.find((s) => s.value === v)?.label ?? STATUS_LABEL_FALLBACK[v] ?? v)
-                        .join(" · ")}
+                    <span className="adm-jstats">
+                      {distinctStatuses(o.jobStatuses).map((v) => (
+                        <span key={v} className={jobStatusClass(v)}>
+                          {nativeStatuses.find((s) => s.value === v)?.label ?? STATUS_LABEL_FALLBACK[v] ?? v}
+                        </span>
+                      ))}
                     </span>
                   ) : (
                     <span
                       className={
                         o.source === "reload"
-                          ? `adm-chip ${o.collected ? "adm-stage-completed" : "adm-chip-member"}`
+                          ? `adm-chip ${o.collected ? "adm-jstat-completed" : "adm-jstat-pending_confirmation"}`
                           : o.source === "native"
-                            ? "adm-chip adm-chip-member"
+                            ? jobStatusClass(o.status)
                             : stageClass(o.stage)
                       }
                     >
