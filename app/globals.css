@@ -5230,10 +5230,10 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Native job-status chips — one chip per distinct status, coloured per status
    so the list is scannable (Waiting / Processing / Cancelled …). */
 .adm-jstats { display: flex; flex-wrap: wrap; gap: 4px; }
-.adm-jstat-waiting              { background: rgba(255, 209, 102, 0.18); color: var(--amber); }
+.adm-jstat-waiting              { background: rgba(255, 255, 255, 0.14); color: #ffffff; }
 .adm-jstat-pending_confirmation { background: rgba(185, 140, 255, 0.18); color: #c4a4ff; }
-.adm-jstat-on_hold              { background: rgba(255, 154, 95, 0.18);  color: #ffb083; }
-.adm-jstat-processing           { background: rgba(53, 216, 255, 0.14);  color: var(--cyan); }
+.adm-jstat-on_hold              { background: rgba(255, 133, 197, 0.18);  color: #ff9ecf; }
+.adm-jstat-processing           { background: rgba(255, 154, 95, 0.18);  color: #ff9a5f; }
 .adm-jstat-production           { background: rgba(122, 162, 255, 0.16); color: var(--blue); }
 .adm-jstat-ready                { background: rgba(63, 224, 200, 0.16);  color: #56e6cd; }
 .adm-jstat-collection           { background: rgba(122, 224, 164, 0.16); color: var(--green); }
