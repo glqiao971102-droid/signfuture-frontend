@@ -483,11 +483,21 @@ export default function AdminOrders() {
                             {l.options.map((o) => <span key={o.label}>{o.label}: {displayOptionValue(o.value, nativeDetail.date)}</span>)}
                           </div>
                         )}
-                        {l.artworkUrl && (
-                          <div className="adm-line-opts">
-                            <a href={l.artworkUrl} target="_blank" rel="noreferrer" className="adm-edit-link">↓ Artwork</a>
-                          </div>
-                        )}
+                        {(() => {
+                          // Show every file on the line — e.g. the 3D wording
+                          // artwork AND the optional Draft Paper — each downloadable.
+                          const arts = l.artworks && l.artworks.length
+                            ? l.artworks
+                            : (l.artworkUrl ? [{ url: l.artworkUrl, name: "Artwork" }] : []);
+                          if (!arts.length) return null;
+                          return (
+                            <div className="adm-line-opts">
+                              {arts.map((a, ai) => (
+                                <a key={ai} href={a.url} target="_blank" rel="noreferrer" className="adm-edit-link" style={{ marginRight: 12 }}>↓ {a.name || "Artwork"}</a>
+                              ))}
+                            </div>
+                          );
+                        })()}
                         {l.refundedAt && <div className="adm-line-opts"><span style={{ color: "#9fe6c0" }}>Refunded RM {money(l.total)}</span></div>}
                       </td>
                       <td className="adm-num">{l.quantity}</td>

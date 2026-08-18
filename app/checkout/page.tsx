@@ -123,6 +123,9 @@ export default function CheckoutPage() {
         spec: it.spec as Record<string, unknown> | undefined,
         // This line's own artwork (first one attached to the line for back-compat).
         artworkUrl: it.artworks && it.artworks[0] ? it.artworks[0].url : undefined,
+        // All files on this line (e.g. 3D wording + Draft Paper) — the admin
+        // shows each under the line item for download.
+        artworks: it.artworks && it.artworks.length ? it.artworks : undefined,
         // Express-date / special requests start as Pending Confirmation.
         requiresConfirmation: it.requiresConfirmation || undefined,
       }));

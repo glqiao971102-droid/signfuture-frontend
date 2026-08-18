@@ -556,6 +556,7 @@ export const api = {
       unitPrice: number;
       options?: { label: string; value: string }[];
       artworkUrl?: string;
+      artworks?: { url: string; name?: string }[];
       spec?: Record<string, unknown>;
       requiresConfirmation?: boolean;
     }[];
@@ -1083,7 +1084,7 @@ export type NativeOrderDetail = {
   placedByAgent?: boolean;
   agentLabel?: string | null;
   date: string | null;
-  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status: string; statusLabel: string; refundedAt: string | null }[];
+  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null }[];
   history: { from: string | null; to: string; note: string | null; date: string | null }[];
 };
 
