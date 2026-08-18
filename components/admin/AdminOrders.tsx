@@ -486,9 +486,17 @@ export default function AdminOrders() {
                         {(() => {
                           // Show every file on the line — e.g. the 3D wording
                           // artwork AND the optional Draft Paper — each downloadable.
-                          const arts = l.artworks && l.artworks.length
-                            ? l.artworks
-                            : (l.artworkUrl ? [{ url: l.artworkUrl, name: "Artwork" }] : []);
+                          let arts = l.artworks && l.artworks.length ? l.artworks : null;
+                          if (!arts) {
+                            // Older orders have no per-line artworks. When the whole
+                            // order is a single line, its order-level artworks ARE
+                            // this line's files — show them all.
+                            if (nativeDetail.lines.length === 1 && nativeDetail.artworks && nativeDetail.artworks.length) {
+                              arts = nativeDetail.artworks;
+                            } else {
+                              arts = l.artworkUrl ? [{ url: l.artworkUrl, name: "Artwork" }] : [];
+                            }
+                          }
                           if (!arts.length) return null;
                           return (
                             <div className="adm-line-opts">
