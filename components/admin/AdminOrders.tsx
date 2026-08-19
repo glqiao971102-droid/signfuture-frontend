@@ -44,6 +44,22 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Date + time of day, for the order detail "Placed" line (e.g. "19 Aug 2026,
+// 03:45 PM"). Shown in the viewer's local timezone.
+function formatDateTime(value: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value.includes("T") ? value : value.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 // Valid collect lead-times (working days). Older orders sometimes stored the
 // resolved collect DATE ("collect Wed, 19 Aug 2026") instead of "N working
 // days" — we derive the number from the order date → collect date, and snap it
@@ -497,7 +513,7 @@ export default function AdminOrders() {
               <button type="button" className="adm-logout" onClick={closeDrawer}>Close</button>
             </div>
             <div className="adm-drawer-meta">
-              <div><span className="adm-key-label">Placed</span>{formatDate(nativeDetail.date)}</div>
+              <div><span className="adm-key-label">Placed</span>{formatDateTime(nativeDetail.date)}</div>
               {nativeDetail.minAdjustment > 0 && (
                 <div><span className="adm-key-label">Min. charge</span>+RM {money(nativeDetail.minAdjustment)} (below RM15)</div>
               )}
@@ -643,7 +659,7 @@ export default function AdminOrders() {
                 <div className="adm-drawer-meta">
                   <div>
                     <span className="adm-key-label">Placed</span>
-                    {formatDate(detail.date)}
+                    {formatDateTime(detail.date)}
                   </div>
                   <div>
                     <span className="adm-key-label">Total</span>
