@@ -33,6 +33,8 @@ export default function CustomTopUp() {
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [manualDone, setManualDone] = useState(false);
 
   const num = parseFloat(amount) || 0;
   const tier = TIERS.find((t) => num >= t.min) || null;
@@ -72,6 +74,37 @@ export default function CustomTopUp() {
       setError(
         err instanceof ApiError ? err.message : "Could not start the payment. Please try again.",
       );
+      setBusy(false);
+    }
+  }
+
+  // Manual bank transfer: upload the receipt and submit. The wallet is NOT
+  // credited now — an admin verifies the receipt and marks it Collected first.
+  async function submitManual() {
+    if (busy) return;
+    setError(null);
+    if (!user) {
+      openLogin();
+      return;
+    }
+    if (num < MIN_TOPUP) {
+      setError(`Please enter at least RM ${MIN_TOPUP.toFixed(2)} in the amount box above.`);
+      return;
+    }
+    if (!receiptFile) {
+      setError("Please choose your transfer receipt file first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { url } = await api.uploadReceipt(receiptFile);
+      await api.manualTopup(num, url);
+      setManualDone(true);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Could not submit your receipt. Please try again.",
+      );
+    } finally {
       setBusy(false);
     }
   }
@@ -149,6 +182,43 @@ export default function CustomTopUp() {
       >
         {busy ? "Redirecting to payment…" : user ? "Proceed to top up" : "Sign in to top up"}
       </button>
+
+      {/* Manual bank-transfer option: upload a receipt instead of paying online.
+          The wallet is credited only after an admin verifies the receipt. */}
+      <div className="topup-manual">
+        <div className="topup-manual-or"><span>or pay by bank transfer</span></div>
+        {manualDone ? (
+          <p className="topup-manual-done" role="status">
+            ✓ Receipt submitted. Your wallet will be credited once we verify your transfer
+            (usually within a working day).
+          </p>
+        ) : (
+          <>
+            <p className="topup-manual-hint">
+              Transferred manually? Enter the amount above, then upload your transfer receipt.
+            </p>
+            <label className="topup-receipt-picker">
+              <span className="topup-receipt-btn">Choose receipt</span>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+              />
+              <span className="topup-receipt-name">
+                {receiptFile ? receiptFile.name : "No file chosen (.jpg / .png / .pdf)"}
+              </span>
+            </label>
+            <button
+              type="button"
+              className="hero-btn ghost topup-btn"
+              onClick={submitManual}
+              disabled={busy}
+            >
+              {busy ? "Submitting…" : "Upload Transfer Receipt"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

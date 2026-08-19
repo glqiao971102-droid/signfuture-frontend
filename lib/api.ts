@@ -631,6 +631,30 @@ export const api = {
     });
   },
 
+  /** Uploads a bank-transfer receipt and returns its stored URL. */
+  async uploadReceipt(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/uploads/artwork`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed", body?.error ?? null);
+    return body as { url: string };
+  },
+
+  /** Submits a MANUAL bank-transfer top-up with an uploaded receipt. The wallet
+   *  is credited only after an admin verifies the receipt and marks it Collected. */
+  manualTopup(amount: number, receiptUrl: string) {
+    return request<{ ok: boolean; refNo: string }>("/api/v1/payments/topup/manual", {
+      method: "POST",
+      body: JSON.stringify({ amount, receiptUrl }),
+    });
+  },
+
   paymentStatus(refNo: string) {
     return request<PaymentStatus>(`/api/v1/payments/${encodeURIComponent(refNo)}`);
   },
@@ -803,6 +827,15 @@ export const api = {
     return request<{ success: boolean; collected: boolean; status: string }>(
       `/api/v1/admin/reloads/${id}/collect`,
       { method: "PATCH", body: JSON.stringify({ collected }) },
+    );
+  },
+
+  /** Reject a manual bank-transfer top-up (fake/unmatched receipt), or undo it.
+   *  Rejecting never credits the wallet. */
+  adminSetReloadRejected(id: number, rejected: boolean) {
+    return request<{ success: boolean; rejected: boolean; status: string }>(
+      `/api/v1/admin/reloads/${id}/reject`,
+      { method: "PATCH", body: JSON.stringify({ rejected }) },
     );
   },
 
@@ -1042,6 +1075,12 @@ export type AdminOrderRow = OrderSummary & {
   jobStatuses?: string[];
   /** Reload rows only: whether the top-up has been marked Collected. */
   collected?: boolean;
+  /** Reload rows only: a manual bank-transfer top-up (uploaded receipt). */
+  manual?: boolean;
+  /** Reload rows only: the member's uploaded transfer receipt URL. */
+  receiptUrl?: string | null;
+  /** Reload rows only: a manual top-up the admin rejected (fake receipt). */
+  rejected?: boolean;
 };
 
 /** A reload (top-up) slip in the admin reconciliation list. */

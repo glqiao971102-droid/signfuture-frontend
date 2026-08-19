@@ -2872,6 +2872,31 @@ a { color: inherit; text-decoration: none; }
 .tier-gold-tag { color: var(--amber); border-color: rgba(255, 209, 102, 0.6); }
 .tier-diamond-tag { color: var(--cyan); border-color: rgba(53, 216, 255, 0.6); }
 .topup-btn { border: 0; }
+.hero-btn.ghost.topup-btn { border: 1px solid var(--line, rgba(57,151,255,0.58)); }
+
+/* Manual bank-transfer top-up (upload receipt) */
+.topup-manual { margin-top: 18px; }
+.topup-manual-or {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
+}
+.topup-manual-or::before, .topup-manual-or::after {
+  content: ""; flex: 1; height: 1px; background: rgba(120, 160, 210, 0.28);
+}
+.topup-manual-hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.topup-receipt-picker {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px; cursor: pointer;
+}
+.topup-receipt-picker input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.topup-receipt-btn {
+  flex: 0 0 auto; padding: 9px 16px; border-radius: 10px; font-weight: 800; font-size: 13px;
+  color: #03101f; background: linear-gradient(90deg, var(--blue), var(--cyan)); white-space: nowrap;
+}
+.topup-receipt-name { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topup-manual-done {
+  margin: 0; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+  color: #9fe6c0; border: 1px solid rgba(66, 239, 125, 0.4); background: rgba(20, 60, 35, 0.35);
+}
 
 .tier-note {
   margin-top: 24px;
@@ -4494,6 +4519,48 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   border-color: transparent;
   color: #03101f;
 }
+/* Reject / Fail a manual bank-transfer top-up (destructive — never credits). */
+.adm-filter-danger {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #f87171;
+}
+.adm-filter-danger:hover {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+}
+/* Collect / Fail buttons inside the reload detail drawer. */
+.adm-reload-drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ---- Reload (top-up) rows — a premium gold accent so they stand apart from
+   the ordinary order rows: just a clean gold left rail, no tinted fill. ---- */
+.adm-reload-row td:first-child {
+  box-shadow: inset 3px 0 0 0 #d4af37;
+}
+/* Gold "RELOAD" pill. */
+.adm-reload-badge {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.22), rgba(245, 214, 110, 0.12));
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  color: #f3d27a;
+  letter-spacing: 0.04em;
+}
+
+/* Gold-lined reload drawer, to match the row it opened from. */
+.adm-reload-drawer {
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.08),
+    0 24px 70px rgba(0, 0, 0, 0.55),
+    inset 0 3px 0 0 #d4af37;
+}
+.adm-reload-drawer .adm-drawer-sub {
+  color: #f3d27a;
+}
 /* Clickable status filter chips with live counts. */
 .adm-status-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
 .adm-status-chip {
@@ -4776,6 +4843,17 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   background: linear-gradient(90deg, var(--blue), var(--cyan));
   border-color: transparent;
   color: #03101f;
+}
+/* Gold View button for reload (top-up) rows, matching the gold left rail. */
+.adm-view-gold {
+  border-color: rgba(212, 175, 55, 0.7);
+  background: rgba(212, 175, 55, 0.12);
+  color: #f3d27a;
+}
+.adm-view-gold:hover {
+  background: linear-gradient(90deg, #d4af37, #f5d66e);
+  border-color: transparent;
+  color: #241a03;
 }
 
 /* ---- editor ---- */

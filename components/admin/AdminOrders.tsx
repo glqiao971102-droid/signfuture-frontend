@@ -173,6 +173,9 @@ function jobStatusClass(status: string): string {
 export default function AdminOrders() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [savingReloadId, setSavingReloadId] = useState<number | null>(null);
+  // Reload detail drawer — keyed by row id so it always reflects the latest
+  // row state (collected/rejected) after an action, without a refetch.
+  const [reloadDetailId, setReloadDetailId] = useState<number | null>(null);
   const [statuses, setStatuses] = useState<{ value: string; label: string }[]>([]);
   const [statusCounts, setStatusCounts] = useState<{ value: string; label: string; count: number }[]>([]);
   const [page, setPage] = useState(1);
@@ -249,6 +252,7 @@ export default function AdminOrders() {
   function closeDrawer() {
     setDetail(null);
     setNativeDetail(null);
+    setReloadDetailId(null);
   }
 
   async function openDetail(row: AdminOrderRow) {
@@ -308,12 +312,16 @@ export default function AdminOrders() {
     }
   }
 
-  // Reload rows: toggle Collected (bookkeeping only — the wallet is untouched).
+  // Reload rows: Collected credits a manual top-up's wallet (gateway ones are
+  // already credited — then it's a bookkeeping flag). Undo reverses the flag.
   async function collectReload(o: AdminOrderRow) {
     if (savingReloadId) return;
+    const next = !o.collected;
+    if (next && o.manual && !window.confirm(
+      `Confirm you have verified the RM ${money(o.total)} bank-transfer receipt from ${o.customer}?\n\nThis credits their wallet immediately.`,
+    )) return;
     setSavingReloadId(o.id);
     try {
-      const next = !o.collected;
       await api.adminSetReloadCollected(o.id, next);
       setRows((rs) =>
         rs.map((x) =>
@@ -321,6 +329,7 @@ export default function AdminOrders() {
             ? {
                 ...x,
                 collected: next,
+                rejected: false,
                 status: next ? "collection" : "pending_confirmation",
                 statusLabel: next ? "Collected" : "Pending Confirmation",
               }
@@ -333,6 +342,41 @@ export default function AdminOrders() {
       setSavingReloadId(null);
     }
   }
+
+  // Reject a manual bank-transfer top-up (fake/unmatched receipt) — never
+  // credits the wallet. Toggles back to Pending Confirmation on undo.
+  async function rejectReload(o: AdminOrderRow) {
+    if (savingReloadId) return;
+    const next = !o.rejected;
+    if (next && !window.confirm(
+      `Reject the RM ${money(o.total)} bank transfer from ${o.customer}?\n\nThe wallet will NOT be credited.`,
+    )) return;
+    setSavingReloadId(o.id);
+    try {
+      await api.adminSetReloadRejected(o.id, next);
+      setRows((rs) =>
+        rs.map((x) =>
+          x.source === "reload" && x.id === o.id
+            ? {
+                ...x,
+                rejected: next,
+                status: next ? "failed" : "pending_confirmation",
+                statusLabel: next ? "Rejected" : "Pending Confirmation",
+              }
+            : x,
+        ),
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not reject the reload");
+    } finally {
+      setSavingReloadId(null);
+    }
+  }
+
+  const reloadDetail =
+    reloadDetailId != null
+      ? rows.find((r) => r.source === "reload" && r.id === reloadDetailId) ?? null
+      : null;
 
   return (
     <div className="adm-wrap">
@@ -431,11 +475,11 @@ export default function AdminOrders() {
               </tr>
             )}
             {rows.map((o) => (
-              <tr key={`${o.source ?? "legacy"}-${o.id}`}>
+              <tr key={`${o.source ?? "legacy"}-${o.id}`} className={o.source === "reload" ? "adm-reload-row" : undefined}>
                 <td className="adm-mono">
                   {o.source === "reload" ? `RL-${o.id}` : o.source === "native" ? o.ref : `#${o.id}`}
                   {o.source === "native" && <span className="adm-chip adm-stage-completed adm-new-badge">NEW</span>}
-                  {o.source === "reload" && <span className="adm-chip adm-chip-member adm-new-badge">RELOAD</span>}
+                  {o.source === "reload" && <span className="adm-chip adm-reload-badge adm-new-badge">RELOAD</span>}
                 </td>
                 <td>
                   {o.customerId ? (
@@ -461,7 +505,7 @@ export default function AdminOrders() {
                     <span
                       className={
                         o.source === "reload"
-                          ? `adm-chip ${o.collected ? "adm-jstat-completed" : "adm-jstat-pending_confirmation"}`
+                          ? `adm-chip ${o.collected ? "adm-jstat-completed" : o.rejected ? "adm-jstat-cancelled" : "adm-jstat-pending_confirmation"}`
                           : o.source === "native"
                             ? jobStatusClass(o.status)
                             : stageClass(o.stage)
@@ -475,13 +519,8 @@ export default function AdminOrders() {
                 <td className="adm-num">{o.source === "reload" ? "—" : o.itemCount}</td>
                 <td>
                   {o.source === "reload" ? (
-                    <button
-                      type="button"
-                      className={`adm-filter${o.collected ? "" : " is-active"}`}
-                      disabled={savingReloadId === o.id}
-                      onClick={() => collectReload(o)}
-                    >
-                      {savingReloadId === o.id ? "Saving…" : o.collected ? "Undo" : "✓ Collected"}
+                    <button type="button" className="adm-view-btn adm-view-gold" onClick={() => setReloadDetailId(o.id)}>
+                      View →
                     </button>
                   ) : (
                     <button type="button" className="adm-view-btn" onClick={() => openDetail(o)}>
@@ -510,6 +549,126 @@ export default function AdminOrders() {
           >
             Next →
           </button>
+        </div>
+      )}
+
+      {/* Reload (top-up) drawer — verify the receipt, then Collect or Fail. */}
+      {reloadDetail && (
+        <div className="adm-modal-overlay" onClick={closeDrawer}>
+          <div className="adm-modal adm-drawer adm-reload-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-card-head-row">
+              <h2>
+                Reload RL-{reloadDetail.id}{" "}
+                <span className="adm-chip adm-chip-member adm-new-badge">RELOAD</span>
+                <span
+                  className={`adm-chip adm-new-badge ${
+                    reloadDetail.collected
+                      ? "adm-jstat-completed"
+                      : reloadDetail.rejected
+                        ? "adm-jstat-cancelled"
+                        : "adm-jstat-pending_confirmation"
+                  }`}
+                >
+                  {reloadDetail.statusLabel}
+                </span>
+              </h2>
+              <button type="button" className="adm-logout" onClick={closeDrawer}>
+                Close
+              </button>
+            </div>
+            <div className="adm-drawer-meta">
+              <div>
+                <span className="adm-key-label">Placed</span>
+                {formatDateTime(reloadDetail.date)}
+              </div>
+              <div>
+                <span className="adm-key-label">Amount</span>
+                RM {money(reloadDetail.total)}
+              </div>
+              <div>
+                <span className="adm-key-label">Method</span>
+                {reloadDetail.manual ? "Bank transfer (manual)" : "Online payment"}
+              </div>
+              <div>
+                <span className="adm-key-label">Customer</span>
+                {reloadDetail.customerId ? (
+                  <Link href={`/admin/users/${reloadDetail.customerId}`} className="adm-edit-link">
+                    {reloadDetail.customer}
+                  </Link>
+                ) : (
+                  reloadDetail.customer
+                )}
+              </div>
+              {reloadDetail.email && (
+                <div>
+                  <span className="adm-key-label">Email</span>
+                  {reloadDetail.email}
+                </div>
+              )}
+            </div>
+
+            {reloadDetail.manual && (
+              <>
+                <h3 className="adm-drawer-sub">Transfer receipt</h3>
+                {reloadDetail.receiptUrl ? (
+                  <a
+                    href={downloadHref({ url: reloadDetail.receiptUrl, name: "transfer receipt" })}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="adm-artwork-chip"
+                  >
+                    ↓ Download the member's uploaded receipt
+                  </a>
+                ) : (
+                  <p className="adm-card-sub">No receipt uploaded.</p>
+                )}
+              </>
+            )}
+
+            <h3 className="adm-drawer-sub">Action</h3>
+            <p className="adm-card-sub" style={{ marginTop: -4 }}>
+              {reloadDetail.manual
+                ? "Verify the receipt against your bank before collecting. Collecting credits the member's wallet immediately; Fail credits nothing."
+                : "Online payment — the wallet was already credited. Collected is a bookkeeping flag."}
+            </p>
+            <div className="adm-reload-drawer-actions">
+              {reloadDetail.rejected ? (
+                <button
+                  type="button"
+                  className="adm-filter"
+                  disabled={savingReloadId === reloadDetail.id}
+                  onClick={() => rejectReload(reloadDetail)}
+                >
+                  {savingReloadId === reloadDetail.id ? "Saving…" : "↩ Undo reject"}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`adm-filter${reloadDetail.collected ? "" : " is-active"}`}
+                    disabled={savingReloadId === reloadDetail.id}
+                    onClick={() => collectReload(reloadDetail)}
+                  >
+                    {savingReloadId === reloadDetail.id
+                      ? "Saving…"
+                      : reloadDetail.collected
+                        ? "↩ Undo collected"
+                        : "✓ Collected"}
+                  </button>
+                  {reloadDetail.manual && !reloadDetail.collected && (
+                    <button
+                      type="button"
+                      className="adm-filter adm-filter-danger"
+                      disabled={savingReloadId === reloadDetail.id}
+                      onClick={() => rejectReload(reloadDetail)}
+                    >
+                      ✗ Fail
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
