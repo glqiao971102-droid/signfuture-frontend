@@ -335,10 +335,10 @@ export default function AdminOrders() {
             <tr>
               <th>Order</th>
               <th>Customer</th>
+              <th>Date</th>
               <th>Status</th>
               <th className="adm-num">Total (RM)</th>
               <th className="adm-num">Items</th>
-              <th>Date</th>
               <th></th>
             </tr>
           </thead>
@@ -373,6 +373,7 @@ export default function AdminOrders() {
                     o.customer
                   )}
                 </td>
+                <td className="adm-date">{formatDate(o.date)}</td>
                 <td>
                   {o.source === "native" && o.jobStatuses && o.jobStatuses.length > 0 ? (
                     <span className="adm-jstats">
@@ -398,7 +399,6 @@ export default function AdminOrders() {
                 </td>
                 <td className="adm-num adm-mono">{money(o.total)}</td>
                 <td className="adm-num">{o.source === "reload" ? "—" : o.itemCount}</td>
-                <td className="adm-date">{formatDate(o.date)}</td>
                 <td>
                   {o.source === "reload" ? (
                     <button
@@ -410,7 +410,7 @@ export default function AdminOrders() {
                       {savingReloadId === o.id ? "Saving…" : o.collected ? "Undo" : "✓ Collected"}
                     </button>
                   ) : (
-                    <button type="button" className="adm-edit-link" onClick={() => openDetail(o)}>
+                    <button type="button" className="adm-view-btn" onClick={() => openDetail(o)}>
                       View →
                     </button>
                   )}

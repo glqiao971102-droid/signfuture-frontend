@@ -493,6 +493,9 @@ function applyLedLengths(letters: AnyLetter[], page: RenderedPage | null, render
   const maxX = page.width - 1;
   const maxY = page.height - 1;
   for (const L of letters) {
+    // The design / artboard / top views share letter objects; skip any already
+    // stamped so LED is computed once per record, not up to three times.
+    if (typeof (L as { led_length_m?: number }).led_length_m === "number") continue;
     const b = L.bbox_in;
     if (!b) continue;
     const x1 = Math.max(0, Math.min(maxX, Math.round(b.x_in * k)));
@@ -500,7 +503,12 @@ function applyLedLengths(letters: AnyLetter[], page: RenderedPage | null, render
     const x2 = Math.max(0, Math.min(maxX, Math.round((b.x_in + b.width_in) * k)));
     const y2 = Math.max(0, Math.min(maxY, Math.round((b.y_in + b.height_in) * k)));
     if (x2 <= x1 || y2 <= y1) continue;
-    (L as { led_length_m?: number }).led_length_m = ledLengthForBox(page, [x1, y1, x2, y2], pxPerCm);
+    // LED is a nice-to-have estimate — never let it break the upload/analysis.
+    try {
+      (L as { led_length_m?: number }).led_length_m = ledLengthForBox(page, [x1, y1, x2, y2], pxPerCm);
+    } catch {
+      (L as { led_length_m?: number }).led_length_m = 0;
+    }
   }
 }
 

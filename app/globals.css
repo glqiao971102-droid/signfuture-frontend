@@ -4724,6 +4724,25 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .adm-edit-link { color: var(--cyan); font-weight: 700; font-size: 13px; }
 .adm-edit-link:hover { text-decoration: underline; }
+/* Clearly-visible "View" button in the orders table (the plain link was hard to
+   see against the dark row). A cyan-bordered pill that fills on hover. */
+.adm-view-btn {
+  padding: 6px 15px;
+  border: 1px solid var(--cyan);
+  border-radius: 999px;
+  background: rgba(53, 216, 255, 0.14);
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.adm-view-btn:hover {
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
+  border-color: transparent;
+  color: #03101f;
+}
 
 /* ---- editor ---- */
 .adm-editor-head {
