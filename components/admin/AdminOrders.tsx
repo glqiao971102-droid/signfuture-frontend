@@ -44,6 +44,16 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Artwork download URL that carries the display name, so the file saves under
+// its human name (e.g. "3D Wording - 30x102 cm.ai") instead of the stored UUID.
+// The `download` attribute is ignored cross-origin, so the backend reads ?name
+// and sets Content-Disposition.
+function downloadHref(a: { url: string; name?: string }): string {
+  const name = (a.name || "artwork").trim();
+  const sep = a.url.includes("?") ? "&" : "?";
+  return `${a.url}${sep}name=${encodeURIComponent(name)}`;
+}
+
 // Date + time of day, for the order detail "Placed" line (e.g. "19 Aug 2026,
 // 03:45 PM"). Shown in the viewer's local timezone.
 function formatDateTime(value: string | null): string {
@@ -554,7 +564,7 @@ export default function AdminOrders() {
                 <h3 className="adm-drawer-sub">Artwork ({nativeDetail.artworks.length}) — for review</h3>
                 <div className="adm-artwork-list">
                   {nativeDetail.artworks.map((a, i) => (
-                    <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="adm-artwork-chip">
+                    <a key={a.url} href={downloadHref(a)} target="_blank" rel="noreferrer" className="adm-artwork-chip">
                       ↓ {a.name || `File ${i + 1}`}
                     </a>
                   ))}
@@ -597,7 +607,7 @@ export default function AdminOrders() {
                           return (
                             <div className="adm-line-opts">
                               {arts.map((a, ai) => (
-                                <a key={ai} href={a.url} target="_blank" rel="noreferrer" className="adm-edit-link" style={{ marginRight: 12 }}>↓ {a.name || "Artwork"}</a>
+                                <a key={ai} href={downloadHref(a)} target="_blank" rel="noreferrer" className="adm-edit-link" style={{ marginRight: 12 }}>↓ {a.name || "Artwork"}</a>
                               ))}
                             </div>
                           );
