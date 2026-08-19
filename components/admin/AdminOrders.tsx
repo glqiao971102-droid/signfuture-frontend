@@ -635,7 +635,8 @@ export default function AdminOrders() {
             <div className="adm-line-opts" style={{ flexDirection: "column", gap: 4 }}>
               {nativeDetail.history.map((h, i) => (
                 <span key={i}>
-                  {formatDate(h.date)} — {h.from ? `${h.from} → ` : ""}{h.to}{h.note ? ` · ${h.note}` : ""}
+                  {formatDateTime(h.date)} — {h.from ? `${h.from} → ` : ""}{h.to}{h.note ? ` · ${h.note}` : ""}
+                  {h.by ? <span style={{ color: "var(--cyan)" }}> · by {h.by}</span> : ""}
                 </span>
               ))}
             </div>

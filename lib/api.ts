@@ -1097,7 +1097,7 @@ export type NativeOrderDetail = {
   agentLabel?: string | null;
   date: string | null;
   lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null }[];
-  history: { from: string | null; to: string; note: string | null; date: string | null }[];
+  history: { from: string | null; to: string; note: string | null; date: string | null; by?: string | null }[];
 };
 
 export type AdminWalletSummary = {
