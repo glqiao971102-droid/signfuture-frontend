@@ -177,6 +177,11 @@ export default function AdminDashboard() {
           hint={`${rm(data.reloads?.amount ?? 0)} topped up · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"}`}
         />
         <Kpi
+          label="Reloads (top-ups)"
+          value={rm(data.reloads?.amount ?? 0)}
+          hint={`${(data.reloads?.users ?? 0).toLocaleString()} members · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"} in this range`}
+        />
+        <Kpi
           label="Wallet balances owed"
           value={rm(k.walletLiability)}
           hint="Outstanding member wallet credit"
