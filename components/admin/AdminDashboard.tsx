@@ -37,6 +37,14 @@ function presetRange(days: number): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
+/** The current calendar month: 1st → today (local date, no UTC shift). */
+function thisMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,6 +98,9 @@ export default function AdminDashboard() {
           To
           <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </label>
+        <button type="button" className="adm-filter" onClick={() => { const r = thisMonthRange(); setFrom(r.from); setTo(r.to); }}>
+          This month
+        </button>
         <button type="button" className="adm-filter" onClick={() => { const r = presetRange(30); setFrom(r.from); setTo(r.to); }}>
           30d
         </button>
@@ -163,7 +174,7 @@ export default function AdminDashboard() {
         <Kpi
           label="Users reloaded"
           value={(data.reloads?.users ?? 0).toLocaleString()}
-          hint="Members who topped up in this range"
+          hint={`${rm(data.reloads?.amount ?? 0)} topped up · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"}`}
         />
         <Kpi
           label="Wallet balances owed"
