@@ -6,6 +6,15 @@ import { api, type AdminOrderRow, type OrderDetail, type NativeOrderDetail } fro
 
 const PER_PAGE = 25;
 
+// Status chips the operator doesn't want in the quick-filter row (still counted
+// in "All" and still available via the dropdown).
+const HIDDEN_STATUS_CHIPS = new Set([
+  "Completed — Ready for Pickup",
+  "Failed",
+  "Refunded",
+  "In Production",
+]);
+
 // Month filter options, newest first: from the current month back to Jan 2024
 // (the store's data start). Value is "YYYY-MM"; label is e.g. "August 2026".
 const MONTH_OPTIONS: { value: string; label: string }[] = (() => {
@@ -139,6 +148,7 @@ export default function AdminOrders() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [savingReloadId, setSavingReloadId] = useState<number | null>(null);
   const [statuses, setStatuses] = useState<{ value: string; label: string }[]>([]);
+  const [statusCounts, setStatusCounts] = useState<{ value: string; label: string; count: number }[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -197,6 +207,18 @@ export default function AdminOrders() {
     void load(page, search, status, month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  // Per-status counts for the clickable chips — depend on search + month only
+  // (they always show every status, regardless of which one is selected).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api
+        .adminOrderStatusCounts({ search: search || undefined, month: month || undefined })
+        .then((r) => setStatusCounts(r.data))
+        .catch(() => setStatusCounts([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, month]);
 
   function closeDrawer() {
     setDetail(null);
@@ -322,6 +344,30 @@ export default function AdminOrders() {
           ))}
         </select>
       </div>
+
+      {statusCounts.length > 0 && (
+        <div className="adm-status-chips">
+          <button
+            type="button"
+            className={`adm-status-chip${status === "" ? " is-active" : ""}`}
+            onClick={() => setStatus("")}
+          >
+            All <span className="adm-status-chip-n">{statusCounts.reduce((a, s) => a + s.count, 0).toLocaleString()}</span>
+          </button>
+          {statusCounts
+            .filter((s) => !HIDDEN_STATUS_CHIPS.has(s.label))
+            .map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                className={`adm-status-chip${status === s.value ? " is-active" : ""}`}
+                onClick={() => setStatus(s.value)}
+              >
+                {s.label} <span className="adm-status-chip-n">{s.count.toLocaleString()}</span>
+              </button>
+            ))}
+        </div>
+      )}
 
       <div className="adm-count">
         {loading ? "Loading…" : `${total.toLocaleString()} order${total === 1 ? "" : "s"}`}

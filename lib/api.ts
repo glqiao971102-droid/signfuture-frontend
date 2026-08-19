@@ -775,6 +775,17 @@ export const api = {
     );
   },
 
+  /** Per-status order counts (legacy), respecting search + month filters. */
+  adminOrderStatusCounts(opts: { search?: string; month?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (opts.search) qs.set("search", opts.search);
+    if (opts.month) qs.set("month", opts.month);
+    const q = qs.toString();
+    return request<{ data: { value: string; label: string; count: number }[] }>(
+      `/api/v1/admin/orders/status-counts${q ? `?${q}` : ""}`,
+    );
+  },
+
   /** Reload (top-up) reconciliation list — Pending Confirmation → Collected. */
   adminReloads(
     opts: { page?: number; perPage?: number; status?: "pending" | "collected"; search?: string } = {},

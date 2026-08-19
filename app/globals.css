@@ -4494,6 +4494,39 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   border-color: transparent;
   color: #03101f;
 }
+/* Clickable status filter chips with live counts. */
+.adm-status-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.adm-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(9, 22, 42, 0.6);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.adm-status-chip:hover { border-color: var(--line); color: var(--text); }
+.adm-status-chip-n {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(90, 140, 255, 0.18);
+  color: var(--cyan);
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+}
+.adm-status-chip.is-active {
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
+  color: #03101f;
+}
+.adm-status-chip.is-active .adm-status-chip-n { background: rgba(3, 16, 31, 0.28); color: #03101f; }
 .adm-count { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
 .adm-local-orders { margin-bottom: 22px; padding: 14px 16px; border: 1px solid rgba(255, 176, 60, 0.4); border-radius: 12px; background: rgba(40, 28, 6, 0.35); }
 .adm-local-orders .adm-count strong { color: #ffcf7a; }
