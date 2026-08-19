@@ -520,7 +520,15 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
       }
       const widthIn = ((bboxPx[2] - bboxPx[0] + 1) / scale / POINTS_PER_INCH) * measurementScale;
       const heightIn = ((bboxPx[3] - bboxPx[1] + 1) / scale / POINTS_PER_INCH) * measurementScale;
-      if (widthIn >= 0.25 && heightIn >= 0.25) {
+      // Keep a record if it's a normal-sized shape (≥0.25in both ways) OR a long
+      // thin bar (a tally line / dash / letter stem): a substantial length with a
+      // non-hairline width. This stops the 0.25in floor from silently dropping
+      // narrow-but-real elements (e.g. 0.22in-wide, 1.58in-tall lines) so all the
+      // artwork's content is counted.
+      const longSide = Math.max(widthIn, heightIn);
+      const shortSide = Math.min(widthIn, heightIn);
+      const keep = (widthIn >= 0.25 && heightIn >= 0.25) || (longSide >= 0.6 && shortSide >= 0.1);
+      if (keep) {
         let highlightPct: RasterEntry["highlight_pct"] = null;
         if (contentArtBbox) {
           const [cx1, cy1, cx2, cy2] = contentArtBbox;
