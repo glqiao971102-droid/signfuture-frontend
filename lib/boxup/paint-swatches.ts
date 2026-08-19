@@ -1,12 +1,14 @@
 /**
- * Box Up paint picker: colour swatches shown inline, single-select.
+ * Box Up paint picker: colour swatches shown inline, MULTI-select.
  *
- * Clicking a colour selects only that one (radio-style) - the previous pick
- * clears. The hidden <select class="mounting-select box-up-paint-select"> is the
- * value carrier. Keeping it means the calculator's existing change handler
- * (which matches ".mounting-select") still rebuilds the 3D preview, so no new
- * wiring is needed on the engine side. Its value is the chosen hex, which is
- * exactly the colour the preview paints the letter.
+ * A letter/logo can be sprayed in several colours, so clicking toggles each
+ * swatch on/off and the picks are kept in CLICK ORDER (at least one must stay
+ * selected). The hidden <select class="mounting-select box-up-paint-select"> is
+ * the value carrier: its value is the comma-separated hex list in pick order.
+ * Keeping the select means the calculator's existing change handler (matching
+ * ".mounting-select") still rebuilds the 3D preview with no new engine wiring —
+ * and the preview/engine already paint the letter with the FIRST hex
+ * (boxUpPaintList[0]), which is exactly the primary colour.
  */
 
 export const PAINT_COLOURS: { name: string; hex: string }[] = [
@@ -56,7 +58,8 @@ const style = `<style>
 .box-up-paint.is-hidden{display:none}
 </style>`;
 
-// Single-select: clicking a colour selects only that one and clears the rest.
+// Multi-select: clicking toggles a colour on/off, keeping the picks in click
+// order (at least one colour must remain selected).
 const script = `<script>
 (function(){
   // Guard on <html>, not window/document: the calculator re-renders results via
@@ -71,12 +74,18 @@ const script = `<script>
   if (root.__paintSwatchInit) return;
   root.__paintSwatchInit = true;
   var sync = function(field){
-    var selected = field.querySelector('.paint-swatch.is-selected');
-    var hex = selected ? selected.querySelector('input').value : '';
+    // All selected swatches, ordered by when they were clicked (data-pick).
+    var picked = [].slice.call(field.querySelectorAll('.paint-swatch.is-selected'));
+    picked.sort(function(a, b){
+      return (parseInt(a.getAttribute('data-pick') || '0', 10)) - (parseInt(b.getAttribute('data-pick') || '0', 10));
+    });
+    var hexes = picked.map(function(s){ var i = s.querySelector('input'); return i ? i.value : ''; }).filter(Boolean);
+    if (!hexes.length) hexes = ['${PAINT_COLOURS[0].hex}'];
+    var val = hexes.join(',');
     var sel = field.querySelector('.box-up-paint-select');
     if (sel) {
-      sel.innerHTML = '<option value="' + hex + '" selected></option>';
-      sel.value = hex;
+      sel.innerHTML = '<option value="' + val + '" selected></option>';
+      sel.value = val;
       // Reuses the calculator's own ".mounting-select" handler to refresh 3D.
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -85,17 +94,22 @@ const script = `<script>
     var swatch = ev.target.closest && ev.target.closest('.box-up-paint .paint-swatch');
     if (!swatch) return;
     ev.preventDefault();
-    if (swatch.classList.contains('is-selected')) return;  // already the pick
     var field = swatch.closest('.box-up-paint');
-    // Clear every other swatch, then select just this one (radio behaviour).
-    field.querySelectorAll('.paint-swatch').forEach(function(s){
-      s.classList.remove('is-selected');
-      var i = s.querySelector('input');
-      if (i) i.checked = false;
-    });
-    swatch.classList.add('is-selected');
     var input = swatch.querySelector('input');
-    if (input) input.checked = true;
+    if (swatch.classList.contains('is-selected')) {
+      // Toggle OFF — but never leave zero colours selected.
+      if (field.querySelectorAll('.paint-swatch.is-selected').length <= 1) return;
+      swatch.classList.remove('is-selected');
+      if (input) input.checked = false;
+      swatch.removeAttribute('data-pick');
+    } else {
+      // Toggle ON — stamp this pick's position in the click order.
+      var seq = (parseInt(field.getAttribute('data-pick-seq') || '0', 10)) + 1;
+      field.setAttribute('data-pick-seq', String(seq));
+      swatch.classList.add('is-selected');
+      if (input) input.checked = true;
+      swatch.setAttribute('data-pick', String(seq));
+    }
     sync(field);
   });
   // Paint only applies to the sprayed finish; the plain material uses the
@@ -112,7 +126,16 @@ const script = `<script>
     if (ev.target && ev.target.matches && ev.target.matches('.box-up-color-select')) syncVisibility();
   });
   var boot = function(){
-    document.querySelectorAll('.box-up-paint').forEach(sync);
+    document.querySelectorAll('.box-up-paint').forEach(function(field){
+      // Give the pre-selected (first) swatch a pick position so later picks
+      // order after it, then push the initial value to the hidden select.
+      var first = field.querySelector('.paint-swatch.is-selected');
+      if (first && !first.getAttribute('data-pick')) {
+        field.setAttribute('data-pick-seq', '1');
+        first.setAttribute('data-pick', '1');
+      }
+      sync(field);
+    });
     syncVisibility();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
