@@ -758,13 +758,14 @@ export const api = {
   // ----- Admin: orders -----
 
   adminOrders(
-    opts: { page?: number; perPage?: number; status?: string; search?: string } = {},
+    opts: { page?: number; perPage?: number; status?: string; search?: string; month?: string } = {},
   ) {
     const qs = new URLSearchParams();
     if (opts.page) qs.set("page", String(opts.page));
     if (opts.perPage) qs.set("perPage", String(opts.perPage));
     if (opts.status) qs.set("status", opts.status);
     if (opts.search) qs.set("search", opts.search);
+    if (opts.month) qs.set("month", opts.month);
     return request<{ data: AdminOrderRow[]; meta: PagedMeta }>(`/api/v1/admin/orders?${qs}`);
   },
 

@@ -3,7 +3,7 @@
 // uses pdfium-WASM rasterization (same engine as the original pypdfium2).
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb, type RenderedPage } from "@/lib/pdf/pdfium";
-import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
+import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, ledLengthForBox, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
 import { ocrRelabel } from "@/lib/boxup/ocr";
 import {
   PdfPathAnalyzer,
@@ -391,6 +391,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
         (designRaster && designRaster.length ? designRaster : null) ||
         outlineLetterDimensions((designFills.length ? designFills : designStrokes) as { bbox: Bbox }[], scale, designBbox);
       const designOutlineM = applyOutlineLengths(letters, pageContours, page.width_pt, page.height_pt, designBbox, scale);
+      applyLedLengths(letters, rendered.get(pageNumber) || null, renderScales.get(pageNumber) || 1.0, scale);
       designs.push({
         name: `Design ${designIndex}`,
         page: pageNumber,
@@ -414,6 +415,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       rasterDims.get(pageNumber) ||
       outlineLetterDimensions((pageFills.length ? pageFills : pageStrokes) as { bbox: Bbox }[], scale, pageContentBbox);
     const artboardOutlineM = applyOutlineLengths(letters, pageContours, page.width_pt, page.height_pt, pageContentBbox, scale);
+    applyLedLengths(letters, rendered.get(pageNumber) || null, renderScales.get(pageNumber) || 1.0, scale);
     artboards.push({
       name: `Artboard ${pageNumber}`,
       page: pageNumber,
@@ -446,6 +448,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
   const topOutlineM = page1
     ? applyOutlineLengths(topLetters, page1Contours, page1.width_pt, page1.height_pt, page1Content, scale)
     : 0;
+  applyLedLengths(topLetters, rendered.get(1) || null, renderScales.get(1) || 1.0, scale);
 
   return {
     file: fileName,
@@ -473,6 +476,32 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
 
 function nonEmpty(list: AnyLetter[]): AnyLetter[] {
   return list.length ? list : [];
+}
+
+// Stamp each record with led_length_m — the metres of 7mm LED strip needed to
+// fill it with concentric rings (1cm gap from the outline, then strip, then a 2cm
+// gap, repeating inward). Applies to BOTH letters and logos: any shape wide enough
+// to hold a ring gets a length; a shape too thin naturally comes out 0 because the
+// distance transform finds nothing ≥1cm inside its outline. Works for the raster
+// and vector paths alike — it re-derives the pixel box from each record's real-inch
+// bbox and measures the shape straight off the page raster.
+function applyLedLengths(letters: AnyLetter[], page: RenderedPage | null, renderScale: number, measurementScale: number): void {
+  if (!page || !letters.length || !(renderScale > 0) || !(measurementScale > 0)) return;
+  const k = (renderScale * POINTS_PER_INCH) / measurementScale; // real inches -> render pixels
+  const pxPerCm = k / 2.54;
+  if (!(pxPerCm > 0)) return;
+  const maxX = page.width - 1;
+  const maxY = page.height - 1;
+  for (const L of letters) {
+    const b = L.bbox_in;
+    if (!b) continue;
+    const x1 = Math.max(0, Math.min(maxX, Math.round(b.x_in * k)));
+    const y1 = Math.max(0, Math.min(maxY, Math.round(b.y_in * k)));
+    const x2 = Math.max(0, Math.min(maxX, Math.round((b.x_in + b.width_in) * k)));
+    const y2 = Math.max(0, Math.min(maxY, Math.round((b.y_in + b.height_in) * k)));
+    if (x2 <= x1 || y2 <= y1) continue;
+    (L as { led_length_m?: number }).led_length_m = ledLengthForBox(page, [x1, y1, x2, y2], pxPerCm);
+  }
 }
 
 // Once text is converted to outlines it is indistinguishable from a logo graphic,

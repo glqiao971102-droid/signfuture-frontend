@@ -6,6 +6,25 @@ import { api, type AdminOrderRow, type OrderDetail, type NativeOrderDetail } fro
 
 const PER_PAGE = 25;
 
+// Month filter options, newest first: from the current month back to Jan 2024
+// (the store's data start). Value is "YYYY-MM"; label is e.g. "August 2026".
+const MONTH_OPTIONS: { value: string; label: string }[] = (() => {
+  const names = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const now = new Date();
+  const out: { value: string; label: string }[] = [];
+  let y = now.getFullYear();
+  let m = now.getMonth(); // 0-based
+  while (y > 2024 || (y === 2024 && m >= 0)) {
+    out.push({ value: `${y}-${String(m + 1).padStart(2, "0")}`, label: `${names[m]} ${y}` });
+    m -= 1;
+    if (m < 0) { m = 11; y -= 1; }
+  }
+  return out;
+})();
+
 const money = (n: number) =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -125,6 +144,7 @@ export default function AdminOrders() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [month, setMonth] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,7 +158,7 @@ export default function AdminOrders() {
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
 
-  const load = useCallback(async (p: number, searchTerm: string, statusFilter: string) => {
+  const load = useCallback(async (p: number, searchTerm: string, statusFilter: string, monthFilter: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -147,6 +167,7 @@ export default function AdminOrders() {
         perPage: PER_PAGE,
         search: searchTerm || undefined,
         status: statusFilter || undefined,
+        month: monthFilter || undefined,
       });
       setRows(res.data);
       setLastPage(res.meta.lastPage);
@@ -167,13 +188,13 @@ export default function AdminOrders() {
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
-      void load(1, search, status);
+      void load(1, search, status, month);
     }, 300);
     return () => clearTimeout(t);
-  }, [search, status, load]);
+  }, [search, status, month, load]);
 
   useEffect(() => {
-    void load(page, search, status);
+    void load(page, search, status, month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
@@ -207,7 +228,7 @@ export default function AdminOrders() {
     try {
       await api.adminUpdateOrderStatus(detail.id, newStatus);
       setDetail((d) => (d ? { ...d, status: newStatus } : d));
-      await load(page, search, status);
+      await load(page, search, status, month);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update status");
     } finally {
@@ -275,6 +296,19 @@ export default function AdminOrders() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select
+          className="adm-select"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          aria-label="Filter by month"
+        >
+          <option value="">All dates</option>
+          {MONTH_OPTIONS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         <select
           className="adm-select"
           value={status}

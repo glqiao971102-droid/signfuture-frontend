@@ -132,6 +132,10 @@ export type RasterEntry = {
   // Contour length of this record's outline, in metres (the path a 3D-printed
   // return traces once per layer). Populated by the Box Up analyzer.
   outline_length_m?: number;
+  // Estimated LED strip length for this record, in metres — concentric rings
+  // filling the letter: 1cm gap from the outline, then 7mm LED strip, 2cm gap,
+  // repeat inward until full. Populated by the Box Up analyzer.
+  led_length_m?: number;
 };
 
 // The bbox of all non-white artwork on the page, in pixels (y-down from top). Used
@@ -556,6 +560,8 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
           highlight_pct: highlightPct,
           // LED clearance from the tight letter box (its shortest side).
           led_clearance: ledClearanceFor(bboxPx),
+          // led_length_m (concentric-ring fill estimate) is stamped later in
+          // analyze.ts so BOTH the raster and vector letter paths get it.
           source: "raster-outline",
         });
       }
@@ -664,6 +670,202 @@ function connectedMaskForBbox(page: RenderedPage, bboxPx: PxBbox): { mask: Uint8
   for (const c of components) if (c.inside > best.inside) best = c;
   paint(best);
   return { mask, width: boxW, height: boxH, x1, y1 };
+}
+
+/**
+ * Build a downsample-bounded shape mask for one letter box and return its LED
+ * fill length. Unlike the thumbnail mask (capped at 600k px so big letters skip
+ * masking) this always produces a mask: for a large box it samples on a coarser
+ * grid so the working area stays within a fixed pixel budget, then scales pxPerCm
+ * to match. The largest connected component is kept so a neighbour clipping the
+ * box corner cannot inflate the fillable area.
+ */
+export function ledLengthForBox(page: RenderedPage, bboxPx: PxBbox, pxPerCm: number): number {
+  if (!pxPerCm || pxPerCm <= 0) return 0;
+  const { width: imgW, height: imgH, rgb } = page;
+  const [x1, y1, x2, y2] = bboxPx;
+  const boxW = x2 - x1 + 1;
+  const boxH = y2 - y1 + 1;
+  if (boxW <= 1 || boxH <= 1) return 0;
+  const BUDGET = 1_200_000;
+  const area = boxW * boxH;
+  const step = area > BUDGET ? Math.ceil(Math.sqrt(area / BUDGET)) : 1;
+  const w = Math.max(1, Math.floor(boxW / step));
+  const h = Math.max(1, Math.floor(boxH / step));
+  if (w <= 1 || h <= 1) return 0;
+  // Max-pool each step×step block into a mask that carries a 1px EMPTY frame
+  // (pw×ph). The frame guarantees a clean "outside" so face-detection's border
+  // flood is correct even when the letter touches the tight box edge, and so the
+  // distance transform insets from every outer edge (the letter's extreme points
+  // sit on the box border). A cell is artwork if ANY pixel in its block is — using
+  // the block (not just the centre pixel) keeps a thin outline stroke connected
+  // after downsampling, so the face flood can't leak through a sampling gap.
+  const pw = w + 2, ph = h + 2;
+  const mask = new Uint8Array(pw * ph);
+  for (let cy = 0; cy < h; cy++) {
+    const gy0 = y1 + cy * step;
+    const gy1 = Math.min(y2, gy0 + step - 1);
+    for (let cx = 0; cx < w; cx++) {
+      const gx0 = x1 + cx * step;
+      const gx1 = Math.min(x2, gx0 + step - 1);
+      let hit = 0;
+      for (let gy = gy0; gy <= gy1 && !hit; gy++) {
+        const rowBase = gy * imgW;
+        for (let gx = gx0; gx <= gx1; gx++) {
+          const i = (rowBase + gx) * 3;
+          if (rgb[i] < 245 || rgb[i + 1] < 245 || rgb[i + 2] < 245) { hit = 1; break; }
+        }
+      }
+      if (hit) mask[(cy + 1) * pw + (cx + 1)] = 1;
+    }
+  }
+  // The artwork draws each glyph as a hollow OUTLINE (channel-letter return), so
+  // recover the solid letter FACE — but NOT its counters. A counter (the hole in
+  // a/o/e/d, or a hole in a logo) gets no LED, so the face keeps a 1cm gap from the
+  // counter edge too. faceMaskExcludingCounters() fills the face and leaves counters
+  // empty; the distance transform then insets from both the outer and counter edges.
+  const faced = faceMaskExcludingCounters(mask, pw, ph);
+  keepLargestComponent(faced, pw, ph);
+  return ledFillLengthMeters(faced, pw, ph, pxPerCm / step);
+}
+
+/**
+ * Keep the letter FACE, drop its counters. An outline glyph draws each closed
+ * shape as a stroke; the background one stroke inside the outermost edge is the
+ * face (gets LED), the background two strokes in is a counter/hole (no LED — the
+ * "a"/"o" hole, or a hole punched in a logo). Every background pixel is classified
+ * by how many artwork boundaries separate it from the image border (a 0-1 BFS,
+ * crossing artwork↔background costs 1). Outside background sits at 0 crossings, the
+ * face at 2, a counter at 4, and so on — so background at ≡2 (mod 4) is face and is
+ * kept; everything at ≡0 (mod 4) is outside/counter and stays empty. Artwork pixels
+ * (the drawn strokes) are always part of the face.
+ */
+function faceMaskExcludingCounters(mask: Uint8Array, w: number, h: number): Uint8Array {
+  const n = w * h;
+  const depth = new Int32Array(n).fill(-1);
+  const buckets: number[][] = [];
+  const push = (i: number, d: number) => { (buckets[d] || (buckets[d] = [])).push(i); };
+  const seedBorder = (i: number) => { if (depth[i] !== 0) { depth[i] = 0; push(i, 0); } };
+  for (let x = 0; x < w; x++) { seedBorder(x); seedBorder((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { seedBorder(y * w); seedBorder(y * w + w - 1); }
+  for (let d = 0; d < buckets.length; d++) {
+    const q = buckets[d];
+    if (!q) continue;
+    for (let qi = 0; qi < q.length; qi++) {
+      const i = q[qi];
+      if (depth[i] !== d) continue; // stale entry from a later relaxation
+      const cx = i % w, cy = (i / w) | 0;
+      const relax = (ni: number) => {
+        const nd = d + (mask[i] === mask[ni] ? 0 : 1);
+        if (depth[ni] === -1 || nd < depth[ni]) { depth[ni] = nd; push(ni, nd); }
+      };
+      if (cx > 0) relax(i - 1);
+      if (cx < w - 1) relax(i + 1);
+      if (cy > 0) relax(i - w);
+      if (cy < h - 1) relax(i + w);
+    }
+  }
+  // Decide whether the artwork is drawn as OUTLINE or SOLID. The background one
+  // boundary in (depth ≡ 2 mod 4) is the letter FACE when the art is a hollow
+  // outline (that region is big, the drawn strokes are thin) but is the COUNTER
+  // when the art is solid (that region is a small hole inside a large fill). So
+  // fill the depth-2 background only when it out-measures the drawn artwork.
+  let maskCount = 0, innerCount = 0;
+  for (let i = 0; i < n; i++) {
+    if (mask[i]) maskCount++;
+    else if ((depth[i] & 3) === 2) innerCount++;
+  }
+  const outline = innerCount > maskCount;
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (mask[i]) out[i] = 1;                              // solid fill / drawn stroke = face
+    else if (outline && (depth[i] & 3) === 2) out[i] = 1; // outline art: background one stroke in = face
+  }
+  return out;
+}
+
+/** Zero every pixel that is not part of the largest 4-connected component. */
+function keepLargestComponent(mask: Uint8Array, w: number, h: number): void {
+  const n = w * h;
+  const label = new Int32Array(n).fill(-1);
+  const stack: number[] = [];
+  let bestId = -1;
+  let bestSize = 0;
+  let nextId = 0;
+  for (let s = 0; s < n; s++) {
+    if (!mask[s] || label[s] !== -1) continue;
+    const id = nextId++;
+    label[s] = id;
+    stack.length = 0;
+    stack.push(s);
+    let size = 0;
+    while (stack.length) {
+      const c = stack.pop()!;
+      size++;
+      const cx = c % w;
+      const cy = (c / w) | 0;
+      if (cx > 0) { const ni = c - 1; if (mask[ni] && label[ni] === -1) { label[ni] = id; stack.push(ni); } }
+      if (cx < w - 1) { const ni = c + 1; if (mask[ni] && label[ni] === -1) { label[ni] = id; stack.push(ni); } }
+      if (cy > 0) { const ni = c - w; if (mask[ni] && label[ni] === -1) { label[ni] = id; stack.push(ni); } }
+      if (cy < h - 1) { const ni = c + w; if (mask[ni] && label[ni] === -1) { label[ni] = id; stack.push(ni); } }
+    }
+    if (size > bestSize) { bestSize = size; bestId = id; }
+  }
+  if (bestId < 0) return;
+  for (let i = 0; i < n; i++) if (label[i] !== bestId) mask[i] = 0;
+}
+
+/**
+ * Estimated LED strip length (metres) to fill one record with concentric rings:
+ * leave a 1cm gap from the outline, stick a 7mm LED strip, leave a 2cm gap, then
+ * another ring, repeating inward until full.
+ *
+ * Rings spaced at pitch = 0.7cm (strip) + 2.0cm (gap) fill the area that sits at
+ * least 1cm inside the outline, so the total strip centreline length is that
+ * fillable area divided by the pitch (the standard area/pitch fill estimate).
+ * The fillable area comes from a chamfer distance transform of the shape mask,
+ * which naturally drops thin strokes that are too narrow for a ring.
+ */
+function ledFillLengthMeters(mask: Uint8Array, w: number, h: number, pxPerCm: number): number {
+  if (!pxPerCm || pxPerCm <= 0 || w <= 0 || h <= 0) return 0;
+  const n = w * h;
+  const INF = 1e9;
+  const dist = new Float32Array(n);
+  for (let i = 0; i < n; i++) dist[i] = mask[i] ? INF : 0;
+  const dOrtho = 1;
+  const dDiag = Math.SQRT2;
+  // Forward pass (top-left to bottom-right).
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (dist[i] === 0) continue;
+      let m = dist[i];
+      if (x > 0) m = Math.min(m, dist[i - 1] + dOrtho);
+      if (y > 0) m = Math.min(m, dist[i - w] + dOrtho);
+      if (x > 0 && y > 0) m = Math.min(m, dist[i - w - 1] + dDiag);
+      if (x < w - 1 && y > 0) m = Math.min(m, dist[i - w + 1] + dDiag);
+      dist[i] = m;
+    }
+  }
+  // Backward pass (bottom-right to top-left).
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (dist[i] === 0) continue;
+      let m = dist[i];
+      if (x < w - 1) m = Math.min(m, dist[i + 1] + dOrtho);
+      if (y < h - 1) m = Math.min(m, dist[i + w] + dOrtho);
+      if (x < w - 1 && y < h - 1) m = Math.min(m, dist[i + w + 1] + dDiag);
+      if (x > 0 && y < h - 1) m = Math.min(m, dist[i + w - 1] + dDiag);
+      dist[i] = m;
+    }
+  }
+  const borderPx = 1.0 * pxPerCm; // leave 1cm empty from the outline
+  let fillablePx = 0;
+  for (let i = 0; i < n; i++) if (dist[i] >= borderPx) fillablePx++;
+  const areaCm2 = fillablePx / (pxPerCm * pxPerCm);
+  const pitchCm = 2.0; // ring centre-to-centre spacing (2cm)
+  return areaCm2 / pitchCm / 100; // cm → metres
 }
 
 // Simple area-average downscale (thumbnail-only; visual parity with PIL LANCZOS).

@@ -259,6 +259,9 @@ export type LetterEntry = {
   // Contour length of this letter's outline, in metres (the path a 3D-printed
   // return traces once per layer). Populated by the Box Up analyzer.
   outline_length_m?: number;
+  // Estimated LED strip length (metres) to fill this letter with concentric
+  // rings. Stamped by the Box Up analyzer from the page raster.
+  led_length_m?: number;
 };
 
 // One connected outline contour (a single subpath) of a filled/stroked shape,
