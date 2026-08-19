@@ -407,6 +407,7 @@ export default function AdminOrders() {
             <tr>
               <th>Order</th>
               <th>Customer</th>
+              <th>Email</th>
               <th>Date</th>
               <th>Status</th>
               <th className="adm-num">Total (RM)</th>
@@ -417,14 +418,14 @@ export default function AdminOrders() {
           <tbody>
             {loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="adm-empty">
+                <td colSpan={8} className="adm-empty">
                   Loading orders…
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="adm-empty">
+                <td colSpan={8} className="adm-empty">
                   No orders match.
                 </td>
               </tr>
@@ -445,6 +446,7 @@ export default function AdminOrders() {
                     o.customer
                   )}
                 </td>
+                <td className="adm-email">{o.email || "—"}</td>
                 <td className="adm-date">{formatDate(o.date)}</td>
                 <td>
                   {o.source === "native" && o.jobStatuses && o.jobStatuses.length > 0 ? (

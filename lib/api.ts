@@ -1034,6 +1034,8 @@ export const api = {
 export type AdminOrderRow = OrderSummary & {
   customer: string;
   customerId: number | null;
+  /** The customer's account e-mail. */
+  email?: string | null;
   source?: "native" | "legacy" | "reload";
   ref?: string;
   /** Per-job statuses (native orders) so the list can show the mix. */

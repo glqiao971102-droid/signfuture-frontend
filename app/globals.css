@@ -4651,6 +4651,7 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .adm-login { font-weight: 600; color: var(--text); }
 .adm-email { color: var(--muted); overflow-wrap: anywhere; }
 .adm-date { color: var(--muted); white-space: nowrap; }
+.adm-email { color: var(--muted); font-size: 12.5px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-empty { text-align: center; color: var(--muted); padding: 28px 0; }
 
 .adm-chip {
