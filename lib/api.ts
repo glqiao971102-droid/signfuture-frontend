@@ -1230,7 +1230,7 @@ export type AdminStats = {
     products: { name: string; revenue: number; qty: number; orders: number }[];
   }[];
   topCustomers: { name: string; email: string | null; orders: number; spend: number }[];
-  recentOrders: { id: number; status: string; total: number; items: number; date: string; customer: string }[];
+  recentOrders: { id: number; ref?: string; status: string; statusLabel?: string; total: number; items: number; date: string; customer: string }[];
   /** Present when the overview was requested with a date range. */
   range?: { from: string | null; to: string | null };
   /** Membership tier headcount, ordered high → low. */

@@ -243,7 +243,7 @@ export default function AdminDashboard() {
           <div className="dash-status-list">
             {data.statusBreakdown.slice(0, 8).map((s) => (
               <div className="dash-status-row" key={s.status}>
-                <span className="dash-status-name">{statusLabel(s.status)}</span>
+                <span className="dash-status-name">{s.status}</span>
                 <span className="dash-status-count">{s.orders}</span>
                 <span className="dash-status-rev">{rm(s.revenue)}</span>
               </div>
@@ -385,11 +385,11 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {data.recentOrders.map((o) => (
-                  <tr key={o.id}>
-                    <td className="adm-mono">#{o.id}</td>
+                  <tr key={`${o.ref ?? o.id}`}>
+                    <td className="adm-mono">{o.ref ?? `#${o.id}`}</td>
                     <td className="adm-login">{o.customer}</td>
                     <td>
-                      <span className="adm-chip adm-chip-member">{statusLabel(o.status)}</span>
+                      <span className="adm-chip adm-chip-member">{o.statusLabel ?? statusLabel(o.status)}</span>
                     </td>
                     <td className="adm-num adm-mono">{o.items}</td>
                     <td className="adm-num adm-mono">{rm2(o.total)}</td>
