@@ -67,6 +67,8 @@ export type ProfileUpdate = {
   companyTin?: string;
   companyConfirmed?: boolean;
   password?: string;
+  /** The member's trades ("What do you do?"). */
+  professions?: string[];
 };
 
 /** Trades offered at registration (mirrors the backend PROFESSIONS list). */

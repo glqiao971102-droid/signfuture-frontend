@@ -4075,6 +4075,15 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   font-weight: 600;
 }
 
+/* "What do you do?" trades block inside Edit Detail. */
+.edit-detail-professions { margin: 4px 0 18px; }
+.edit-detail-professions-label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
 /* Admin: referral code display chip. */
 .adm-referral-code {
   display: inline-block;

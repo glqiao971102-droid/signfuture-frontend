@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { api, type ProfileUpdate } from "@/lib/api";
+import { api, PROFESSIONS, type ProfileUpdate } from "@/lib/api";
 
 /**
  * Edit Detail — the customer's registration details.
@@ -77,6 +77,8 @@ export default function EditDetail() {
   const [company, setCompany] = useState<Company>(EMPTY_COMPANY);
   const [contact, setContact] = useState<Contact>(EMPTY_CONTACT);
   const [pw, setPw] = useState({ next: "", confirm: "" });
+  // The member's trades ("What do you do?") — saved with the contact form.
+  const [professions, setProfessions] = useState<string[]>([]);
   const [companyMsg, setCompanyMsg] = useState("");
   const [contactMsg, setContactMsg] = useState("");
   const [savingCompany, setSavingCompany] = useState(false);
@@ -117,7 +119,12 @@ export default function EditDetail() {
       state: stateFromPostcode(postcode) || b.state || "",
       mobile: user?.phone || b.phone || "",
     });
+    setProfessions(user?.professions ?? []);
   }, [user]);
+
+  function toggleProfession(p: string) {
+    setProfessions((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
 
   const companyComplete =
     company.name.trim() !== "" && company.regNo.trim() !== "" && company.tin.trim() !== "";
@@ -177,6 +184,7 @@ export default function EditDetail() {
         postcode: contact.postcode.trim(),
         city: contact.city.trim(),
         state: contact.state.trim(),
+        professions,
       };
       if (pw.next) patch.password = pw.next;
       await api.updateProfile(patch);
@@ -267,6 +275,26 @@ export default function EditDetail() {
         <div className="edit-detail-block-head">
           <h3>Contact &amp; Login</h3>
         </div>
+
+        {/* What do you do? — the member's trades (select all that apply). */}
+        <div className="edit-detail-professions">
+          <span className="edit-detail-professions-label">
+            What do you do? <span className="login-optional">(select all that apply)</span>
+          </span>
+          <div className="reg-chips">
+            {PROFESSIONS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`reg-chip${professions.includes(p) ? " is-active" : ""}`}
+                onClick={() => toggleProfession(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="edit-detail-grid">
           <label className="span-2">
             Email
