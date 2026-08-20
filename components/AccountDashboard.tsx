@@ -9,11 +9,14 @@ import InvoiceList from "@/components/InvoiceList";
 import ReloadList from "@/components/ReloadList";
 import WalletTransactions from "@/components/WalletTransactions";
 import EditDetail from "@/components/EditDetail";
+import RequestQuotation from "@/components/RequestQuotation";
+import MyQuotations from "@/components/MyQuotations";
 import VoucherCards from "@/components/VoucherCards";
 import MyInstallationFrame from "@/components/MyInstallationFrame";
 
 type SectionKey =
   | "consultant"
+  | "requestQuote"
   | "quotation"
   | "voucher"
   | "wallet"
@@ -31,6 +34,7 @@ type SectionKey =
 // `soon` items are disabled and show a small "soon" badge (coming later).
 const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] = [
   { key: "consultant", label: "My Consultant", glyph: "☎" },
+  { key: "requestQuote", label: "Request Quotation", glyph: "✉" },
   { key: "quotation", label: "My Quotation", glyph: "❝" },
   { key: "voucher", label: "My Voucher", glyph: "▧" },
   { key: "wallet", label: "My Wallet", glyph: "◈" },
@@ -451,18 +455,11 @@ export default function AccountDashboard() {
         );
       }
 
+      case "requestQuote":
+        return <RequestQuotation />;
+
       case "quotation":
-        return (
-          <section className="acct-card acct-section-card">
-            <div className="acct-card-head">
-              <h2>My Quotation</h2>
-              <span>Filter by product, ref., date or status — then place your order.</span>
-            </div>
-            <p className="acct-card-sub" style={{ padding: "8px 0" }}>
-              No quotations yet. Your saved quotes will appear here.
-            </p>
-          </section>
-        );
+        return <MyQuotations />;
 
       case "voucher":
         return (

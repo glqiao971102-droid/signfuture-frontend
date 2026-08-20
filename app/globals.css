@@ -1331,6 +1331,92 @@ a { color: inherit; text-decoration: none; }
   -webkit-text-fill-color: #7f8da2;
 }
 .edit-detail-field-note { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+
+/* ---- Request Quotation (RFQ) ---- */
+.rfq-wrap { display: flex; flex-direction: column; gap: 18px; }
+.edit-detail-grid textarea.rfq-textarea {
+  padding: 9px 11px; border-radius: 8px;
+  border: 1px solid rgba(120, 150, 190, 0.35);
+  background: rgba(3, 15, 31, 0.6); color: #eaf2ff; font-weight: 500;
+  font-family: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; min-height: 90px;
+}
+.rfq-size-row { display: flex; gap: 8px; }
+.rfq-size-row input { flex: 1 1 auto; min-width: 0; }
+.rfq-size-row select { flex: 0 0 72px; }
+.rfq-check-label {
+  flex-direction: row !important; align-items: center; gap: 9px !important;
+  align-self: end; padding-bottom: 9px;
+}
+.rfq-check-label input { width: 17px; height: 17px; accent-color: var(--cyan); cursor: pointer; }
+.rfq-check-label span { font-weight: 700; color: #b9c9dd; }
+.rfq-files { margin: 16px 0 4px; }
+.rfq-file-picker { display: flex; gap: 10px; align-items: center; }
+.rfq-file-btn { padding: 9px 16px; font-size: 13.5px; }
+.rfq-file-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.rfq-file-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 11px; border-radius: 8px;
+  border: 1px solid rgba(120, 150, 190, 0.28); background: rgba(3, 15, 31, 0.45);
+}
+.rfq-file-name { font-size: 12.5px; color: #eaf2ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rfq-file-remove {
+  flex: 0 0 auto; border: none; background: transparent; color: #f87171;
+  font-size: 14px; font-weight: 800; cursor: pointer; line-height: 1; padding: 2px 4px;
+}
+.rfq-file-remove:hover { color: #fca5a5; }
+
+/* ---- Admin: Quotation Requests ---- */
+.rfq-admin-list { display: flex; flex-direction: column; gap: 14px; }
+.rfq-admin-card {
+  border: 1px solid var(--line-soft); border-radius: 14px;
+  background: rgba(9, 22, 42, 0.5); padding: 16px 18px;
+}
+.rfq-admin-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.rfq-admin-title { font-size: 15.5px; color: var(--text); margin-right: 10px; }
+.rfq-admin-date { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.rfq-admin-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; margin: 14px 0 4px;
+  font-size: 13.5px; color: var(--text);
+}
+.rfq-admin-grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rfq-admin-remark { margin-top: 10px; }
+.rfq-admin-remark p { margin: 3px 0 0; font-size: 13px; color: #cdd9ea; white-space: pre-wrap; }
+.rfq-admin-files { margin-top: 12px; }
+.rfq-admin-file-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+.rfq-admin-actions {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft);
+}
+.rfq-admin-status-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.rfq-admin-status-pick .adm-select { min-width: 190px; }
+/* Status badge colours. */
+.rfq-status { font-weight: 800; }
+.rfq-status-new { background: rgba(53, 216, 255, 0.14); color: var(--cyan); border: 1px solid rgba(53, 216, 255, 0.4); }
+.rfq-status-quoted { background: rgba(251, 191, 36, 0.14); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+.rfq-status-converted { background: rgba(52, 211, 153, 0.14); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.4); }
+.rfq-status-closed { background: rgba(148, 163, 184, 0.14); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.4); }
+@media (max-width: 720px) {
+  .rfq-admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Customer picker in the Add-quotation modal. */
+.rfq-cust-search { position: relative; }
+.rfq-cust-results {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 6px;
+  border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden;
+  background: rgba(9, 22, 42, 0.9);
+}
+.rfq-cust-result {
+  text-align: left; padding: 9px 12px; border: none; background: transparent;
+  color: var(--text); font-size: 13px; cursor: pointer;
+}
+.rfq-cust-result:hover { background: rgba(57, 151, 255, 0.12); }
+.rfq-cust-picked {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--cyan); border-radius: 10px;
+  background: rgba(53, 216, 255, 0.1); font-size: 13.5px; color: var(--text);
+}
+.rfq-cust-picked .rfq-file-remove { color: var(--cyan); font-size: 12px; font-weight: 700; }
 .edit-detail-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
 .edit-detail-note { margin: 0; font-size: 12px; color: var(--muted); flex: 1 1 240px; }
 .edit-detail-msg { margin: 0; font-size: 12.5px; font-weight: 700; color: #34d399; }
@@ -2347,6 +2433,61 @@ a { color: inherit; text-decoration: none; }
 .rs-hold { color: #ff9f43; border-color: rgba(255, 159, 67, 0.5); background: rgba(255, 159, 67, 0.12); }
 .rs-ready { color: #b08bff; border-color: rgba(176, 139, 255, 0.5); background: rgba(176, 139, 255, 0.12); }
 .rs-pending-confirm { color: #ffb03c; border-color: rgba(255, 176, 60, 0.55); background: rgba(255, 176, 60, 0.12); }
+.rs-quoted { color: #35d8ff; border-color: rgba(53, 216, 255, 0.5); background: rgba(53, 216, 255, 0.12); }
+
+/* Member's quoted price table + confirm (in Your recent requests). */
+.rfq-quote { margin-top: 12px; }
+.rfq-quote-table {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+}
+.rfq-quote-cell {
+  display: flex; flex-direction: column; gap: 3px; padding: 9px 10px;
+  border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(3, 15, 31, 0.5);
+}
+.rfq-quote-cell.is-mine { border-color: var(--cyan); background: rgba(53, 216, 255, 0.12); }
+.rfq-quote-tier { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); text-transform: uppercase; }
+.rfq-quote-cell.is-mine .rfq-quote-tier { color: var(--cyan); }
+.rfq-quote-price { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.rfq-quote-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.rfq-quote-your { font-size: 13.5px; color: #cdd9ea; }
+.rfq-quote-your strong { color: #eaf2ff; }
+.rfq-confirm-btn { padding: 10px 22px; }
+.rfq-quote-confirmed { margin: 12px 0 0; font-size: 13.5px; font-weight: 700; color: #34d399; }
+.rfq-quote-valid { margin: 12px 0 6px; font-size: 12.5px; color: var(--muted); }
+.rfq-quote-valid strong { color: #eaf2ff; }
+.rfq-quote-expired { margin: 12px 0 0; font-size: 13px; font-weight: 700; color: #ffb03c; }
+/* Request Repeat Order — sits top-right of a confirmed quote card. */
+.rfq-repeat-btn {
+  margin-left: auto;
+  padding: 6px 13px;
+  border: 1px solid var(--cyan);
+  border-radius: 999px;
+  background: rgba(53, 216, 255, 0.12);
+  color: var(--cyan);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.rfq-repeat-btn:hover { background: linear-gradient(90deg, var(--blue), var(--cyan)); border-color: transparent; color: #03101f; }
+.rfq-repeat-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Admin tier-pricing editor on a quotation card. */
+.rfq-price-editor { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.rfq-price-grid { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 8px; }
+.rfq-price-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.rfq-price-grid input {
+  width: 118px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid rgba(120, 150, 190, 0.35); background: rgba(3, 15, 31, 0.6);
+  color: #eaf2ff; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.rfq-price-agent input { border-color: rgba(53, 216, 255, 0.55); }
+.rfq-price-days input { width: 100px; border-color: rgba(251, 191, 36, 0.5); }
+.rfq-price-send { padding: 9px 18px; }
+.rfq-quote-lead { margin: 0 0 10px; font-size: 13px; color: #cdd9ea; }
+.rfq-quote-lead strong { color: #fbbf24; }
+.rfq-price-note { margin: 8px 0 0; font-size: 12px; color: #34d399; font-weight: 600; }
 
 /* Order Status Guide — always-visible legend: just the coloured status pills. */
 .status-guide { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 10px; }

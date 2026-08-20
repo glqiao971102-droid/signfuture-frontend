@@ -71,6 +71,80 @@ export type ProfileUpdate = {
   professions?: string[];
 };
 
+/** A reference file attached to a quotation request. */
+export type QuotationFile = { url: string; name: string };
+
+/** Payload to submit a quotation request (RFQ). */
+export type QuotationInput = {
+  category: string;
+  title: string;
+  quantity?: number;
+  width?: number;
+  height?: number;
+  unit?: "in" | "ft" | "cm" | "mm" | "m";
+  targetDate?: string;
+  installation?: boolean;
+  remark?: string;
+  files?: QuotationFile[];
+};
+
+/** A member's submitted quotation request. */
+export type QuotationRow = {
+  id: number;
+  category: string;
+  title: string;
+  quantity: number;
+  width: number | null;
+  height: number | null;
+  unit: string | null;
+  targetDate: string | null;
+  installation: boolean;
+  remark: string | null;
+  files: QuotationFile[];
+  /** Lead time promised at quote time (working days). */
+  workingDays?: number | null;
+  status: string;
+  /** Tier prices once the admin has quoted (null until then). */
+  prices?: { agent: number | null; silver: number | null; gold: number | null; diamond: number | null };
+  quotedAt?: string | null;
+  /** When the quote lapses (30 days after it was issued). */
+  expiresAt?: string | null;
+  /** True when a quoted request has passed its validity. */
+  expired?: boolean;
+  confirmedAt?: string | null;
+  /** The native order ref (100xxx) created once the member confirmed. */
+  orderRef?: string | null;
+  createdAt: string | null;
+};
+
+/** Tier prices for a quotation (agent is the base; the rest are −5/6/8%). */
+export type QuotationPrices = { agent: number; silver?: number; gold?: number; diamond?: number; workingDays?: number };
+
+/** Admin view of a quotation request (adds the customer's contact details). */
+export type AdminQuotationRow = QuotationRow & {
+  userId: number;
+  customer: string;
+  email: string | null;
+  phone: string | null;
+};
+
+/** Payload for an admin-created quotation (proactively quoting a customer). */
+export type AdminQuotationInput = {
+  userId: number;
+  category: string;
+  title: string;
+  quantity?: number;
+  width?: number;
+  height?: number;
+  unit?: "in" | "ft" | "cm" | "mm" | "m";
+  targetDate?: string;
+  installation?: boolean;
+  remark?: string;
+  files?: QuotationFile[];
+  agent?: number;
+  workingDays?: number;
+};
+
 /** Trades offered at registration (mirrors the backend PROFESSIONS list). */
 export const PROFESSIONS = [
   "Offset Printing",
@@ -646,6 +720,93 @@ export const api = {
     const body = await res.json().catch(() => null);
     if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed", body?.error ?? null);
     return body as { url: string };
+  },
+
+  /** Uploads any reference file (artwork/photo/PDF) and returns its stored URL. */
+  async uploadFile(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/uploads/artwork`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed", body?.error ?? null);
+    return body as { url: string };
+  },
+
+  /** Submits a quotation request (RFQ). */
+  createQuotation(input: QuotationInput) {
+    return request<{ ok: boolean; id: number }>("/api/v1/quotations", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** The member's own quotation requests, newest first. */
+  myQuotations() {
+    return request<{ data: QuotationRow[] }>("/api/v1/quotations");
+  },
+
+  /** The member confirms the order at the quoted price — places a real order
+   *  paid from the wallet. Throws ApiError("INSUFFICIENT_WALLET") if short. */
+  confirmQuotation(id: number) {
+    return request<{ success: boolean; status: string; orderRef?: string }>(
+      `/api/v1/quotations/${id}/confirm`,
+      { method: "POST" },
+    );
+  },
+
+  /** Repeat a confirmed quotation as a new order at the same quoted price. */
+  reorderQuotation(id: number) {
+    return request<{ success: boolean; status: string; orderRef?: string }>(
+      `/api/v1/quotations/${id}/reorder`,
+      { method: "POST" },
+    );
+  },
+
+  /** Admin: list all quotation requests. */
+  adminQuotations(opts: { page?: number; perPage?: number; status?: string; search?: string; month?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (opts.page) qs.set("page", String(opts.page));
+    if (opts.perPage) qs.set("perPage", String(opts.perPage));
+    if (opts.status) qs.set("status", opts.status);
+    if (opts.search) qs.set("search", opts.search);
+    if (opts.month) qs.set("month", opts.month);
+    return request<{ data: AdminQuotationRow[]; meta: PagedMeta; counts: { status: string; count: number }[] }>(
+      `/api/v1/admin/quotations?${qs}`,
+    );
+  },
+
+  /** Admin: proactively create a quotation for a customer (optionally quoted). */
+  adminCreateQuotation(input: AdminQuotationInput) {
+    return request<{ ok: boolean; id: number; status: string }>("/api/v1/admin/quotations", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  /** Admin: change a quotation request's status. */
+  adminUpdateQuotationStatus(id: number, status: string) {
+    return request<{ success: boolean; status: string }>(
+      `/api/v1/admin/quotations/${id}/status`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
+    );
+  },
+
+  /** Admin: set the tier prices (quotes the request). Agent is the base. */
+  adminSetQuotationPrices(id: number, prices: QuotationPrices) {
+    return request<{
+      success: boolean;
+      status: string;
+      workingDays: number | null;
+      prices: { agent: number; silver: number; gold: number; diamond: number };
+    }>(`/api/v1/admin/quotations/${id}/prices`, {
+      method: "PATCH",
+      body: JSON.stringify(prices),
+    });
   },
 
   /** Submits a MANUAL bank-transfer top-up with an uploaded receipt. The wallet

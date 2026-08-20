@@ -109,14 +109,18 @@ function workingDaysLabel(n: number): string {
   return `${snapped} working days`;
 }
 
-/** Pulls the collect lead-time out of a line item's spec/options, as one of the
- *  five valid labels (7 / 4 / 3 / 2 / next working days), or "—" if none. */
+/** Pulls the collect lead-time out of a line item's spec/options. An explicit
+ *  "N working days" (e.g. a custom quotation lead time) is shown EXACTLY; only a
+ *  value derived from a "collect <date>" is snapped to the standard lead-times. */
 function workingDaysOf(options: { label: string; value: string }[], orderDate?: string | null): string {
   for (const o of options) {
     const text = `${o.value} ${o.label}`;
     if (/next\s*working\s*days?/i.test(text)) return "next working days";
     const m = /(\d+)\s*working\s*days?/i.exec(text);
-    if (m) return workingDaysLabel(parseInt(m[1], 10));
+    if (m) {
+      const n = parseInt(m[1], 10);
+      return n <= 1 ? "next working days" : `${n} working days`;
+    }
   }
   for (const o of options) {
     const n = collectWorkingDays(o.value, orderDate);
