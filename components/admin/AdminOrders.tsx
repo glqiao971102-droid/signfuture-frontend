@@ -174,6 +174,38 @@ function jobStatusClass(status: string): string {
   return `adm-chip adm-jstat-${status}`;
 }
 
+// ---- Box-up cost estimate ----
+// A box-up order line carries "LED Length: X m" and "3D Outline: Y m" (metres),
+// captured from the analyzer at checkout. 3D-print material length ≈ outline ×
+// (depth ÷ 0.3mm layer): 3cm → ×100, 5cm → ×166.67.
+// Internal cost inputs — surfaced in the Cost estimate, hidden from the plain
+// line-item option list.
+const COST_OPTION_LABELS = new Set(["LED Length", "3D Outline"]);
+function optValue(options: { label: string; value: string }[], label: string): string | null {
+  const o = options.find((x) => x.label.toLowerCase() === label.toLowerCase());
+  return o ? o.value : null;
+}
+function metresOf(v: string | null): number | null {
+  if (!v) return null;
+  const m = /([\d.]+)/.exec(v);
+  return m ? Number(m[1]) : null;
+}
+function boxupDepthCm(options: { label: string; value: string }[]): number | null {
+  const m = /(\d+)\s*cm/i.exec(optValue(options, "Size") || "");
+  return m ? Number(m[1]) : null;
+}
+type CostLine = { name: string; led: number | null; outline: number | null; depth: number | null };
+function costLinesOf(lines: { name: string; options: { label: string; value: string }[] }[]): CostLine[] {
+  return lines
+    .map((l) => {
+      const led = metresOf(optValue(l.options, "LED Length"));
+      const outline = metresOf(optValue(l.options, "3D Outline"));
+      if (led == null && outline == null) return null;
+      return { name: l.name, led, outline, depth: boxupDepthCm(l.options) };
+    })
+    .filter((c): c is CostLine => c !== null);
+}
+
 export default function AdminOrders() {
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [savingReloadId, setSavingReloadId] = useState<number | null>(null);
@@ -749,9 +781,11 @@ export default function AdminOrders() {
                       <td>
                         <strong className="adm-job-no">{nativeDetail.ref}-{i + 1}</strong>{" "}
                         {l.name}
-                        {l.options.length > 0 && (
+                        {l.options.filter((o) => !COST_OPTION_LABELS.has(o.label)).length > 0 && (
                           <div className="adm-line-opts">
-                            {l.options.map((o) => <span key={o.label}>{o.label}: {displayOptionValue(o.value, nativeDetail.date)}</span>)}
+                            {l.options.filter((o) => !COST_OPTION_LABELS.has(o.label)).map((o) => (
+                              <span key={o.label}>{o.label}: {displayOptionValue(o.value, nativeDetail.date)}</span>
+                            ))}
                           </div>
                         )}
                         {(() => {
@@ -798,6 +832,46 @@ export default function AdminOrders() {
                 </tbody>
               </table>
             </div>
+
+            {/* Cost estimate — LED metres + 3D-print material metres (box-up). */}
+            {(() => {
+              const cost = costLinesOf(nativeDetail.lines);
+              if (!cost.length) return null;
+              return (
+                <>
+                  <h3 className="adm-drawer-sub">Cost estimate</h3>
+                  <div className="adm-cost">
+                    {cost.map((c, i) => (
+                      <div key={i} className="adm-cost-card">
+                        <strong className="adm-cost-name">{c.name}{c.depth ? ` · ${c.depth}cm box up` : ""}</strong>
+                        <div className="adm-cost-rows">
+                          {c.led != null && (
+                            <div className="adm-cost-row"><span>LED strip</span><strong>{c.led.toFixed(2)} m</strong></div>
+                          )}
+                          {c.outline != null && (
+                            <>
+                              <div className="adm-cost-row"><span>3D outline</span><strong>{c.outline.toFixed(2)} m</strong></div>
+                              {c.depth != null ? (
+                                <div className="adm-cost-row is-ordered">
+                                  <span>3D material ({c.depth}cm)</span>
+                                  <strong>{(c.outline * (c.depth === 5 ? 500 / 3 : (c.depth * 10) / 0.3)).toFixed(1)} m</strong>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="adm-cost-row"><span>3D material @ 3cm</span><strong>{(c.outline * 100).toFixed(1)} m</strong></div>
+                                  <div className="adm-cost-row"><span>3D material @ 5cm</span><strong>{(c.outline * (500 / 3)).toFixed(1)} m</strong></div>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="adm-cost-hint">Material length ≈ outline × (depth ÷ 0.3mm layer). LED strip = concentric-ring fill at 2cm spacing.</p>
+                </>
+              );
+            })()}
 
             {nativeDetail.notes && (
               <>
