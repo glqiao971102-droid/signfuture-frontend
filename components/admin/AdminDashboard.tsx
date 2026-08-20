@@ -64,6 +64,9 @@ export default function AdminDashboard() {
   const [from, setFrom] = useState<string>(() => thisMonthRange().from);
   const [to, setTo] = useState<string>(() => thisMonthRange().to);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // The revenue trend chart always shows the full YEAR (Jan → now) so it stays
+  // a meaningful trend even while the KPIs default to just this month.
+  const [yearMonths, setYearMonths] = useState<AdminStats["revenueByMonth"] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +88,23 @@ export default function AdminDashboard() {
       cancelled = true;
     };
   }, [from, to]);
+
+  // Fetch the full-year monthly revenue once for the trend chart (independent
+  // of the range selector above).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const y = await api.adminStatsRanged(thisYearRange());
+        if (!cancelled) setYearMonths(y.revenueByMonth);
+      } catch {
+        /* the chart falls back to the ranged data */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function download(kind: "orders" | "sales" | "products") {
     setDownloading(kind);
@@ -156,7 +176,10 @@ export default function AdminDashboard() {
       ? ((k.thisMonthRevenue - k.lastMonthRevenue) / k.lastMonthRevenue) * 100
       : null;
 
-  const maxRev = Math.max(1, ...data.revenueByMonth.map((m) => m.revenue));
+  // Revenue chart always shows the full year; fall back to the ranged data
+  // until the year fetch resolves.
+  const chartMonths = yearMonths ?? data.revenueByMonth;
+  const maxRev = Math.max(1, ...chartMonths.map((m) => m.revenue));
   const maxProdRev = Math.max(1, ...data.topProducts.map((p) => p.revenue));
 
   return (
@@ -190,7 +213,7 @@ export default function AdminDashboard() {
         {/* ---- Revenue trend ---- */}
         <section className="adm-card dash-chart-card">
           <div className="adm-card-head-row">
-            <h2>{mode === "month" ? "Revenue — this month" : mode === "year" ? "Revenue — this year" : "Revenue — selected range"}</h2>
+            <h2>Revenue — this year</h2>
             <span className="dash-mom">
               This month {rm2(k.thisMonthRevenue)}
               {momPct !== null && (
@@ -201,7 +224,7 @@ export default function AdminDashboard() {
             </span>
           </div>
           <div className="dash-chart">
-            {data.revenueByMonth.map((m) => (
+            {chartMonths.map((m) => (
               <div className="dash-bar-col" key={m.month} title={`${m.month}: ${rm2(m.revenue)} · ${m.orders} orders`}>
                 <span className="dash-bar-val">{Math.round(m.revenue / 1000)}k</span>
                 <div className="dash-bar" style={{ height: `${(m.revenue / maxRev) * 100}%` }} />
