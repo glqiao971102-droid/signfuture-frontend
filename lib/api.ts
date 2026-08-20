@@ -1469,6 +1469,8 @@ export type AdminUserRow = {
   roles: string[];
   memberNo: string;
   walletBalance: number;
+  /** The member's consultant (referrer admin); null for admins / no referrer. */
+  consultant?: string | null;
 };
 
 /**

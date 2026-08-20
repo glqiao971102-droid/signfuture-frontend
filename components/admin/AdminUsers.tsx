@@ -118,6 +118,7 @@ export default function AdminUsers() {
                 <th>Login</th>
                 <th>Email</th>
                 <th>Tier</th>
+                <th>Consultant</th>
                 <th className="adm-num">Wallet (RM)</th>
                 <th>Registered</th>
               </tr>
@@ -125,14 +126,14 @@ export default function AdminUsers() {
             <tbody>
               {loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="adm-empty">
+                  <td colSpan={7} className="adm-empty">
                     Loading users…
                   </td>
                 </tr>
               )}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="adm-empty">
+                  <td colSpan={7} className="adm-empty">
                     No users match.
                   </td>
                 </tr>
@@ -151,6 +152,7 @@ export default function AdminUsers() {
                       {u.isAdmin ? "ADMIN" : u.tier ?? "Member"}
                     </span>
                   </td>
+                  <td className="adm-email">{u.isAdmin ? "—" : u.consultant || "—"}</td>
                   <td className="adm-num adm-mono">{money(u.walletBalance)}</td>
                   <td className="adm-date">{formatDate(u.registeredAt)}</td>
                 </tr>
