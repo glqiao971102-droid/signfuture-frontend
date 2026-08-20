@@ -15,6 +15,17 @@ const ROLE_FILTERS = [
   { value: "admin", label: "Admins" },
 ];
 
+// Segments the admin can export directly (server applies the same role filter).
+const DL_OPTIONS = [
+  { value: "current", label: "Current view" },
+  { value: "all", label: "All members" },
+  { value: "Diamond", label: "Diamond members" },
+  { value: "Gold", label: "Gold members" },
+  { value: "Silver", label: "Silver members" },
+  { value: "customer", label: "Normal (no tier)" },
+  { value: "admin", label: "Admins" },
+];
+
 const money = (n: number) =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -41,13 +52,22 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [dlMenu, setDlMenu] = useState(false);
 
-  async function downloadExcel() {
+  // What each download option pulls (server applies the role filter).
+  async function download(scope: string) {
+    setDlMenu(false);
     setDownloading(true);
     try {
-      await api.adminDownloadUsers({ search: search || undefined, role: role || undefined });
+      const opts =
+        scope === "current"
+          ? { search: search || undefined, role: role || undefined }
+          : scope === "all"
+            ? {}
+            : { role: scope };
+      await api.adminDownloadUsers(opts);
     } catch {
-      /* ignore — button just won't produce a file */
+      /* ignore — just won't produce a file */
     } finally {
       setDownloading(false);
     }
@@ -113,9 +133,23 @@ export default function AdminUsers() {
             </button>
           ))}
         </div>
-        <button type="button" className="adm-view-btn" disabled={downloading} onClick={downloadExcel}>
-          {downloading ? "Preparing…" : "↓ Download Excel"}
-        </button>
+        <div className="adm-dl">
+          <button type="button" className="adm-view-btn" disabled={downloading} onClick={() => setDlMenu((o) => !o)}>
+            {downloading ? "Preparing…" : "↓ Download Excel ▾"}
+          </button>
+          {dlMenu && (
+            <>
+              <div className="adm-dl-backdrop" onClick={() => setDlMenu(false)} />
+              <div className="adm-dl-menu">
+                {DL_OPTIONS.map((o) => (
+                  <button key={o.value} type="button" className="adm-dl-item" onClick={() => download(o.value)}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="adm-count">
