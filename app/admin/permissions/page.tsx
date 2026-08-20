@@ -9,6 +9,7 @@ type AdminRow = { id: number; login: string; email: string; level: "super" | "ad
 const SECTION_LABEL: Record<string, string> = {
   dashboard: "Dashboard",
   orders: "Orders",
+  quotations: "Quotations",
   customers: "Customers",
   wallet: "Wallet",
   invoices: "Invoices",
