@@ -1224,6 +1224,27 @@ export const api = {
     a.remove();
     URL.revokeObjectURL(url);
   },
+
+  /** Download the (filtered) customer list as a CSV (opens in Excel). */
+  async adminDownloadUsers(opts: { search?: string; role?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (opts.search) qs.set("search", opts.search);
+    if (opts.role) qs.set("role", opts.role);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/users.csv?${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Download failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "signfuture-customers.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 /** A row in the admin all-orders table (native orders carry source + ref). */

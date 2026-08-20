@@ -40,6 +40,18 @@ export default function AdminUsers() {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadExcel() {
+    setDownloading(true);
+    try {
+      await api.adminDownloadUsers({ search: search || undefined, role: role || undefined });
+    } catch {
+      /* ignore — button just won't produce a file */
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const load = useCallback(
     async (p: number, searchTerm: string, roleFilter: string) => {
@@ -101,6 +113,9 @@ export default function AdminUsers() {
             </button>
           ))}
         </div>
+        <button type="button" className="adm-view-btn" disabled={downloading} onClick={downloadExcel}>
+          {downloading ? "Preparing…" : "↓ Download Excel"}
+        </button>
       </div>
 
       <div className="adm-count">
