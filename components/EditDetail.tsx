@@ -19,9 +19,6 @@ import { api, PROFESSIONS, type ProfileUpdate } from "@/lib/api";
  * is the single source of truth and follows the member across every device.
  */
 
-// "Request to change" for the locked company details goes to the consultant.
-const CONSULTANT_WA = "60179907559";
-
 const STATES = [
   "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Labuan", "Melaka",
   "Negeri Sembilan", "Pahang", "Penang", "Perak", "Perlis", "Putrajaya",
@@ -126,14 +123,8 @@ export default function EditDetail() {
     setProfessions((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   }
 
-  const companyComplete =
-    company.name.trim() !== "" && company.regNo.trim() !== "" && company.tin.trim() !== "";
-
-  async function confirmCompany() {
-    if (!companyComplete) {
-      setCompanyMsg("Please fill in all company fields first.");
-      return;
-    }
+  // Company details are freely editable and saved on demand.
+  async function saveCompany() {
     setSavingCompany(true);
     setCompanyMsg("");
     try {
@@ -144,8 +135,7 @@ export default function EditDetail() {
         companyConfirmed: true,
       });
       await refresh();
-      setCompany((c) => ({ ...c, confirmed: true }));
-      setCompanyMsg("Company details confirmed and locked.");
+      setCompanyMsg("Company details saved.");
     } catch (err) {
       setCompanyMsg(err instanceof Error ? err.message : "Could not save company details.");
     } finally {
@@ -153,19 +143,8 @@ export default function EditDetail() {
     }
   }
 
-  function requestCompanyChange() {
-    const text = encodeURIComponent(
-      `Hi, I'm member ${user?.memberNo ?? ""}. I'd like to request a change to my company details (Name / Register No / TIN).`,
-    );
-    window.open(`https://api.whatsapp.com/send?phone=${CONSULTANT_WA}&text=${text}`, "_blank", "noopener");
-  }
-
   async function saveContact(e: React.FormEvent) {
     e.preventDefault();
-    if (!contact.email.trim()) {
-      setContactMsg("Email can't be empty.");
-      return;
-    }
     if (pw.next && pw.next.length < 6) {
       setContactMsg("Password must be at least 6 characters.");
       return;
@@ -178,7 +157,6 @@ export default function EditDetail() {
     setContactMsg("");
     try {
       const patch: ProfileUpdate = {
-        email: contact.email.trim(),
         phone: contact.mobile.trim(),
         address: contact.address.trim(),
         postcode: contact.postcode.trim(),
@@ -206,18 +184,16 @@ export default function EditDetail() {
         <span>Your registration details</span>
       </div>
 
-      {/* Company — locked once confirmed */}
+      {/* Company — freely editable */}
       <div className="edit-detail-block">
         <div className="edit-detail-block-head">
           <h3>Company Information</h3>
-          {company.confirmed && <span className="edit-detail-lock">🔒 Locked</span>}
         </div>
         <div className="edit-detail-grid">
           <label>
             Company Name
             <input
               value={company.name}
-              readOnly={company.confirmed}
               placeholder="Your company name"
               onChange={(e) => setCompany({ ...company, name: e.target.value })}
             />
@@ -226,7 +202,6 @@ export default function EditDetail() {
             Company Register Number
             <input
               value={company.regNo}
-              readOnly={company.confirmed}
               placeholder="e.g. 202301234567"
               onChange={(e) => setCompany({ ...company, regNo: e.target.value })}
             />
@@ -235,37 +210,20 @@ export default function EditDetail() {
             Company TIN Number
             <input
               value={company.tin}
-              readOnly={company.confirmed}
               placeholder="e.g. C1234567890"
               onChange={(e) => setCompany({ ...company, tin: e.target.value })}
             />
           </label>
         </div>
         <div className="edit-detail-actions">
-          {company.confirmed ? (
-            <>
-              <p className="edit-detail-note">
-                Company details are confirmed. To change them, please request an update.
-              </p>
-              <button type="button" className="hero-btn ghost" onClick={requestCompanyChange}>
-                Request to change
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="edit-detail-note">
-                Once confirmed, company details are locked — changing them later needs a request.
-              </p>
-              <button
-                type="button"
-                className="hero-btn primary"
-                disabled={!companyComplete || savingCompany}
-                onClick={confirmCompany}
-              >
-                {savingCompany ? "Saving…" : "Confirm company details"}
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className="hero-btn primary"
+            disabled={savingCompany}
+            onClick={saveCompany}
+          >
+            {savingCompany ? "Saving…" : "Save company details"}
+          </button>
         </div>
         {companyMsg && <p className="edit-detail-msg">{companyMsg}</p>}
       </div>
@@ -301,9 +259,14 @@ export default function EditDetail() {
             <input
               type="email"
               value={contact.email}
-              placeholder="you@example.com"
-              onChange={(e) => setContact({ ...contact, email: e.target.value })}
+              readOnly
+              disabled
+              className="edit-detail-locked-input"
+              title="Your registered email can't be changed"
             />
+            <span className="edit-detail-field-note">
+              Your registered email — this can’t be changed.
+            </span>
           </label>
           <label className="span-2">
             Address
