@@ -37,20 +37,32 @@ function presetRange(days: number): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
+const isoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 /** The current calendar month: 1st → today (local date, no UTC shift). */
 function thisMonthRange(): { from: string; to: string } {
   const now = new Date();
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
+  return { from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDate(now) };
 }
+
+/** The current calendar year: Jan 1 → today (local date, no UTC shift). */
+function thisYearRange(): { from: string; to: string } {
+  const now = new Date();
+  return { from: isoDate(new Date(now.getFullYear(), 0, 1)), to: isoDate(now) };
+}
+
+type RangeMode = "month" | "year" | "custom";
 
 export default function AdminDashboard() {
   const [data, setData] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Default every visit to the CURRENT MONTH's report; "This year" switches to
+  // the year-to-date view, and editing the dates is a custom range.
+  const [mode, setMode] = useState<RangeMode>("month");
+  const [from, setFrom] = useState<string>(() => thisMonthRange().from);
+  const [to, setTo] = useState<string>(() => thisMonthRange().to);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,36 +97,32 @@ export default function AdminDashboard() {
     }
   }
 
-  const ranged = Boolean(from || to);
+  const rangeLabel =
+    mode === "month" ? "this month" : mode === "year" ? "this year" : `${from || "start"} → ${to || "today"}`;
 
   const toolbar = (
     <div className="dash-toolbar">
       <div className="dash-range">
         <label>
           From
-          <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+          <input type="date" value={from} max={to || undefined} onChange={(e) => { setMode("custom"); setFrom(e.target.value); }} />
         </label>
         <label>
           To
-          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+          <input type="date" value={to} min={from || undefined} onChange={(e) => { setMode("custom"); setTo(e.target.value); }} />
         </label>
-        <button type="button" className="adm-filter" onClick={() => { const r = thisMonthRange(); setFrom(r.from); setTo(r.to); }}>
+        <button type="button" className={`adm-filter${mode === "month" ? " is-active" : ""}`} onClick={() => { const r = thisMonthRange(); setMode("month"); setFrom(r.from); setTo(r.to); }}>
           This month
         </button>
-        <button type="button" className="adm-filter" onClick={() => { const r = presetRange(30); setFrom(r.from); setTo(r.to); }}>
+        <button type="button" className={`adm-filter${mode === "year" ? " is-active" : ""}`} onClick={() => { const r = thisYearRange(); setMode("year"); setFrom(r.from); setTo(r.to); }}>
+          This year
+        </button>
+        <button type="button" className="adm-filter" onClick={() => { setMode("custom"); const r = presetRange(30); setFrom(r.from); setTo(r.to); }}>
           30d
         </button>
-        <button type="button" className="adm-filter" onClick={() => { const r = presetRange(90); setFrom(r.from); setTo(r.to); }}>
+        <button type="button" className="adm-filter" onClick={() => { setMode("custom"); const r = presetRange(90); setFrom(r.from); setTo(r.to); }}>
           90d
         </button>
-        <button type="button" className="adm-filter" onClick={() => { const r = presetRange(365); setFrom(r.from); setTo(r.to); }}>
-          1y
-        </button>
-        {ranged && (
-          <button type="button" className="adm-filter" onClick={() => { setFrom(""); setTo(""); }}>
-            Clear
-          </button>
-        )}
       </div>
       <div className="dash-exports">
         <button type="button" className="adm-filter" disabled={downloading !== null} onClick={() => download("orders")}>
@@ -155,11 +163,7 @@ export default function AdminDashboard() {
     <>
       <div className="adm-page-head">
         <h1>Sales performance</h1>
-        <p>
-          {ranged
-            ? `Filtered ${from || "start"} → ${to || "today"}.`
-            : "Every order across the platform — revenue, products and customers."}
-        </p>
+        <p>Showing {rangeLabel} — revenue, products and customers.</p>
       </div>
 
       {toolbar}
@@ -168,7 +172,6 @@ export default function AdminDashboard() {
       <div className="dash-kpis">
         <Kpi label="Total revenue" value={rm(k.revenue)} accent />
         <Kpi label="Orders" value={k.orders.toLocaleString()} />
-        <Kpi label="Avg order value" value={rm2(k.avgOrderValue)} />
         <Kpi label="Items sold" value={k.itemsSold.toLocaleString()} />
         <Kpi label="Customers" value={k.customers.toLocaleString()} />
         <Kpi
@@ -181,18 +184,13 @@ export default function AdminDashboard() {
           value={rm(data.reloads?.amount ?? 0)}
           hint={`${(data.reloads?.users ?? 0).toLocaleString()} members · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"} in this range`}
         />
-        <Kpi
-          label="Wallet balances owed"
-          value={rm(k.walletLiability)}
-          hint="Outstanding member wallet credit"
-        />
       </div>
 
       <div className="dash-grid">
         {/* ---- Revenue trend ---- */}
         <section className="adm-card dash-chart-card">
           <div className="adm-card-head-row">
-            <h2>{ranged ? "Revenue — selected range" : "Revenue — last 12 months"}</h2>
+            <h2>{mode === "month" ? "Revenue — this month" : mode === "year" ? "Revenue — this year" : "Revenue — selected range"}</h2>
             <span className="dash-mom">
               This month {rm2(k.thisMonthRevenue)}
               {momPct !== null && (
