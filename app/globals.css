@@ -5467,6 +5467,25 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .dash-chart-card { grid-column: 1 / -1; }
 .dash-recent { grid-column: 1 / -1; }
+/* Grid spacing is the gap; drop each card's own bottom margin. */
+.dash-grid > .adm-card { margin-bottom: 0; }
+/* Two-column data cards: one uniform height so rows line up; content taller
+   than the card scrolls inside it, with the title kept pinned at the top. */
+.dash-grid > .adm-card:not(.dash-chart-card):not(.dash-recent) {
+  height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 0;
+}
+.dash-grid > .adm-card:not(.dash-chart-card):not(.dash-recent) > h2,
+.dash-grid > .adm-card:not(.dash-chart-card):not(.dash-recent) > .adm-card-head-row {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  padding: 16px 0 9px;
+  margin: 0 0 4px;
+}
 
 .dash-mom { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
 .dash-mom em { font-style: normal; font-weight: 700; }
@@ -5481,6 +5500,17 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   margin-top: 14px;
   padding-top: 18px;
 }
+
+/* Premium revenue trend (SVG area + smooth line). */
+.dash-rev-svg { width: 100%; height: auto; display: block; margin-top: 10px; overflow: visible; }
+.dash-rev-grid { stroke: rgba(120, 150, 190, 0.14); stroke-width: 1; }
+.dash-rev-vline { stroke: rgba(120, 150, 190, 0.08); stroke-width: 1; }
+.dash-rev-ylabel { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dash-rev-xlabel { fill: var(--muted); font-size: 13px; }
+.dash-rev-val { fill: #aebfd6; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dash-rev-val.is-last { fill: var(--cyan); }
+.dash-rev-dot { fill: #06131f; stroke: var(--cyan); stroke-width: 2; }
+.dash-rev-dot.is-last { fill: var(--cyan); stroke: #06131f; stroke-width: 2.5; }
 .dash-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; min-width: 0; }
 .dash-bar-val { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dash-bar {
@@ -5516,6 +5546,9 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .dash-rank-bar { height: 4px; border-radius: 3px; background: rgba(57, 151, 255, 0.12); overflow: hidden; margin-top: 3px; }
 .dash-rank-bar div { height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); border-radius: 3px; }
 .dash-rank-value { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Production-volume sub-group heading (By area / By quantity). */
+.dash-vol-group { margin: 14px 0 8px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.dash-vol-group:first-child { margin-top: 4px; }
 
 /* Clickable category row (revenue-by-category drill-down). */
 .dash-cat-row {

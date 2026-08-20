@@ -54,6 +54,77 @@ function thisYearRange(): { from: string; to: string } {
 
 type RangeMode = "month" | "year" | "custom";
 
+/** Premium revenue trend — gradient area under a smooth glowing line. */
+function RevenueTrend({ months }: { months: { month: string; revenue: number; orders: number }[] }) {
+  const W = 1000, H = 260, padL = 54, padR = 22, padT = 30, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = months.length;
+  const max = Math.max(1, ...months.map((m) => m.revenue));
+  const xf = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const yf = (v: number) => padT + plotH - (v / max) * plotH;
+  const pts = months.map((m, i) => [xf(i), yf(m.revenue)] as [number, number]);
+  // Catmull-Rom → cubic bézier for a smooth curve.
+  const smooth = (p: [number, number][]): string => {
+    if (p.length < 2) return p.length ? `M${p[0][0]},${p[0][1]}` : "";
+    let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  };
+  const line = smooth(pts);
+  const area = n ? `${line} L${xf(n - 1).toFixed(1)},${(padT + plotH).toFixed(1)} L${xf(0).toFixed(1)},${(padT + plotH).toFixed(1)} Z` : "";
+  const grid = [0, 0.25, 0.5, 0.75, 1];
+  const kfmt = (v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${Math.round(v)}`);
+  return (
+    <svg className="dash-rev-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Revenue trend">
+      <defs>
+        <linearGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0.36" />
+          <stop offset="55%" stopColor="var(--blue)" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="var(--blue)" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="revLine" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="var(--blue)" />
+          <stop offset="100%" stopColor="var(--cyan)" />
+        </linearGradient>
+        <filter id="revGlow" x="-10%" y="-40%" width="120%" height="180%">
+          <feGaussianBlur stdDeviation="4" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {grid.map((g, i) => {
+        const yy = padT + plotH - g * plotH;
+        return (
+          <g key={i}>
+            <line x1={padL} y1={yy} x2={W - padR} y2={yy} className="dash-rev-grid" />
+            <text x={padL - 10} y={yy + 4} className="dash-rev-ylabel" textAnchor="end">{kfmt(g * max)}</text>
+          </g>
+        );
+      })}
+      {area && <path d={area} fill="url(#revArea)" />}
+      {line && <path d={line} fill="none" stroke="url(#revLine)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" filter="url(#revGlow)" />}
+      {pts.map((p, i) => {
+        const last = i === pts.length - 1;
+        return (
+          <g key={i}>
+            <line x1={p[0]} y1={p[1]} x2={p[0]} y2={padT + plotH} className="dash-rev-vline" />
+            <circle cx={p[0]} cy={p[1]} r={last ? 5.5 : 3.5} className={last ? "dash-rev-dot is-last" : "dash-rev-dot"} />
+            <text x={p[0]} y={p[1] - 12} className={`dash-rev-val${last ? " is-last" : ""}`} textAnchor="middle">{kfmt(months[i].revenue)}</text>
+            <text x={p[0]} y={H - 10} className="dash-rev-xlabel" textAnchor="middle">{monthLabel(months[i].month)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,7 +252,6 @@ export default function AdminDashboard() {
   // Revenue chart always shows the full year; fall back to the ranged data
   // until the year fetch resolves.
   const chartMonths = yearMonths ?? data.revenueByMonth;
-  const maxRev = Math.max(1, ...chartMonths.map((m) => m.revenue));
   const cats = data.categoryBreakdown ?? [];
   const maxCatRev = Math.max(1, ...cats.map((c) => c.revenue));
 
@@ -197,6 +267,11 @@ export default function AdminDashboard() {
       {/* ---- KPI cards ---- */}
       <div className="dash-kpis">
         <Kpi label="Total revenue" value={rm(k.revenue)} accent />
+        <Kpi
+          label="Reloads (top-ups)"
+          value={rm(data.reloads?.amount ?? 0)}
+          hint={`${(data.reloads?.users ?? 0).toLocaleString()} members · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"} in this range`}
+        />
         <Kpi label="Orders" value={k.orders.toLocaleString()} />
         <Kpi label="Items sold" value={k.itemsSold.toLocaleString()} />
         <Kpi label="Customers" value={k.customers.toLocaleString()} />
@@ -204,11 +279,6 @@ export default function AdminDashboard() {
           label="Users reloaded"
           value={(data.reloads?.users ?? 0).toLocaleString()}
           hint={`${rm(data.reloads?.amount ?? 0)} topped up · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"}`}
-        />
-        <Kpi
-          label="Reloads (top-ups)"
-          value={rm(data.reloads?.amount ?? 0)}
-          hint={`${(data.reloads?.users ?? 0).toLocaleString()} members · ${(data.reloads?.count ?? 0).toLocaleString()} reload${(data.reloads?.count ?? 0) === 1 ? "" : "s"} in this range`}
         />
       </div>
 
@@ -226,15 +296,7 @@ export default function AdminDashboard() {
               )}
             </span>
           </div>
-          <div className="dash-chart">
-            {chartMonths.map((m) => (
-              <div className="dash-bar-col" key={m.month} title={`${m.month}: ${rm2(m.revenue)} · ${m.orders} orders`}>
-                <span className="dash-bar-val">{Math.round(m.revenue / 1000)}k</span>
-                <div className="dash-bar" style={{ height: `${(m.revenue / maxRev) * 100}%` }} />
-                <span className="dash-bar-month">{monthLabel(m.month)}</span>
-              </div>
-            ))}
-          </div>
+          <RevenueTrend months={chartMonths} />
         </section>
 
         {/* ---- Order status ---- */}
@@ -299,6 +361,60 @@ export default function AdminDashboard() {
               })}
             </div>
           )}
+        </section>
+
+        {/* ---- Production volume (area products in sq ft, others in pcs) ---- */}
+        <section className="adm-card">
+          <div className="adm-card-head-row">
+            <h2>Production volume</h2>
+            <span className="dash-mom">{rangeLabel}</span>
+          </div>
+          {(() => {
+            const pv = data.productionVolume ?? [];
+            const areaItems = pv.filter((p) => p.area);
+            const pcsItems = pv.filter((p) => !p.area);
+            if (pv.length === 0) return <p className="adm-card-sub">No production in this range.</p>;
+            const maxSqft = Math.max(1, ...areaItems.map((p) => p.sqft));
+            const maxPcs = Math.max(1, ...pcsItems.map((p) => p.pcs));
+            return (
+              <>
+                {areaItems.length > 0 && (
+                  <>
+                    <p className="dash-vol-group">By area (sq ft)</p>
+                    <div className="dash-rank">
+                      {areaItems.map((p, i) => (
+                        <div className="dash-rank-row" key={`a${i}`}>
+                          <div className="dash-rank-main">
+                            <span className="dash-rank-name">{p.name}</span>
+                            <span className="dash-rank-sub">{p.count} order{p.count === 1 ? "" : "s"}</span>
+                            <div className="dash-rank-bar"><div style={{ width: `${(p.sqft / maxSqft) * 100}%` }} /></div>
+                          </div>
+                          <span className="dash-rank-value">{p.sqft.toLocaleString("en-MY", { maximumFractionDigits: 1 })} ft²</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {pcsItems.length > 0 && (
+                  <>
+                    <p className="dash-vol-group">By quantity (pcs)</p>
+                    <div className="dash-rank">
+                      {pcsItems.map((p, i) => (
+                        <div className="dash-rank-row" key={`p${i}`}>
+                          <div className="dash-rank-main">
+                            <span className="dash-rank-name">{p.name}</span>
+                            <span className="dash-rank-sub">{p.count} order{p.count === 1 ? "" : "s"}</span>
+                            <div className="dash-rank-bar"><div style={{ width: `${(p.pcs / maxPcs) * 100}%` }} /></div>
+                          </div>
+                          <span className="dash-rank-value">{p.pcs.toLocaleString()} pcs</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* ---- Top customers ---- */}

@@ -1411,6 +1411,8 @@ export type AdminStats = {
     qty: number;
     products: { name: string; revenue: number; qty: number; orders: number }[];
   }[];
+  /** Monthly production volume per product — area products in sq ft, others in pcs. */
+  productionVolume: { name: string; area: boolean; sqft: number; pcs: number; count: number }[];
   topCustomers: { name: string; email: string | null; orders: number; spend: number }[];
   recentOrders: { id: number; ref?: string; status: string; statusLabel?: string; total: number; items: number; date: string; customer: string }[];
   /** Present when the overview was requested with a date range. */
