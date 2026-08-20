@@ -64,6 +64,8 @@ export default function AdminDashboard() {
   const [from, setFrom] = useState<string>(() => thisMonthRange().from);
   const [to, setTo] = useState<string>(() => thisMonthRange().to);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Which category rows are expanded to show their products.
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   // The revenue trend chart always shows the full YEAR (Jan → now) so it stays
   // a meaningful trend even while the KPIs default to just this month.
   const [yearMonths, setYearMonths] = useState<AdminStats["revenueByMonth"] | null>(null);
@@ -180,7 +182,8 @@ export default function AdminDashboard() {
   // until the year fetch resolves.
   const chartMonths = yearMonths ?? data.revenueByMonth;
   const maxRev = Math.max(1, ...chartMonths.map((m) => m.revenue));
-  const maxProdRev = Math.max(1, ...data.topProducts.map((p) => p.revenue));
+  const cats = data.categoryBreakdown ?? [];
+  const maxCatRev = Math.max(1, ...cats.map((c) => c.revenue));
 
   return (
     <>
@@ -248,25 +251,54 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* ---- Top products ---- */}
+        {/* ---- Revenue by category (click a category to see its products) ---- */}
         <section className="adm-card">
-          <h2>Top products</h2>
-          <div className="dash-rank">
-            {data.topProducts.map((p, i) => (
-              <div className="dash-rank-row" key={i}>
-                <div className="dash-rank-main">
-                  <span className="dash-rank-name">{p.name}</span>
-                  <span className="dash-rank-sub">
-                    {p.qty.toLocaleString()} sold · {p.orders} orders
-                  </span>
-                  <div className="dash-rank-bar">
-                    <div style={{ width: `${(p.revenue / maxProdRev) * 100}%` }} />
-                  </div>
-                </div>
-                <span className="dash-rank-value">{rm(p.revenue)}</span>
-              </div>
-            ))}
+          <div className="adm-card-head-row">
+            <h2>Revenue by category</h2>
+            <span className="dash-mom">{rangeLabel}</span>
           </div>
+          {cats.length === 0 ? (
+            <p className="adm-card-sub">No sales in this range.</p>
+          ) : (
+            <div className="dash-rank">
+              {cats.map((c) => {
+                const open = !!openCats[c.category];
+                return (
+                  <div key={c.category}>
+                    <button
+                      type="button"
+                      className={`dash-cat-row${open ? " is-open" : ""}`}
+                      onClick={() => setOpenCats((s) => ({ ...s, [c.category]: !s[c.category] }))}
+                    >
+                      <div className="dash-rank-main">
+                        <span className="dash-rank-name">
+                          <span className="dash-cat-caret">{open ? "▾" : "▸"}</span> {c.category}
+                        </span>
+                        <span className="dash-rank-sub">
+                          {c.products.length} product{c.products.length === 1 ? "" : "s"} · {c.qty.toLocaleString()} sold
+                        </span>
+                        <div className="dash-rank-bar">
+                          <div style={{ width: `${(c.revenue / maxCatRev) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="dash-rank-value">{rm(c.revenue)}</span>
+                    </button>
+                    {open && (
+                      <div className="dash-cat-products">
+                        {c.products.map((p, i) => (
+                          <div className="dash-cat-product" key={i}>
+                            <span className="dash-cat-product-name">{p.name}</span>
+                            <span className="dash-cat-product-sub">{p.qty.toLocaleString()} sold</span>
+                            <span className="dash-cat-product-val">{rm2(p.revenue)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* ---- Top customers ---- */}

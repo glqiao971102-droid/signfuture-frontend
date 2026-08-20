@@ -1222,6 +1222,13 @@ export type AdminStats = {
   revenueByMonth: { month: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; orders: number; revenue: number }[];
   topProducts: { name: string; orders: number; qty: number; revenue: number }[];
+  /** Native revenue grouped by product category, each with its products (drill-down). */
+  categoryBreakdown: {
+    category: string;
+    revenue: number;
+    qty: number;
+    products: { name: string; revenue: number; qty: number; orders: number }[];
+  }[];
   topCustomers: { name: string; email: string | null; orders: number; spend: number }[];
   recentOrders: { id: number; status: string; total: number; items: number; date: string; customer: string }[];
   /** Present when the overview was requested with a date range. */
