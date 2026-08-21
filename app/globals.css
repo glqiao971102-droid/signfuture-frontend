@@ -5067,7 +5067,7 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .adm-subnav-item:hover { background: rgba(57, 151, 255, 0.08); color: var(--text); }
 
-.adm-content { flex: 1; padding: 26px 30px 80px; max-width: 1240px; min-width: 0; }
+.adm-content { flex: 1; padding: 26px 30px 80px; max-width: 1560px; min-width: 0; }
 
 /* Sales Listing: full-bleed — no padding / max-width, so the embedded app lays
    out edge-to-edge exactly like the standalone page. */
