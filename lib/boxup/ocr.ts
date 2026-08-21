@@ -156,6 +156,11 @@ export async function ocrRelabel<T extends Labelled>(records: T[]): Promise<T[]>
   if (!records.length) return records;
   // Diagnostic escape hatch (__diag=nocr) — never set in normal use.
   if ((globalThis as { __SF_SKIP_OCR?: boolean }).__SF_SKIP_OCR) return records;
+  // On Vercel serverless the tesseract engine crawls (10-30s per analysis) and
+  // each fresh instance re-pays the cost, so go STRAIGHT to the fast geometric
+  // heuristic there. OCR still runs on localhost / an always-on server, where
+  // it's quick and gives the more precise Letter/Logo split.
+  if (process.env.VERCEL) throw new Error("OCR skipped on serverless");
   if (ocrUnavailable) throw new Error("OCR unavailable in this environment");
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
