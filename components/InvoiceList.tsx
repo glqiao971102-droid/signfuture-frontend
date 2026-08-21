@@ -5,12 +5,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { api, type InvoiceRow, type OrderDetail, type NativeOrderRow } from "@/lib/api";
 import {
   buildInvoicePdf,
-  buildOrderInvoicePdf,
   downloadBlob,
-  ringgitInWords,
   type InvoiceData,
   type EInvoiceItem,
-  type OrderInvoiceData,
 } from "@/lib/invoicePdf";
 import { DEV_PREVIEW } from "@/lib/preview";
 import { invoiceReady, invoiceTotal } from "@/lib/nativeInvoice";
@@ -33,33 +30,6 @@ const CANCELLED_JOBS = ["cancelled", "refunded", "failed"];
  * (non-cancelled) jobs are billed, and every job's options are written out in
  * full as the line's spec (material / size / working days / …).
  */
-function toOrderInvoiceData(o: NativeOrderRow, billing: string[]): OrderInvoiceData {
-  const items = o.items
-    .filter((l) => !CANCELLED_JOBS.includes(l.status ?? o.status))
-    .map((l) => ({
-      name: l.name,
-      spec: l.options
-        .filter((op) => op.value != null && String(op.value).trim() !== "")
-        .map((op) => `${op.label}: ${op.value}`)
-        .join("   ·   "),
-      qty: String(l.qty),
-      unitPrice: money(Number(l.unitPrice) || 0),
-      amount: money(Number(l.total) || 0),
-    }));
-  const t = invoiceTotal(o);
-  return {
-    invoiceNo: `INV-${o.ref}`,
-    date: o.date ? formatDate(o.date) : "—",
-    status: o.statusLabel || "Processing",
-    payment: "Wallet",
-    billingTo: billing,
-    items,
-    totals: [{ label: "Subtotal", value: money(t) }],
-    total: money(t),
-    amountInWords: ringgitInWords(t),
-  };
-}
-
 // Sample invoices shown in the preview (no backend). Each carries its own PDF
 // data so "Download PDF" works without fetching a real order.
 const SAMPLE_INVOICES: { row: InvoiceRow; data: InvoiceData }[] = [
@@ -242,18 +212,16 @@ export default function InvoiceList() {
     }
   }
 
-  /** Builds the styled invoice for a native order entirely on the client. */
+  /**
+   * Downloads the SAME server-rendered invoice the admin gets (BE
+   * invoice_service) so the member's PDF is identical to the admin's.
+   */
   async function downloadNative(o: NativeOrderRow) {
     if (busyId) return;
     setBusyId(o.id);
     try {
-      const billing = [
-        user?.name?.trim() || "Customer",
-        user?.email?.trim() || "",
-        user?.phone?.trim() || "",
-      ].filter(Boolean);
-      const blob = await buildOrderInvoicePdf(toOrderInvoiceData(o, billing));
-      downloadBlob(blob, `INV-${o.ref}.pdf`);
+      const blob = await api.nativeInvoiceBlob(o.id);
+      downloadBlob(blob, `Sign Future INV-${o.ref}.pdf`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not build the invoice PDF");
     } finally {

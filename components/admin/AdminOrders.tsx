@@ -43,6 +43,13 @@ function formatDate(value: string | null): string {
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
+// YYYY-MM-DD, for download filenames (e.g. "2026-08-20").
+function fileDate(value: string | null): string {
+  if (!value) return "";
+  const d = new Date(value.includes("T") ? value : value.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
 
 // Artwork download URL that carries the display name, so the file saves under
 // its human name (e.g. "3D Wording - 30x102 cm.ai") instead of the stored UUID.
@@ -747,14 +754,32 @@ export default function AdminOrders() {
 
             {/* Order-level status removed — each line item now carries its own
                 status (see "Line items — each can be handled separately"). */}
-            <button
-              type="button"
-              className="adm-edit-link"
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
-              onClick={() => api.openAdminNativeInvoice(nativeDetail.id).catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))}
-            >
-              ↓ Download invoice PDF
-            </button>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+              <button
+                type="button"
+                className="adm-edit-link"
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                onClick={() =>
+                  api
+                    .downloadAdminNativeInvoice(nativeDetail.id, `Sign Future INV-${nativeDetail.ref}`)
+                    .catch((e) => alert(e instanceof Error ? e.message : "Could not open invoice"))
+                }
+              >
+                ↓ Download invoice PDF
+              </button>
+              <button
+                type="button"
+                className="adm-edit-link"
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 700 }}
+                onClick={() =>
+                  api
+                    .downloadAdminNativeJobOrder(nativeDetail.id, `${fileDate(nativeDetail.date)} Job-${nativeDetail.ref}`)
+                    .catch((e) => alert(e instanceof Error ? e.message : "Could not open job order"))
+                }
+              >
+                🛠 Download Job Order (production)
+              </button>
+            </div>
 
             {nativeDetail.artworks && nativeDetail.artworks.length > 0 && (
               <>

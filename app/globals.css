@@ -4367,7 +4367,9 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-steps {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Pills never shrink below ~175px, so the date+time always fits INSIDE the
+     box; columns reflow (4 → 3 → 2 → 1) as the width tightens. */
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
   gap: 10px;
 }
 .job-step {
@@ -4394,6 +4396,11 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   color: #fff;
   line-height: 1;
 }
+.job-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .job-step-label {
   font-size: 12px;
   font-weight: 700;
@@ -4401,6 +4408,19 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Date + time a milestone was reached, shown on ONE line just under its label. */
+.job-step-time {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.1px;
+  color: #8aa0bd;
+  white-space: nowrap;
+}
+.job-step.js-done .job-step-time { color: #8fd3aa; }
+.job-step.js-active .job-step-time { color: #b7d4f7; }
+.job-step.js-fail .job-step-time { color: #f3b0b0; }
 .job-step.js-done {
   border-color: rgba(34, 197, 94, 0.35);
   background: rgba(34, 197, 94, 0.1);
@@ -4421,7 +4441,7 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-step.js-fail .job-step-num { background: #ef4444; }
 .job-step.js-fail .job-step-label { color: #fca5a5; }
 @media (max-width: 640px) {
-  .job-steps { grid-template-columns: repeat(2, 1fr); }
+  .job-steps { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }
 .order-ship-to {
   margin: 4px 0 0;

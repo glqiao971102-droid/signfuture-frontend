@@ -682,6 +682,26 @@ export const api = {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
+  /**
+   * Fetches the member's native-order invoice PDF as a Blob — the SAME
+   * server-rendered invoice the admin gets, so the downloaded file is identical.
+   */
+  async nativeInvoiceBlob(id: number): Promise<Blob> {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/orders/native/${id}/invoice`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let msg = "Could not build the invoice PDF.";
+      try {
+        const j = await res.json();
+        if (j?.message) msg = j.message;
+      } catch { /* non-JSON body */ }
+      throw new ApiError(res.status, msg, null);
+    }
+    return res.blob();
+  },
+
   /** Admin: open any native order's invoice PDF. */
   async openAdminNativeInvoice(id: number) {
     const token = getToken();
@@ -691,6 +711,51 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, "Could not load the invoice.", null);
     const url = URL.createObjectURL(await res.blob());
     window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
+  /**
+   * Admin: download a native order's invoice PDF under a chosen filename
+   * (e.g. "Sign Future INV-100045.pdf"), via a temporary <a download> so the
+   * saved file has a clean name instead of a garbled blob-URL name.
+   */
+  async downloadAdminNativeInvoice(id: number, filename: string) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/orders/native/${id}/invoice`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Could not load the invoice.", null);
+    const url = URL.createObjectURL(await res.blob());
+    const name = filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
+  /**
+   * Downloads the production Job Order PDF for a native order under a chosen
+   * filename (e.g. "20 Aug 2026 Job File 100045.pdf"). Fetches the blob and
+   * saves it via a temporary <a download> so the file has a clean name — a
+   * plain window.open on a blob URL would save a random/garbled name.
+   */
+  async downloadAdminNativeJobOrder(id: number, filename: string) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/orders/native/${id}/job-order`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Could not load the job order.", null);
+    const url = URL.createObjectURL(await res.blob());
+    const name = filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
@@ -1293,6 +1358,7 @@ export type NativeOrderRow = {
   currency: string;
   date: string | null;
   items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string }[];
+  history?: { to: string; date: string | null }[];
 };
 
 export type NativeOrderDetail = {
@@ -1322,7 +1388,7 @@ export type NativeOrderDetail = {
   agentLabel?: string | null;
   date: string | null;
   lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null }[];
-  history: { from: string | null; to: string; note: string | null; date: string | null; by?: string | null }[];
+  history: { to: string; date: string | null; from?: string | null; note?: string | null; by?: string | null }[];
 };
 
 export type AdminWalletSummary = {

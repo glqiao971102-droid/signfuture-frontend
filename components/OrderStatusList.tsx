@@ -139,7 +139,25 @@ function jobStepIndex(status: string): number {
   const i = JOB_STEPS.findIndex((s) => s.statuses.includes(status));
   return i < 0 ? 0 : i;
 }
-function JobSteps({ status }: { status: string }) {
+type StepHistory = { to: string; date: string | null }[];
+// When was a milestone box reached? Use the newest history row whose target
+// status falls in that box; the first box also falls back to the placed date.
+function stepReachedAt(st: (typeof JOB_STEPS)[number], history: StepHistory, placed?: string | null): string | null {
+  const hits = history.filter((h) => st.statuses.includes(h.to) && h.date);
+  if (hits.length) return hits[hits.length - 1].date;
+  if (st.key === "order") return placed ?? null;
+  return null;
+}
+function fmtStepTime(v: string | null): string {
+  if (!v) return "";
+  const d = new Date(v.includes("T") ? v : v.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-MY", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
+}
+function JobSteps({ status, history = [], placed }: { status: string; history?: StepHistory; placed?: string | null }) {
   const cur = jobStepIndex(status);
   const dead = DEAD.includes(status);
   return (
@@ -151,10 +169,14 @@ function JobSteps({ status }: { status: string }) {
         const active = i === cur;
         const label = active ? meta(status).label : st.label;
         const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
+        const when = fmtStepTime(stepReachedAt(st, history, placed));
         return (
           <div key={st.key} className={`job-step ${cls}`}>
             <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
-            <span className="job-step-label">{label}</span>
+            <span className="job-step-text">
+              <span className="job-step-label">{label}</span>
+              {when && <span className="job-step-time">{when}</span>}
+            </span>
           </div>
         );
       })}
@@ -354,7 +376,7 @@ export default function OrderStatusList() {
                                 ))}
                               </div>
                             )}
-                            <JobSteps status={l.status ?? o.status} />
+                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} />
                           </div>
                         ))}
                       </div>
