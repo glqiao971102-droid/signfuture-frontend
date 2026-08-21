@@ -146,9 +146,10 @@ function padAndUpscale(src: PNG): PNG {
 // serverless function (it's fine on a normal always-on server). Bound it: on a
 // timeout or engine failure we mark OCR unavailable for the rest of this process
 // and rethrow so classifyRecords() falls back to the geometric row heuristic —
-// a slightly less precise Letter/Logo split, but the analysis COMPLETES instead
-// of timing out into a 504.
-const OCR_BUDGET_MS = 20000;
+// a slightly less precise Letter/Logo split, but the analysis COMPLETES fast
+// instead of grinding for 20-30s on Vercel's slow CPU. Kept generous enough that
+// simple designs still finish OCR; slow/complex ones bail early to the fallback.
+const OCR_BUDGET_MS = 6000;
 let ocrUnavailable = false;
 
 export async function ocrRelabel<T extends Labelled>(records: T[]): Promise<T[]> {
