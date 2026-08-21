@@ -497,6 +497,7 @@ export default function AdminOrders() {
               <th>Email</th>
               <th>Date</th>
               <th>Status</th>
+              <th className="adm-docs-col">Docs</th>
               <th className="adm-num">Total (RM)</th>
               <th className="adm-num">Items</th>
               <th></th>
@@ -505,14 +506,14 @@ export default function AdminOrders() {
           <tbody>
             {loading && rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="adm-empty">
+                <td colSpan={9} className="adm-empty">
                   Loading orders…
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="adm-empty">
+                <td colSpan={9} className="adm-empty">
                   No orders match.
                 </td>
               </tr>
@@ -557,6 +558,38 @@ export default function AdminOrders() {
                       {o.statusLabel}
                     </span>
                   )}
+                </td>
+                <td className="adm-docs-col">
+                  {o.source === "native" ? (
+                    <span className="adm-doc-actions">
+                      <button
+                        type="button"
+                        className="adm-doc-btn"
+                        title="Download invoice PDF"
+                        aria-label="Download invoice PDF"
+                        onClick={() =>
+                          api
+                            .downloadAdminNativeInvoice(o.id, `Sign Future INV-${o.ref}`)
+                            .catch((e) => alert(e instanceof Error ? e.message : "Could not download invoice"))
+                        }
+                      >
+                        🧾
+                      </button>
+                      <button
+                        type="button"
+                        className="adm-doc-btn"
+                        title="Download Job Order (production)"
+                        aria-label="Download Job Order (production)"
+                        onClick={() =>
+                          api
+                            .downloadAdminNativeJobOrder(o.id, `${fileDate(o.date)} Job-${o.ref}`)
+                            .catch((e) => alert(e instanceof Error ? e.message : "Could not download job order"))
+                        }
+                      >
+                        🛠
+                      </button>
+                    </span>
+                  ) : null}
                 </td>
                 <td className="adm-num adm-mono">{money(o.total)}</td>
                 <td className="adm-num">{o.source === "reload" ? "—" : o.itemCount}</td>
