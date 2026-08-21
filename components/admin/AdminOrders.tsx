@@ -240,11 +240,14 @@ export default function AdminOrders() {
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
   // "Out for Delivery" collects courier + tracking + phone, emailed to the customer.
-  const [deliveryModal, setDeliveryModal] = useState<{ itemId: number; itemName: string } | null>(null);
+  // `all` marks the bulk "set every item" flow.
+  const [deliveryModal, setDeliveryModal] = useState<{ itemId?: number; itemName?: string; all?: boolean } | null>(null);
   const [dlvCourier, setDlvCourier] = useState("DHL");
   const [dlvCourierOther, setDlvCourierOther] = useState("");
   const [dlvTracking, setDlvTracking] = useState("");
   const [dlvPhone, setDlvPhone] = useState("");
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [savingAll, setSavingAll] = useState(false);
 
   const load = useCallback(async (p: number, searchTerm: string, statusFilter: string, monthFilter: string) => {
     setLoading(true);
@@ -371,8 +374,42 @@ export default function AdminOrders() {
     }
   }
 
+  // Set EVERY item to one status in one action → one combined customer email.
+  async function applyAllItemsStatus(newStatus: string) {
+    if (!nativeDetail || !newStatus) return;
+    if (newStatus === "shipped") {
+      setDlvCourier("DHL");
+      setDlvCourierOther("");
+      setDlvTracking("");
+      setDlvPhone("");
+      setDeliveryModal({ all: true });
+      return;
+    }
+    const label = nativeStatuses.find((s) => s.value === newStatus)?.label ?? newStatus;
+    const refunds = newStatus === "cancelled" || newStatus === "refunded";
+    if (
+      !window.confirm(
+        `Set ALL ${nativeDetail.lines.length} items to "${label}"?` +
+          (refunds ? "\n\nThis refunds EVERY item's amount to the customer's wallet." : "") +
+          "\n\nThe customer gets ONE email covering all items.",
+      )
+    )
+      return;
+    setSavingAll(true);
+    try {
+      await api.adminUpdateAllNativeItemsStatus(nativeDetail.id, newStatus);
+      setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+      setBulkStatus("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update items");
+    } finally {
+      setSavingAll(false);
+    }
+  }
+
   // Confirm "Out for Delivery" with the courier details; sent as the status
-  // note, so it lands in the status history AND the customer's email.
+  // note, so it lands in the status history AND the customer's email. Handles
+  // both a single item and the bulk "all items" flow.
   async function submitDeliveryStatus() {
     if (!nativeDetail || !deliveryModal) return;
     const courier = dlvCourier === "Other" ? dlvCourierOther.trim() || "Other" : dlvCourier;
@@ -384,8 +421,23 @@ export default function AdminOrders() {
     if (dlvTracking.trim()) parts.push(`Tracking No: ${dlvTracking.trim()}`);
     if (dlvPhone.trim()) parts.push(`Contact: ${dlvPhone.trim()}`);
     const note = parts.join(" · ");
+    const bulk = !!deliveryModal.all;
     const itemId = deliveryModal.itemId;
     setDeliveryModal(null);
+    if (bulk) {
+      setSavingAll(true);
+      try {
+        await api.adminUpdateAllNativeItemsStatus(nativeDetail.id, "shipped", note);
+        setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+        setBulkStatus("");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Could not update items");
+      } finally {
+        setSavingAll(false);
+      }
+      return;
+    }
+    if (itemId == null) return;
     setSavingItemId(itemId);
     try {
       await api.adminUpdateNativeItemStatus(nativeDetail.id, itemId, "shipped", note);
@@ -870,6 +922,30 @@ export default function AdminOrders() {
             )}
 
             <h3 className="adm-drawer-sub">Line items — each can be handled separately</h3>
+            {nativeDetail.lines.length > 1 && (
+              <div className="adm-setall">
+                <span>Set all {nativeDetail.lines.length} items to:</span>
+                <select
+                  className="adm-select"
+                  value={bulkStatus}
+                  disabled={savingAll}
+                  onChange={(e) => setBulkStatus(e.target.value)}
+                >
+                  <option value="">Choose status…</option>
+                  {nativeStatuses.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="hero-btn primary adm-setall-btn"
+                  disabled={!bulkStatus || savingAll}
+                  onClick={() => applyAllItemsStatus(bulkStatus)}
+                >
+                  {savingAll ? "Saving…" : "Apply to all"}
+                </button>
+              </div>
+            )}
             <div className="adm-lineitems">
               <table className="adm-table">
                 <thead><tr><th>Item</th><th className="adm-num">Qty</th><th className="adm-num">Total</th><th>Item status</th></tr></thead>
@@ -1110,7 +1186,9 @@ export default function AdminOrders() {
           <div className="adm-modal">
             <h2>Out for Delivery</h2>
             <p className="adm-card-sub" style={{ margin: 0 }}>
-              “{deliveryModal.itemName}” — the customer will be emailed these delivery details.
+              {deliveryModal.all
+                ? `All ${nativeDetail?.lines.length ?? ""} items — the customer will be emailed these delivery details.`
+                : `“${deliveryModal.itemName}” — the customer will be emailed these delivery details.`}
             </p>
             <label className="adm-modal-field">
               Courier

@@ -1110,6 +1110,13 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ status, note }) },
     );
   },
+  /** Set ALL items in a native order to one status (one combined customer email). */
+  adminUpdateAllNativeItemsStatus(id: number, status: string, note?: string) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/orders/native/${id}/items/status`,
+      { method: "PATCH", body: JSON.stringify({ status, note }) },
+    );
+  },
 
   // ----- Admin: customer detail -----
 
