@@ -239,6 +239,12 @@ export default function AdminOrders() {
   const [nativeStatuses, setNativeStatuses] = useState<{ value: string; label: string }[]>([]);
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
+  // "Out for Delivery" collects courier + tracking + phone, emailed to the customer.
+  const [deliveryModal, setDeliveryModal] = useState<{ itemId: number; itemName: string } | null>(null);
+  const [dlvCourier, setDlvCourier] = useState("DHL");
+  const [dlvCourierOther, setDlvCourierOther] = useState("");
+  const [dlvTracking, setDlvTracking] = useState("");
+  const [dlvPhone, setDlvPhone] = useState("");
 
   const load = useCallback(async (p: number, searchTerm: string, statusFilter: string, monthFilter: string) => {
     setLoading(true);
@@ -335,6 +341,16 @@ export default function AdminOrders() {
   // Per-item status: cancelling/refunding a single line refunds only that line.
   async function changeNativeItemStatus(itemId: number, newStatus: string, itemName: string) {
     if (!nativeDetail) return;
+    // "Out for Delivery" (shipped) → collect courier / tracking / phone first;
+    // the actual status change happens when that modal is submitted.
+    if (newStatus === "shipped") {
+      setDlvCourier("DHL");
+      setDlvCourierOther("");
+      setDlvTracking("");
+      setDlvPhone("");
+      setDeliveryModal({ itemId, itemName });
+      return;
+    }
     const label = nativeStatuses.find((s) => s.value === newStatus)?.label ?? newStatus;
     const refunds = newStatus === "cancelled" || newStatus === "refunded";
     if (
@@ -347,6 +363,32 @@ export default function AdminOrders() {
     setSavingItemId(itemId);
     try {
       await api.adminUpdateNativeItemStatus(nativeDetail.id, itemId, newStatus);
+      setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update item status");
+    } finally {
+      setSavingItemId(null);
+    }
+  }
+
+  // Confirm "Out for Delivery" with the courier details; sent as the status
+  // note, so it lands in the status history AND the customer's email.
+  async function submitDeliveryStatus() {
+    if (!nativeDetail || !deliveryModal) return;
+    const courier = dlvCourier === "Other" ? dlvCourierOther.trim() || "Other" : dlvCourier;
+    if (!dlvTracking.trim() && !dlvPhone.trim()) {
+      alert("Please enter a tracking number or a contact phone.");
+      return;
+    }
+    const parts = [`Courier: ${courier}`];
+    if (dlvTracking.trim()) parts.push(`Tracking No: ${dlvTracking.trim()}`);
+    if (dlvPhone.trim()) parts.push(`Contact: ${dlvPhone.trim()}`);
+    const note = parts.join(" · ");
+    const itemId = deliveryModal.itemId;
+    setDeliveryModal(null);
+    setSavingItemId(itemId);
+    try {
+      await api.adminUpdateNativeItemStatus(nativeDetail.id, itemId, "shipped", note);
       setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not update item status");
@@ -1059,6 +1101,59 @@ export default function AdminOrders() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {deliveryModal && (
+        <div className="adm-modal-overlay">
+          <div className="adm-modal">
+            <h2>Out for Delivery</h2>
+            <p className="adm-card-sub" style={{ margin: 0 }}>
+              “{deliveryModal.itemName}” — the customer will be emailed these delivery details.
+            </p>
+            <label className="adm-modal-field">
+              Courier
+              <select value={dlvCourier} onChange={(e) => setDlvCourier(e.target.value)}>
+                {["DHL", "Xendnow", "J&T", "Easy Parcel", "Ninja Van", "Other"].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            {dlvCourier === "Other" && (
+              <label className="adm-modal-field">
+                Courier name
+                <input
+                  value={dlvCourierOther}
+                  onChange={(e) => setDlvCourierOther(e.target.value)}
+                  placeholder="Enter courier name"
+                />
+              </label>
+            )}
+            <label className="adm-modal-field">
+              Tracking number
+              <input
+                value={dlvTracking}
+                onChange={(e) => setDlvTracking(e.target.value)}
+                placeholder="e.g. SPXMY0123456789"
+              />
+            </label>
+            <label className="adm-modal-field">
+              Contact phone
+              <input
+                value={dlvPhone}
+                onChange={(e) => setDlvPhone(e.target.value)}
+                placeholder="e.g. 012-3456789"
+              />
+            </label>
+            <div className="adm-modal-actions">
+              <button type="button" className="hero-btn ghost" onClick={() => setDeliveryModal(null)}>
+                Cancel
+              </button>
+              <button type="button" className="hero-btn primary" onClick={submitDeliveryStatus}>
+                Mark Out for Delivery
+              </button>
+            </div>
           </div>
         </div>
       )}
