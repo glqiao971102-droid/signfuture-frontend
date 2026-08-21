@@ -27,7 +27,10 @@ export default function ProductFrame({
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const { add } = useCart();
-  const { user } = useAuth();
+  const { user, loading, openLogin } = useAuth();
+  // Calculators are gated behind login — a visitor must sign in (or register)
+  // before they can upload a file / see any pricing.
+  const authed = !!user;
   // The member's own tier (Agent 0 … Diamond 3). The Order Summary in every
   // calculator should mark THIS row as the customer's price.
   const memberTier = tierIndex(user?.tier);
@@ -209,7 +212,7 @@ export default function ProductFrame({
       ro?.disconnect();
       window.clearInterval(interval);
     };
-  }, [src]);
+  }, [src, authed]);
 
   // Fresh iframe content → forget the previously-captured look.
   useEffect(() => {
@@ -327,13 +330,39 @@ export default function ProductFrame({
       if (debounce) window.clearTimeout(debounce);
       timers.forEach((t) => window.clearTimeout(t));
     };
-  }, [src, memberTier]);
+  }, [src, memberTier, authed]);
 
   return (
     <>
       <Nav />
       <div className="product-host">
-        <iframe ref={ref} src={src} title={title} scrolling="no" />
+        {loading ? (
+          <div className="calc-gate">
+            <p className="calc-gate-loading">Loading…</p>
+          </div>
+        ) : authed ? (
+          <iframe ref={ref} src={src} title={title} scrolling="no" />
+        ) : (
+          <div className="calc-gate">
+            <div className="calc-gate-card">
+              <div className="calc-gate-icon">🔒</div>
+              <h2>Login to see pricing</h2>
+              <p>
+                Please sign in to your account to upload your file and view the price for{" "}
+                <strong>{title}</strong>. Pricing is for registered members only.
+              </p>
+              <div className="calc-gate-actions">
+                <button type="button" className="calc-gate-btn primary" onClick={openLogin}>
+                  Login
+                </button>
+                <button type="button" className="calc-gate-btn" onClick={openLogin}>
+                  Register
+                </button>
+              </div>
+              <p className="calc-gate-hint">No account yet? Registration is free.</p>
+            </div>
+          </div>
+        )}
       </div>
       <Footer />
     </>

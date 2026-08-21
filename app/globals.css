@@ -315,6 +315,50 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg);
 }
 
+/* Login gate shown in place of a calculator for signed-out visitors. */
+.calc-gate {
+  min-height: calc(100vh - var(--nav-h) - 220px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+.calc-gate-loading { color: #8aa0bd; font-size: 15px; }
+.calc-gate-card {
+  width: min(460px, 100%);
+  text-align: center;
+  padding: 40px 32px;
+  border: 1px solid rgba(112, 164, 255, 0.28);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(53, 216, 255, 0.08), transparent 60%),
+    rgba(9, 22, 42, 0.86);
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+}
+.calc-gate-icon { font-size: 40px; margin-bottom: 10px; }
+.calc-gate-card h2 { margin: 0 0 10px; font-size: 22px; color: #f2f7ff; }
+.calc-gate-card p { margin: 0 auto 8px; max-width: 360px; color: #aebfd6; font-size: 14px; line-height: 1.6; }
+.calc-gate-card p strong { color: #dbe8ff; }
+.calc-gate-actions { display: flex; gap: 12px; justify-content: center; margin: 22px 0 10px; flex-wrap: wrap; }
+.calc-gate-btn {
+  padding: 11px 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 164, 255, 0.4);
+  background: rgba(13, 32, 57, 0.9);
+  color: #dbe8ff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.calc-gate-btn:hover { border-color: var(--cyan, #3997ff); transform: translateY(-1px); }
+.calc-gate-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--blue, #1e66ff), var(--cyan, #35d8ff));
+  color: #03101f;
+}
+.calc-gate-hint { color: #7f92ad !important; font-size: 12.5px !important; margin-top: 4px !important; }
+
 /* ---------- Home page ---------- */
 .home-main {
   width: min(1180px, 100%);
