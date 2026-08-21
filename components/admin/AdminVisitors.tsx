@@ -10,7 +10,12 @@ function timeOf(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", hour12: true });
+    : d.toLocaleTimeString("en-MY", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "Asia/Kuala_Lumpur",
+      });
 }
 
 type ActionMeta = {
