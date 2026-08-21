@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { useCart } from "@/components/CartProvider";
+import { track } from "@/lib/track";
 import { useAuth } from "@/components/AuthProvider";
 import { tierIndex } from "@/lib/tier";
 import { api } from "@/lib/api";
@@ -101,9 +102,39 @@ export default function ProductFrame({
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       const data = event.data;
+      // Activity tracking: a file was uploaded to a calculator (to get a price).
+      // Record it with the file URL so the admin can download what they uploaded.
+      if (data && data.type === "sf-activity" && data.event && typeof data.event.url === "string") {
+        track({
+          type: "action",
+          action: typeof data.event.action === "string" ? data.event.action : "upload",
+          label: typeof data.event.label === "string" ? data.event.label : "file",
+          meta: {
+            url: data.event.url,
+            product: typeof data.event.product === "string" ? data.event.product : undefined,
+          },
+        });
+        return;
+      }
       if (!data || data.type !== "sign-cart-add" || !data.item) return;
       const item = data.item;
       if (typeof item.label !== "string" || typeof item.href !== "string") return;
+      // Activity tracking: capture what the visitor configured + its price + files.
+      track({
+        type: "action",
+        action: "add_to_cart",
+        path: typeof item.href === "string" ? item.href : undefined,
+        label: item.label,
+        meta: {
+          price: typeof item.price === "number" ? item.price : undefined,
+          spec: typeof item.meta === "string" ? item.meta : undefined,
+          files: Array.isArray(item.artworks)
+            ? item.artworks
+                .filter((a: unknown): a is { url: string; name?: string } => !!a && typeof (a as { url?: unknown }).url === "string")
+                .map((a: { url: string; name?: string }) => ({ url: a.url, name: a.name }))
+            : undefined,
+        },
+      });
       void (async () => {
         const artworks = await collectArtworks(item);
         add({

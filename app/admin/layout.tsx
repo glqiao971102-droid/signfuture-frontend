@@ -19,6 +19,7 @@ type NavItem = { href: string; label: string; icon: string; section: string; chi
 
 const NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "◆", section: "dashboard" },
+  { href: "/admin/visitors", label: "Visitors", icon: "👣", section: "visitors" },
   { href: "/admin/orders", label: "Orders", icon: "▤", section: "orders" },
   { href: "/admin/quotations", label: "Quotations", icon: "✉", section: "quotations" },
   { href: "/admin/users", label: "Customers", icon: "☺", section: "customers" },

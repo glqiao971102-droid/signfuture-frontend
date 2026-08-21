@@ -505,6 +505,13 @@ export const api = {
     return res;
   },
 
+  // ----- Admin: visitor activity -----
+
+  adminActivity(date?: string) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return request<AdminActivity>(`/api/v1/admin/activity${qs}`);
+  },
+
   // ----- Super admin: permissions -----
 
   adminAccessSections() {
@@ -1389,6 +1396,26 @@ export type NativeOrderDetail = {
   date: string | null;
   lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null }[];
   history: { to: string; date: string | null; from?: string | null; note?: string | null; by?: string | null }[];
+};
+
+export type ActivityVisitor = {
+  visitorId: string;
+  isMember: boolean;
+  userId: number | null;
+  name: string;
+  email: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  durationMs: number;
+  durationLabel: string;
+  pageviews: number;
+  pages: { path: string; visits: number; dwellMs: number; dwellLabel: string }[];
+  actions: { action: string; label: string; meta: unknown; at: string }[];
+  uploads: number;
+};
+export type AdminActivity = {
+  summary: { date: string; visitors: number; members: number; guests: number; pageviews: number; actions: number };
+  visitors: ActivityVisitor[];
 };
 
 export type AdminWalletSummary = {

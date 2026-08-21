@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import AgentBanner from "@/components/AgentBanner";
+import Tracker from "@/components/Tracker";
 
 export const metadata: Metadata = {
   title: "Sign Calculators — Banner · Neon Line · 3D Box Up",
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <CartProvider>
+            <Tracker />
             <AgentBanner />
             {children}
           </CartProvider>

@@ -5047,6 +5047,91 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
+/* ---- Admin Visitors (activity) ---- */
+.vis-toolbar { display: flex; gap: 12px; align-items: center; margin: 4px 0 18px; flex-wrap: wrap; }
+.vis-datefield { display: inline-flex; align-items: center; gap: 8px; color: #9fb4d4; font-size: 13px; font-weight: 700; }
+.vis-datefield input {
+  background: rgba(13, 32, 57, 0.9);
+  border: 1px solid rgba(112, 164, 255, 0.34);
+  border-radius: 8px;
+  color: #eaf2ff;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.vis-list { display: flex; flex-direction: column; gap: 10px; }
+.vis-card {
+  border: 1px solid rgba(112, 164, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(9, 22, 42, 0.72);
+  overflow: hidden;
+}
+.vis-card.is-member { border-left: 3px solid var(--cyan, #3997ff); }
+.vis-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  flex-wrap: wrap;
+}
+.vis-head:hover { background: rgba(53, 216, 255, 0.05); }
+.vis-id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.vis-id strong { color: #f2f7ff; font-size: 15px; }
+.vis-email { color: #7f92ad; font-size: 12px; }
+.vis-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.vis-badge.is-member { background: rgba(53, 216, 255, 0.16); color: #7fdcff; border: 1px solid rgba(53, 216, 255, 0.4); }
+.vis-badge.is-guest { background: rgba(148, 163, 184, 0.14); color: #b5c3d8; border: 1px solid rgba(148, 163, 184, 0.34); }
+.vis-metrics { display: inline-flex; align-items: center; gap: 14px; color: #b8c8de; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.vis-time { color: #8194ae; font-weight: 500; }
+.vis-caret { color: #6b83a3; font-size: 11px; }
+.vis-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 4px 16px 16px;
+  border-top: 1px solid rgba(112, 164, 255, 0.14);
+}
+.vis-body h4 { margin: 12px 0 8px; font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: #6eb6ff; }
+.vis-pages, .vis-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vis-pages li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: #d7e3f5; }
+.vis-path { color: #cfe0f7; word-break: break-all; }
+.vis-dwell { color: #86a0c0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vis-actions li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: #d7e3f5; }
+.vis-action-main { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.vis-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(53, 216, 255, 0.12);
+  border: 1px solid rgba(53, 216, 255, 0.34);
+  color: #7fdcff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vis-file:hover { background: rgba(53, 216, 255, 0.2); border-color: var(--cyan, #3997ff); }
+.vis-at { color: #86a0c0; white-space: nowrap; }
+.vis-none { color: #6b7d97; font-size: 13px; margin: 0; }
+@media (max-width: 720px) { .vis-body { grid-template-columns: 1fr; } }
+
 /* Per-row document download icons (invoice + job order), between Status & Total. */
 .adm-docs-col { white-space: nowrap; text-align: center; }
 .adm-doc-actions { display: inline-flex; gap: 6px; }
