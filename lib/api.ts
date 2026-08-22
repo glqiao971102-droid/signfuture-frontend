@@ -1124,6 +1124,13 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ note }) },
     );
   },
+  /** Swap a same-price option on an item (e.g. filament colour). Price unchanged. */
+  adminUpdateNativeItemOption(id: number, itemId: number, label: string, value: string) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/orders/native/${id}/items/${itemId}/option`,
+      { method: "PATCH", body: JSON.stringify({ label, value }) },
+    );
+  },
 
   // ----- Admin: customer detail -----
 

@@ -188,6 +188,55 @@ function jobStatusClass(status: string): string {
 // Internal cost inputs — surfaced in the Cost estimate, hidden from the plain
 // line-item option list.
 const COST_OPTION_LABELS = new Set(["LED Length", "3D Outline"]);
+// Options an admin may swap mid-order WITHOUT changing the price — a like-for-like
+// change (e.g. filament colour White → Red at the customer's request). Only values
+// that do NOT affect the box-up price are listed; price-changing choices (UV
+// Printing, 2K Spray, LED, Power Supply, …) are intentionally absent so they can't
+// be picked here. The backend re-validates against the same whitelist.
+const SWAPPABLE_OPTIONS: Record<string, string[]> = {
+  "3D Filament Color": [
+    "White",
+    "Translucent White",
+    "Translucent Red",
+    "Translucent Yellow",
+    "Translucent Green",
+    "Translucent Blue",
+    "Translucent Orange",
+    "Translucent Cyclamen",
+  ],
+  Surface: ["3mm White Acrylic", "3mm Black Acrylic"],
+  "Side Finishing": ["Option 1", "Option 2", "Option 3"],
+  "Base Finishing": ["10mm PVC Foam Board", "3mm ACP Board"],
+  // LED: only the WHITE colour temperatures — they share the same per-cm add-on,
+  // so swapping between them is free. "None" (no LED) and "RGB" (quote-on-request)
+  // change the price, so they are absent AND the pencil only shows when the item's
+  // current LED is already one of these (see the same-price guard on the pencil).
+  LED: ["3000K", "4000K", "10000K"],
+  // Neon Color (Neon Sign): the 12 solid colours all cost the same per metre.
+  // "RGB" doubles the line rate, so it is excluded and the pencil hides on an
+  // RGB neon sign. Up to 4 colours are stored, joined by " / ".
+  "Neon Color": [
+    "White",
+    "3K Warm",
+    "4.5K Warm",
+    "Red",
+    "Lemon Yellow",
+    "Yellow",
+    "Orange",
+    "Ice Blue",
+    "Blue",
+    "Green",
+    "Pink",
+    "Purple",
+  ],
+};
+// How many 3D Filament Color slots an item has — Side Finishing Option 2/3 use two
+// side extrusions (two colours, joined by " / "); Option 1 is a single colour. The
+// colour list is deduped, so "White / White" collapses to "White".
+function filamentSlots(options: { label: string; value: string }[]): number {
+  const side = options.find((o) => o.label === "Side Finishing")?.value;
+  return side === "Option 2" || side === "Option 3" ? 2 : 1;
+}
 function optValue(options: { label: string; value: string }[], label: string): string | null {
   const o = options.find((x) => x.label.toLowerCase() === label.toLowerCase());
   return o ? o.value : null;
@@ -239,6 +288,10 @@ export default function AdminOrders() {
   const [nativeStatuses, setNativeStatuses] = useState<{ value: string; label: string }[]>([]);
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
+  // Inline "swap a same-price option" editor: which item+label is open, its draft value.
+  const [editOpt, setEditOpt] = useState<{ itemId: number; label: string } | null>(null);
+  const [editOptValue, setEditOptValue] = useState("");
+  const [savingOpt, setSavingOpt] = useState(false);
   // "Out for Delivery" collects courier + tracking + phone, emailed to the customer.
   // `all` marks the bulk "set every item" flow.
   const [deliveryModal, setDeliveryModal] = useState<{ itemId?: number; itemName?: string; all?: boolean; edit?: boolean } | null>(null);
@@ -371,6 +424,22 @@ export default function AdminOrders() {
       alert(err instanceof Error ? err.message : "Could not update item status");
     } finally {
       setSavingItemId(null);
+    }
+  }
+
+  // Swap a same-price option (e.g. filament colour) on one item. Price is
+  // unchanged; the change is logged to the order history (no customer email).
+  async function saveItemOption() {
+    if (!nativeDetail || !editOpt) return;
+    setSavingOpt(true);
+    try {
+      await api.adminUpdateNativeItemOption(nativeDetail.id, editOpt.itemId, editOpt.label, editOptValue);
+      setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+      setEditOpt(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not update option");
+    } finally {
+      setSavingOpt(false);
     }
   }
 
@@ -993,9 +1062,75 @@ export default function AdminOrders() {
                         {l.name}
                         {l.options.filter((o) => !COST_OPTION_LABELS.has(o.label)).length > 0 && (
                           <div className="adm-line-opts">
-                            {l.options.filter((o) => !COST_OPTION_LABELS.has(o.label)).map((o) => (
-                              <span key={o.label}>{o.label}: {displayOptionValue(o.value, nativeDetail.date)}</span>
-                            ))}
+                            {l.options.filter((o) => !COST_OPTION_LABELS.has(o.label)).map((o) => {
+                              const choices = SWAPPABLE_OPTIONS[o.label];
+                              // Only offer editing when EVERY current value is already
+                              // in the same-price group — otherwise a swap could change
+                              // the price (e.g. LED "None"/"RGB" → a white temperature).
+                              const canEdit =
+                                !!choices &&
+                                o.value.split(" / ").map((p) => p.trim()).filter(Boolean).every((p) => choices.includes(p));
+                              const editing = editOpt?.itemId === l.id && editOpt?.label === o.label;
+                              if (editing) {
+                                // 3D Filament Color can need 2 colours (Side Finishing
+                                // Option 2/3); other multi-value options (e.g. Neon
+                                // Color) keep however many colours they already have.
+                                const slots =
+                                  o.label === "3D Filament Color"
+                                    ? filamentSlots(l.options)
+                                    : Math.max(1, editOptValue.split(" / ").filter((p) => p.trim()).length);
+                                const cur = editOptValue.split(" / ");
+                                const parts = Array.from({ length: slots }, (_, pi) =>
+                                  choices!.includes(cur[pi]) ? cur[pi] : choices!.includes(cur[cur.length - 1]) ? cur[cur.length - 1] : choices![0],
+                                );
+                                return (
+                                  <span key={o.label} className="adm-opt-edit">
+                                    {o.label}:{" "}
+                                    {parts.map((part, pi) => (
+                                      <select
+                                        key={pi}
+                                        className="adm-select adm-opt-select"
+                                        value={part}
+                                        disabled={savingOpt}
+                                        onChange={(e) => {
+                                          const next = [...parts];
+                                          next[pi] = e.target.value;
+                                          setEditOptValue(next.join(" / "));
+                                        }}
+                                      >
+                                        {choices!.map((v) => <option key={v} value={v}>{v}</option>)}
+                                      </select>
+                                    ))}
+                                    <button type="button" className="adm-edit-link" disabled={savingOpt} onClick={saveItemOption}>
+                                      {savingOpt ? "Saving…" : "Save"}
+                                    </button>
+                                    <button type="button" className="adm-edit-link adm-opt-cancel" disabled={savingOpt} onClick={() => setEditOpt(null)}>
+                                      Cancel
+                                    </button>
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span key={o.label}>
+                                  {o.label}: {displayOptionValue(o.value, nativeDetail.date)}
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      className="adm-opt-pencil"
+                                      title={`Change ${o.label} (same price)`}
+                                      onClick={() => {
+                                        const cur = o.value.split(" / ").map((p) => p.trim()).filter(Boolean);
+                                        const sane = (cur.length ? cur : [choices![0]]).map((p) => (choices!.includes(p) ? p : choices![0]));
+                                        setEditOpt({ itemId: l.id, label: o.label });
+                                        setEditOptValue(sane.join(" / "));
+                                      }}
+                                    >
+                                      ✎
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                         {(() => {
