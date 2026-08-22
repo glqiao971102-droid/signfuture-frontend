@@ -194,7 +194,14 @@ function JobSteps({
           // ones ahead stay blank until it gets there.
           if (i > cur) return <div key={st.key} className="job-step js-empty" aria-hidden />;
           const active = i === cur;
-          const label = active ? meta(status).label : st.label;
+          // A completed box shows the status the job ACTUALLY passed through in
+          // that box (from history) — e.g. "Out for Delivery" rather than the
+          // generic "Available for Collection" — so the flow reflects reality
+          // even after the job has moved on to Delivered.
+          const boxStatus = active
+            ? status
+            : ([...history].reverse().find((h) => st.statuses.includes(h.to))?.to ?? null);
+          const label = boxStatus ? meta(boxStatus).label : st.label;
           const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
           const when = fmtStepTime(stepReachedAt(st, history, placed));
           // The delivery-details icon lives on the "Out for Delivery" (shipped) box.
