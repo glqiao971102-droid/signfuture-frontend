@@ -18,8 +18,8 @@ const STATUS_META: Record<string, { label: string; cls: string; pct: number }> =
   ready: { label: "Available for Collection", cls: "rs-ready", pct: 80 },
   collection: { label: "Collected", cls: "rs-success", pct: 100 },
   delivery: { label: "Delivery Arranged", cls: "rs-progress", pct: 88 },
-  shipped: { label: "Out for Delivery", cls: "rs-progress", pct: 88 },
-  delivered: { label: "Delivered", cls: "rs-success", pct: 100 },
+  shipped: { label: "Ready to Ship", cls: "rs-progress", pct: 88 },
+  delivered: { label: "Shipped", cls: "rs-success", pct: 100 },
   completed: { label: "Completed", cls: "rs-success", pct: 100 },
   cancelled: { label: "Cancelled", cls: "rs-fail", pct: 0 },
   refunded: { label: "Refunded", cls: "rs-fail", pct: 0 },
@@ -79,15 +79,15 @@ const STATUS_GUIDE: { key: string; label: string; cls: string; desc: string }[] 
   },
   {
     key: "shipped",
-    label: "Out for Delivery",
+    label: "Ready to Ship",
     cls: "rs-progress",
-    desc: "Handed to the courier and on the way to you.",
+    desc: "Packed and ready to be shipped out.",
   },
   {
     key: "delivered",
-    label: "Delivered",
+    label: "Shipped",
     cls: "rs-success",
-    desc: "Delivered to your address.",
+    desc: "Shipped out — on its way to you.",
   },
   {
     key: "collection",
@@ -133,7 +133,7 @@ const JOB_STEPS: { key: string; label: string; statuses: string[] }[] = [
   { key: "order", label: "Waiting Order", statuses: ["pending_confirmation", "waiting", "pending"] },
   { key: "processing", label: "Processing", statuses: ["processing", "on_hold", ...DEAD] },
   { key: "ready", label: "Available for Collection", statuses: ["ready", "shipped", "delivery"] },
-  { key: "done", label: "Delivered", statuses: ["delivered", "collection", "completed"] },
+  { key: "done", label: "Shipped", statuses: ["delivered", "collection", "completed"] },
 ];
 function jobStepIndex(status: string): number {
   const i = JOB_STEPS.findIndex((s) => s.statuses.includes(status));

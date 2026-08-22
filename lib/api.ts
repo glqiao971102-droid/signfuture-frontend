@@ -1132,6 +1132,46 @@ export const api = {
     );
   },
 
+  // ----- Admin: Production board -----
+
+  adminProduction() {
+    return request<{ jobs: ProductionJob[]; holidays: ProductionHoliday[]; serverDate: string }>(
+      "/api/v1/admin/production",
+    );
+  },
+  adminSetProductionStage(orderId: number, itemId: number, stage: string) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}/stage`,
+      { method: "PATCH", body: JSON.stringify({ stage }) },
+    );
+  },
+  adminProductionStats(months = 12) {
+    return request<{
+      monthly: { month: string; completed: number; onTime: number; late: number; noDue: number; onTimeRate: number | null }[];
+      currentlyOverdue: number;
+    }>(`/api/v1/admin/production/stats?months=${months}`);
+  },
+  adminProductionJob(orderId: number, itemId: number) {
+    return request<{ productionNote: string | null; activity: { actor: string; text: string | null; at: string | null }[] }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}`,
+    );
+  },
+  adminSaveProductionNote(orderId: number, itemId: number, note: string) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}/note`,
+      { method: "PATCH", body: JSON.stringify({ note }) },
+    );
+  },
+  adminAddHoliday(day: string, label?: string) {
+    return request<{ success: boolean; id: number }>("/api/v1/admin/production/holidays", {
+      method: "POST",
+      body: JSON.stringify({ day, label }),
+    });
+  },
+  adminDeleteHoliday(id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/production/holidays/${id}`, { method: "DELETE" });
+  },
+
   // ----- Admin: customer detail -----
 
   adminUserOrders(id: number, page = 1) {
@@ -1376,6 +1416,33 @@ export type AdminReloadRow = {
   status: string;
   statusLabel: string;
 };
+
+export type ProductionJob = {
+  id: number;
+  orderId: number;
+  ref: string;
+  jobNo: number;
+  jobRef: string;
+  productName: string;
+  qty: number;
+  status: string;
+  statusLabel: string;
+  productionStage: string | null;
+  options: { label: string; value: string }[];
+  customerName: string | null;
+  deliveryMethod: string | null;
+  selfCollect: boolean;
+  orderDate: string | null;
+  completedAt: string | null;
+  collect: string | null;
+  workingDays: number | null;
+  dueDate: string | null;
+  artworkUrl: string | null;
+  artworks: { url: string; name?: string }[] | null;
+  deliveryNote: string | null;
+  productionNote: string | null;
+};
+export type ProductionHoliday = { id: number; day: string; label: string | null };
 
 export type NativeOrderRow = {
   id: number;

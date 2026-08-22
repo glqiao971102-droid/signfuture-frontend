@@ -21,6 +21,7 @@ const NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "◆", section: "dashboard" },
   { href: "/admin/visitors", label: "Visitors", icon: "👣", section: "visitors" },
   { href: "/admin/orders", label: "Orders", icon: "▤", section: "orders" },
+  { href: "/admin/production", label: "Production", icon: "🏭", section: "production" },
   { href: "/admin/quotations", label: "Quotations", icon: "✉", section: "quotations" },
   { href: "/admin/users", label: "Customers", icon: "☺", section: "customers" },
   { href: "/admin/wallet", label: "Wallet", icon: "◈", section: "wallet" },
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
 // pages every admin may open (the /admin root redirect, Launch Tests).
 function sectionForPath(path: string): string | null {
   if (path.startsWith("/admin/orders")) return "orders";
+  if (path.startsWith("/admin/production")) return "production";
   if (path.startsWith("/admin/quotations")) return "quotations";
   if (path.startsWith("/admin/users")) return "customers";
   if (path.startsWith("/admin/wallet")) return "wallet";

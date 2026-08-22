@@ -158,8 +158,30 @@ function displayOptionValue(value: string, orderDate: string | null | undefined)
 const STATUS_LABEL_FALLBACK: Record<string, string> = {
   waiting: "Waiting Order", on_hold: "On Hold", processing: "Processing", production: "In Production",
   ready: "Available for Collection", collection: "Pickup Already", delivery: "Delivery Arranged",
-  delivered: "Delivered", completed: "Completed", cancelled: "Cancelled", refunded: "Refunded", failed: "Failed",
+  shipped: "Ready to Ship", delivered: "Shipped", completed: "Completed", cancelled: "Cancelled", refunded: "Refunded", failed: "Failed",
 };
+// The status dropdowns are split into tiers with a divider line between each,
+// so the pipeline (received → in production → ready → completed) reads at a glance.
+const STATUS_TIERS: { label: string; values: string[] }[] = [
+  { label: "① Order received", values: ["pending_confirmation", "waiting"] },
+  { label: "② In production", values: ["on_hold", "processing"] },
+  { label: "③ Ready", values: ["ready", "shipped"] },
+  { label: "④ Completed", values: ["delivered", "collection"] },
+  { label: "Cancelled", values: ["cancelled"] },
+];
+/** Groups the flat status list into the tiers above, keeping any unlisted ones. */
+function statusTiers(statuses: { value: string; label: string }[]) {
+  const byVal = new Map(statuses.map((s) => [s.value, s.label]));
+  const used = new Set<string>();
+  const groups = STATUS_TIERS.map((t) => ({
+    label: t.label,
+    items: t.values.filter((v) => byVal.has(v)).map((v) => { used.add(v); return { value: v, label: byVal.get(v)! }; }),
+  })).filter((g) => g.items.length > 0);
+  const rest = statuses.filter((s) => !used.has(s.value));
+  if (rest.length) groups.push({ label: "Other", items: rest });
+  return groups;
+}
+
 const DISPLAY_RANK: Record<string, number> = {
   processing: 0, production: 1, ready: 2, delivery: 3, delivered: 4, collection: 5, completed: 6,
   waiting: 7, pending_confirmation: 7, on_hold: 8, cancelled: 9, refunded: 9, failed: 9,
@@ -1035,8 +1057,12 @@ export default function AdminOrders() {
                   onChange={(e) => setBulkStatus(e.target.value)}
                 >
                   <option value="">Choose status…</option>
-                  {nativeStatuses.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                  {statusTiers(nativeStatuses).map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.items.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 <button
@@ -1167,7 +1193,11 @@ export default function AdminOrders() {
                           disabled={savingItemId === l.id}
                           onChange={(e) => changeNativeItemStatus(l.id, e.target.value, l.name)}
                         >
-                          {nativeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          {statusTiers(nativeStatuses).map((g) => (
+                            <optgroup key={g.label} label={g.label}>
+                              {g.items.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </optgroup>
+                          ))}
                         </select>
                         {savingItemId === l.id && <em className="adm-card-sub"> Saving…</em>}
                         {l.status === "shipped" && l.deliveryNote && (
@@ -1374,7 +1404,7 @@ export default function AdminOrders() {
       {deliveryModal && (
         <div className="adm-modal-overlay">
           <div className="adm-modal">
-            <h2>{deliveryModal.edit ? "Edit Delivery Details" : "Out for Delivery"}</h2>
+            <h2>{deliveryModal.edit ? "Edit Delivery Details" : "Ready to Ship"}</h2>
             <p className="adm-card-sub" style={{ margin: 0 }}>
               {deliveryModal.all
                 ? `All ${nativeDetail?.lines.length ?? ""} items — the customer will be emailed these delivery details.`
@@ -1419,7 +1449,7 @@ export default function AdminOrders() {
                 Cancel
               </button>
               <button type="button" className="hero-btn primary" onClick={submitDeliveryStatus}>
-                {deliveryModal.edit ? "Save changes" : "Mark Out for Delivery"}
+                {deliveryModal.edit ? "Save changes" : "Mark Ready to Ship"}
               </button>
             </div>
           </div>
