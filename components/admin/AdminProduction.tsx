@@ -15,52 +15,64 @@ import { api, type ProductionJob, type ProductionHoliday } from "@/lib/api";
 // a card is moved here via the dropdown; some columns share a stage but are
 // split for display by delivery method / month.
 type Col = { key: string; title: string; stage: string; hint?: string };
+// Each column maps 1:1 to a customer status — moving a card here sets that
+// status on the order. The stage sent to the backend equals the column key.
 const COLUMNS: Col[] = [
   { key: "in_progress", title: "Job In Progress", stage: "in_progress", hint: "New orders land here" },
   { key: "router_3d", title: "Router & 3D Printer", stage: "router_3d" },
   { key: "qc", title: "QC", stage: "qc" },
-  { key: "ready_collection", title: "Available for Collection", stage: "ready", hint: "Self-collect — customer notified" },
-  { key: "delivery", title: "Ready for Delivery", stage: "ready", hint: "To be delivered" },
-  { key: "collection", title: "Collected", stage: "done" },
-  { key: "delivered", title: "Shipped", stage: "done" },
+  { key: "ready", title: "Available for Collection", stage: "ready", hint: "Self-collect — customer notified" },
+  { key: "shipped", title: "Ready to Ship", stage: "shipped", hint: "Fill in the driver / courier details" },
+  { key: "collection", title: "Collected", stage: "collection" },
+  { key: "delivered", title: "Shipped", stage: "delivered" },
 ];
 
 // The two "finished" columns (grouped by month, no urgency colour).
 const DONE_LANES = ["collection", "delivered"];
 const isDoneLane = (lane: string) => DONE_LANES.includes(lane);
 
-// The dropdown a card offers to move between stages.
+// The dropdown a card offers to move between stages (values = column keys).
 const STAGE_OPTIONS: { value: string; label: string }[] = [
   { value: "in_progress", label: "Job In Progress" },
   { value: "router_3d", label: "Router & 3D Printer" },
   { value: "qc", label: "QC" },
-  { value: "ready", label: "Ready (Collection / Delivery)" },
-  { value: "done", label: "Done (Collected / Shipped)" },
+  { value: "ready", label: "Available for Collection" },
+  { value: "shipped", label: "Ready to Ship" },
+  { value: "collection", label: "Collected" },
+  { value: "delivered", label: "Shipped" },
 ];
+// Columns that support "select many → advance to the next stage in one go".
+const NEXT_STAGE: Record<string, { stage: string; label: string }> = {
+  ready: { stage: "collection", label: "Collected" },
+  shipped: { stage: "delivered", label: "Shipped" },
+};
+// Tail stages change the customer status → confirm (and email) before moving.
+const CONFIRM_STAGE: Record<string, string> = {
+  ready: "Available for Collection",
+  shipped: "Ready to Ship",
+  collection: "Collected",
+  delivered: "Shipped",
+};
 
 // Which board column a job falls into, from its status + production stage.
 function laneOf(j: ProductionJob): string {
-  // New (waiting/pending) jobs land directly in Job In Progress — no separate
-  // intake column.
+  // New (waiting/pending) jobs land directly in Job In Progress.
   if (j.status === "waiting" || j.status === "pending_confirmation") return "in_progress";
   if (j.status === "processing") {
     if (j.productionStage === "router_3d") return "router_3d";
     if (j.productionStage === "qc") return "qc";
     return "in_progress";
   }
-  if (j.status === "ready") return j.selfCollect ? "ready_collection" : "delivery";
-  if (j.status === "shipped") return "delivery";
+  if (j.status === "ready") return "ready";
+  if (j.status === "shipped") return "shipped";
   if (j.status === "collection") return "collection";
   if (j.status === "delivered") return "delivered";
   return "in_progress";
 }
 
-// The dropdown's current value for a job (maps a lane back to a stage).
+// The dropdown's current value for a job = its lane (columns are 1:1 with stages).
 function stageValueOf(j: ProductionJob): string {
-  const lane = laneOf(j);
-  if (lane === "ready_collection" || lane === "delivery") return "ready";
-  if (isDoneLane(lane)) return "done";
-  return lane;
+  return laneOf(j);
 }
 
 // Malaysia "now": today's date (YYYY-MM-DD) and the current hour (0–23),
@@ -121,6 +133,8 @@ export default function AdminProduction() {
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [openJobId, setOpenJobId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [showHolidays, setShowHolidays] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -202,8 +216,11 @@ export default function AdminProduction() {
 
   async function move(j: ProductionJob, stage: string) {
     if (stage === stageValueOf(j)) return;
-    if (stage === "ready" && !window.confirm(`Mark ${j.jobRef} as ready? The customer will be emailed.`)) return;
-    if (stage === "done" && !window.confirm(`Mark ${j.jobRef} as ${j.selfCollect ? "Collected" : "Shipped"}?`)) return;
+    if (stage === "delivered" && !(j.deliveryNote && j.deliveryNote.trim())) {
+      alert("Fill in the driver / delivery details first before marking this job as Shipped.");
+      return;
+    }
+    if (CONFIRM_STAGE[stage] && !window.confirm(`Mark ${j.jobRef} as "${CONFIRM_STAGE[stage]}"? The customer status changes${stage === "delivered" ? "" : " and they will be emailed"}.`)) return;
     setSavingId(j.id);
     try {
       await api.adminSetProductionStage(j.orderId, j.id, stage);
@@ -212,6 +229,43 @@ export default function AdminProduction() {
       alert(e instanceof Error ? e.message : "Could not move the job");
     } finally {
       setSavingId(null);
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectAll(laneKey: string, laneJobs: ProductionJob[]) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOn = laneJobs.every((j) => next.has(j.id));
+      for (const j of laneJobs) allOn ? next.delete(j.id) : next.add(j.id);
+      return next;
+    });
+  }
+  // Advance every SELECTED card in a column to that column's next stage in one go.
+  async function bulkAdvance(laneKey: string, laneJobs: ProductionJob[]) {
+    const info = NEXT_STAGE[laneKey];
+    const picked = laneJobs.filter((j) => selected.has(j.id));
+    if (!info || picked.length === 0) return;
+    if (!window.confirm(`Move ${picked.length} job(s) to "${info.label}"? The customer status changes${info.stage === "delivered" ? "" : " and they will be emailed"}.`)) return;
+    setBulkBusy(true);
+    try {
+      for (const j of picked) {
+        await api.adminSetProductionStage(j.orderId, j.id, info.stage);
+      }
+      setSelected(new Set());
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not move the jobs");
+      await load();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -375,6 +429,16 @@ export default function AdminProduction() {
         <div className="prod-board">
           {COLUMNS.map((col) => {
             const list = byLane[col.key] ?? [];
+            const next = NEXT_STAGE[col.key];
+            // In "Ready to Ship" only jobs with driver details filled can be
+            // selected / advanced; other bulk columns allow all cards.
+            const selectableList = next
+              ? col.key === "shipped"
+                ? list.filter((j) => j.deliveryNote && j.deliveryNote.trim())
+                : list
+              : [];
+            const selCount = selectableList.filter((j) => selected.has(j.id)).length;
+            const allSel = selectableList.length > 0 && selectableList.every((j) => selected.has(j.id));
             return (
               <div key={col.key} className="prod-col">
                 <div className="prod-col-head">
@@ -382,11 +446,36 @@ export default function AdminProduction() {
                   <span className="prod-col-count">{list.length}</span>
                 </div>
                 {col.hint && <div className="prod-col-hint">{col.hint}</div>}
+                {next && list.length > 0 && (
+                  <div className="prod-bulk">
+                    <label className="prod-bulk-all">
+                      <input type="checkbox" checked={!!allSel} disabled={selectableList.length === 0} onChange={() => toggleSelectAll(col.key, selectableList)} /> Select all
+                    </label>
+                    <button
+                      type="button"
+                      className="hero-btn primary prod-bulk-btn"
+                      disabled={selCount === 0 || bulkBusy}
+                      onClick={() => bulkAdvance(col.key, selectableList)}
+                    >
+                      {bulkBusy ? "Moving…" : `→ ${next.label} (${selCount})`}
+                    </button>
+                  </div>
+                )}
                 <div className="prod-col-body">
                   {isDoneLane(col.key)
                     ? renderDoneGrouped(list)
                     : list.map((j) => (
-                        <ProductionCard key={j.id} job={j} now={now} saving={savingId === j.id} onOpen={(x) => setOpenJobId(x.id)} />
+                        <ProductionCard
+                          key={j.id}
+                          job={j}
+                          now={now}
+                          saving={savingId === j.id}
+                          onOpen={(x) => setOpenJobId(x.id)}
+                          selectable={!!next}
+                          canSelect={col.key !== "shipped" || !!(j.deliveryNote && j.deliveryNote.trim())}
+                          checked={selected.has(j.id)}
+                          onToggle={() => toggleSelect(j.id)}
+                        />
                       ))}
                   {list.length === 0 && <div className="prod-empty">—</div>}
                 </div>
@@ -436,16 +525,39 @@ function ProductionCard({
   now,
   saving,
   onOpen,
+  selectable = false,
+  canSelect = true,
+  checked = false,
+  onToggle,
 }: {
   job: ProductionJob;
   now: { today: string; hour: number };
   saving: boolean;
   onOpen: (j: ProductionJob) => void;
+  selectable?: boolean;
+  canSelect?: boolean;
+  checked?: boolean;
+  onToggle?: () => void;
 }) {
   const u = urgencyOf(job, now);
-  const done = isDoneLane(laneOf(job));
+  const lane = laneOf(job);
+  const done = isDoneLane(lane);
+  const hasDelivery = !!(job.deliveryNote && job.deliveryNote.trim());
   return (
-    <button type="button" className={`prod-card prod-${u.level}${saving ? " is-saving" : ""}`} onClick={() => onOpen(job)}>
+    <div className={`prod-card-wrap${checked ? " is-selected" : ""}`}>
+      {selectable && (
+        <input
+          type="checkbox"
+          className="prod-card-check"
+          checked={checked}
+          disabled={!canSelect}
+          onChange={onToggle}
+          onClick={(e) => e.stopPropagation()}
+          title={canSelect ? `Select ${job.jobRef}` : "Fill the driver / delivery details first"}
+          aria-label={`Select ${job.jobRef}`}
+        />
+      )}
+      <button type="button" className={`prod-card prod-${u.level}${saving ? " is-saving" : ""}${selectable ? " is-selectable" : ""}`} onClick={() => onOpen(job)}>
       <div className="prod-card-top">
         <strong className="prod-card-ref">{job.jobRef}</strong>
         {job.qty > 1 && <span className="prod-card-qty">×{job.qty}</span>}
@@ -461,7 +573,13 @@ function ProductionCard({
           {u.label && <span className="prod-due-badge">{u.label}</span>}
         </div>
       )}
-    </button>
+      {lane === "shipped" && (
+        <div className={`prod-driver ${hasDelivery ? "prod-driver-ok" : "prod-driver-missing"}`}>
+          {hasDelivery ? "✓ Driver arranged" : "⚠ Fill driver info"}
+        </div>
+      )}
+      </button>
+    </div>
   );
 }
 
@@ -476,6 +594,34 @@ function fmtActivityTime(iso: string | null): string {
   return new Date(iso).toLocaleString("en-MY", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
   });
+}
+
+// Driver / courier details for the "Ready to Ship" step (same shape as the
+// Orders drawer courier modal: "Courier: X · Tracking No: Y · Contact: Z").
+const COURIERS = ["DHL", "Xendnow", "J&T", "Easy Parcel", "Ninja Van", "Other"];
+function parseDriver(note: string | null): { courier: string; tracking: string; phone: string } {
+  const out = { courier: "", tracking: "", phone: "" };
+  if (!note || !note.trim()) return out;
+  const parts = note.split(new RegExp("\\s*[\\u00B7\\u2022\\u2219\\u30FB]\\s*|\\n|;")).map((s) => s.trim()).filter(Boolean);
+  for (const p of parts) {
+    const i = p.indexOf(":");
+    if (i < 0) continue;
+    const k = p.slice(0, i).trim().toLowerCase();
+    const v = p.slice(i + 1).trim();
+    if (k.startsWith("courier")) out.courier = v;
+    else if (k.startsWith("tracking")) out.tracking = v;
+    else if (k.startsWith("contact") || k.startsWith("phone")) out.phone = v;
+  }
+  return out;
+}
+function buildDriverNote(courier: string, tracking: string, phone: string): string {
+  const parts: string[] = [];
+  if (courier.trim()) parts.push("Courier: " + courier.trim());
+  if (tracking.trim()) parts.push("Tracking No: " + tracking.trim());
+  if (phone.trim()) parts.push("Contact: " + phone.trim());
+  // Join with a guaranteed U+00B7 middot (source-file encoding can mangle a typed
+  // one) so the member-side parser splits it back into rows.
+  return parts.join(" · ");
 }
 
 // Card detail modal: full job info, an editable Description, the stage mover, and
@@ -498,6 +644,16 @@ function JobModal({
   const [loadingAct, setLoadingAct] = useState(true);
   const [savingNote, setSavingNote] = useState(false);
   const [moving, setMoving] = useState(false);
+  // Driver / courier details (Ready to Ship), prefilled from the saved note.
+  const driver0 = parseDriver(job.deliveryNote);
+  const [courier, setCourier] = useState(driver0.courier ? (COURIERS.includes(driver0.courier) ? driver0.courier : "Other") : "DHL");
+  const [courierOther, setCourierOther] = useState(driver0.courier && !COURIERS.includes(driver0.courier) ? driver0.courier : "");
+  const [tracking, setTracking] = useState(driver0.tracking);
+  const [phone, setPhone] = useState(driver0.phone);
+  const [savingDriver, setSavingDriver] = useState(false);
+  // Handover / proof photos (Available for Collection & Ready to Ship).
+  const [photos, setPhotos] = useState<{ url: string; name?: string }[]>(job.handoverPhotos ?? []);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const loadActivity = useCallback(async () => {
     setLoadingAct(true);
@@ -531,6 +687,54 @@ function JobModal({
       alert(e instanceof Error ? e.message : "Could not save the description");
     } finally {
       setSavingNote(false);
+    }
+  }
+
+  async function saveDriver() {
+    const finalCourier = courier === "Other" ? courierOther : courier;
+    const noteStr = buildDriverNote(finalCourier, tracking, phone);
+    if (!noteStr) {
+      alert("Enter the courier / driver details first.");
+      return;
+    }
+    setSavingDriver(true);
+    try {
+      await api.adminUpdateNativeItemDelivery(job.orderId, job.id, noteStr);
+      await loadActivity();
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not save driver details");
+    } finally {
+      setSavingDriver(false);
+    }
+  }
+
+  async function addPhotos(files: FileList) {
+    setUploadingPhoto(true);
+    try {
+      const uploaded: { url: string; name?: string }[] = [];
+      for (const f of Array.from(files)) {
+        const r = await api.adminUploadPhoto(f);
+        uploaded.push({ url: r.url, name: f.name });
+      }
+      const next = [...photos, ...uploaded];
+      setPhotos(next);
+      await api.adminSaveProductionPhotos(job.orderId, job.id, next);
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not upload the photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+  async function removePhoto(url: string) {
+    const next = photos.filter((p) => p.url !== url);
+    setPhotos(next);
+    try {
+      await api.adminSaveProductionPhotos(job.orderId, job.id, next);
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not remove the photo");
     }
   }
 
@@ -609,6 +813,66 @@ function JobModal({
             </option>
           ))}
         </select>
+
+        {laneOf(job) === "shipped" && (
+          <div className="prod-driver-box">
+            <div className="prod-modal-label">
+              Driver / Delivery details{" "}
+              {job.deliveryNote && job.deliveryNote.trim() ? (
+                <span className="prod-driver-ok">✓ arranged</span>
+              ) : (
+                <span className="prod-driver-missing">⚠ not arranged — fill below</span>
+              )}
+            </div>
+            <div className="prod-driver-form">
+              <select className="adm-select" value={courier} disabled={savingDriver} onChange={(e) => setCourier(e.target.value)}>
+                {COURIERS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {courier === "Other" && (
+                <input className="adm-input" placeholder="Courier name" value={courierOther} disabled={savingDriver} onChange={(e) => setCourierOther(e.target.value)} />
+              )}
+              <input className="adm-input" placeholder="Tracking number" value={tracking} disabled={savingDriver} onChange={(e) => setTracking(e.target.value)} />
+              <input className="adm-input" placeholder="Contact phone" value={phone} disabled={savingDriver} onChange={(e) => setPhone(e.target.value)} />
+              <button type="button" className="hero-btn primary" disabled={savingDriver} onClick={saveDriver}>
+                {savingDriver ? "Saving…" : "Save driver details"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(laneOf(job) === "ready" || laneOf(job) === "shipped") && (
+          <>
+            <label className="prod-modal-label">Handover / proof photos</label>
+            <p className="adm-card-sub" style={{ margin: "0 0 6px" }}>
+              Photo of the goods at collection / ship-out — the customer can view it later.
+            </p>
+            <div className="prod-photos">
+              {photos.map((p, i) => (
+                <div key={i} className="prod-photo">
+                  <a href={p.url} target="_blank" rel="noreferrer">
+                    <img src={p.url} alt={p.name || "Handover photo"} />
+                  </a>
+                  <button type="button" className="prod-photo-x" onClick={() => removePhoto(p.url)} aria-label="Remove photo">
+                    ×
+                  </button>
+                </div>
+              ))}
+              <label className={`prod-photo-add${uploadingPhoto ? " is-busy" : ""}`}>
+                {uploadingPhoto ? "Uploading…" : "＋ Add photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  disabled={uploadingPhoto}
+                  onChange={(e) => e.target.files && e.target.files.length && addPhotos(e.target.files)}
+                />
+              </label>
+            </div>
+          </>
+        )}
 
         <label className="prod-modal-label">Description</label>
         <textarea

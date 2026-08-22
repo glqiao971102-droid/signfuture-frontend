@@ -176,16 +176,20 @@ function JobSteps({
   history = [],
   placed,
   delivery,
+  photos = [],
 }: {
   status: string;
   history?: StepHistory;
   placed?: string | null;
   delivery?: string | null;
+  photos?: { url: string; name?: string }[];
 }) {
   const [showDelivery, setShowDelivery] = useState(false);
   const cur = jobStepIndex(status);
   const dead = DEAD.includes(status);
   const deliveryRows = delivery && delivery.trim() ? parseDelivery(delivery) : null;
+  const photoList = Array.isArray(photos) ? photos : [];
+  const hasInfo = !!deliveryRows || photoList.length > 0;
   return (
     <>
       <div className="job-steps">
@@ -204,24 +208,25 @@ function JobSteps({
           const label = boxStatus ? meta(boxStatus).label : st.label;
           const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
           const when = fmtStepTime(stepReachedAt(st, history, placed));
-          // The delivery-details icon lives on the "Out for Delivery" (shipped) box.
-          const hasDelivery = st.statuses.includes("shipped") && deliveryRows;
+          // Delivery details + handover photos live on the final box (Shipped /
+          // Collected) — the customer sees them only once the job is done.
+          const showToggleHere = st.statuses.includes("delivered") && hasInfo;
           return (
             <div key={st.key} className={`job-step ${cls}`}>
               <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
               <span className="job-step-text">
                 <span className="job-step-label">
                   {label}
-                  {hasDelivery && (
+                  {showToggleHere && (
                     <button
                       type="button"
                       className="job-step-info"
                       onClick={() => setShowDelivery((v) => !v)}
-                      title="View delivery details"
-                      aria-label="View delivery details"
+                      title="View delivery details & photos"
+                      aria-label="View delivery details & photos"
                     >
-                      <span className="job-step-info-icon">🚚</span>
-                      <span className="job-step-info-text">{showDelivery ? "Hide" : "Track"}</span>
+                      <span className="job-step-info-icon">📦</span>
+                      <span className="job-step-info-text">{showDelivery ? "Hide" : "View"}</span>
                     </button>
                   )}
                 </span>
@@ -231,15 +236,31 @@ function JobSteps({
           );
         })}
       </div>
-      {showDelivery && deliveryRows && (
+      {showDelivery && hasInfo && (
         <div className="job-delivery">
-          <div className="job-delivery-title">Delivery details</div>
-          {deliveryRows.map((r, i) => (
-            <div key={i} className="job-delivery-row">
-              {r.label && <span className="job-delivery-label">{r.label}</span>}
-              <span className="job-delivery-value">{r.value}</span>
-            </div>
-          ))}
+          {deliveryRows && (
+            <>
+              <div className="job-delivery-title">Delivery details</div>
+              {deliveryRows.map((r, i) => (
+                <div key={i} className="job-delivery-row">
+                  {r.label && <span className="job-delivery-label">{r.label}</span>}
+                  <span className="job-delivery-value">{r.value}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {photoList.length > 0 && (
+            <>
+              <div className="job-delivery-title" style={{ marginTop: deliveryRows ? 10 : 0 }}>Handover photos</div>
+              <div className="job-photos">
+                {photoList.map((p, i) => (
+                  <a key={i} href={p.url} target="_blank" rel="noreferrer" className="job-photo">
+                    <img src={p.url} alt={p.name || "Handover photo"} loading="lazy" />
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </>
@@ -438,7 +459,7 @@ export default function OrderStatusList() {
                                 ))}
                               </div>
                             )}
-                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} delivery={l.deliveryNote} />
+                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} delivery={l.deliveryNote} photos={l.handoverPhotos} />
                           </div>
                         ))}
                       </div>

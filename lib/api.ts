@@ -1162,6 +1162,27 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ note }) },
     );
   },
+  /** Save the handover / proof photos array on a job. */
+  adminSaveProductionPhotos(orderId: number, itemId: number, photos: { url: string; name?: string }[]) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}/photos`,
+      { method: "PATCH", body: JSON.stringify({ photos }) },
+    );
+  },
+  /** Upload one handover photo; returns its public URL. */
+  async adminUploadPhoto(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/uploads/artwork`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : {},
+      body: form,
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, body?.message ?? "Upload failed", body?.error ?? null);
+    return body as { url: string; key?: string };
+  },
   adminAddHoliday(day: string, label?: string) {
     return request<{ success: boolean; id: number }>("/api/v1/admin/production/holidays", {
       method: "POST",
@@ -1441,6 +1462,7 @@ export type ProductionJob = {
   artworks: { url: string; name?: string }[] | null;
   deliveryNote: string | null;
   productionNote: string | null;
+  handoverPhotos: { url: string; name?: string }[];
 };
 export type ProductionHoliday = { id: number; day: string; label: string | null };
 
@@ -1452,7 +1474,7 @@ export type NativeOrderRow = {
   total: number;
   currency: string;
   date: string | null;
-  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string; deliveryNote?: string | null }[];
+  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string; deliveryNote?: string | null; handoverPhotos?: { url: string; name?: string }[] }[];
   history?: { to: string; date: string | null }[];
 };
 

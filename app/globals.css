@@ -4504,6 +4504,9 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-delivery-row { display: flex; gap: 10px; font-size: 13px; align-items: baseline; }
 .job-delivery-label { min-width: 92px; color: #8aa0bd; font-weight: 600; }
 .job-delivery-value { color: #eaf2ff; font-weight: 700; word-break: break-all; }
+.job-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.job-photo { width: 84px; height: 84px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(63,176,255,0.3); display: block; }
+.job-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .job-step.js-done {
   border-color: rgba(34, 197, 94, 0.35);
   background: rgba(34, 197, 94, 0.1);
@@ -5936,6 +5939,16 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-col-body { display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; }
 .prod-empty { text-align: center; color: rgba(159,176,198,0.4); font-size: 12px; padding: 10px 0; }
 
+.prod-card-wrap { position: relative; }
+.prod-card-check { position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; cursor: pointer; z-index: 2; accent-color: var(--cyan, #5fd0ff); }
+.prod-card-check:disabled { opacity: 0.35; cursor: not-allowed; }
+.prod-card-wrap.is-selected .prod-card { border-color: var(--cyan, #5fd0ff); box-shadow: 0 0 0 1px var(--cyan, #5fd0ff) inset; }
+.prod-card.is-selectable { padding-right: 30px; }
+/* Bulk "advance selected" toolbar on the Available for Collection / Ready to Ship columns. */
+.prod-bulk { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 8px; }
+.prod-bulk-all { font-size: 11px; color: #9fb0c6; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.prod-bulk-all input { accent-color: var(--cyan, #5fd0ff); }
+.prod-bulk-btn { font-size: 11.5px; padding: 4px 10px; }
 .prod-card { width: 100%; text-align: left; font: inherit; cursor: pointer; background: rgba(9,20,38,0.95); border: 1px solid rgba(63,176,255,0.2); border-left: 4px solid rgba(63,176,255,0.5); border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; transition: transform 0.08s, box-shadow 0.08s; }
 .prod-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
 .prod-card.is-saving { opacity: 0.55; }
@@ -5943,6 +5956,21 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-card-ref { color: var(--cyan, #5fd0ff); font-size: 13px; }
 .prod-card-qty { font-size: 11px; color: #9fb0c6; margin-left: auto; }
 .prod-card-hasnote { font-size: 11px; }
+.prod-driver { font-size: 10.5px; font-weight: 800; margin-top: 3px; padding: 2px 6px; border-radius: 6px; display: inline-block; }
+.prod-driver-ok { color: #7ee6b4; }
+.prod-driver-missing { color: #ffbe70; }
+.prod-card .prod-driver-ok { background: rgba(62,207,142,0.14); }
+.prod-card .prod-driver-missing { background: rgba(255,168,60,0.16); }
+.prod-driver-box { border: 1px solid rgba(255,168,60,0.25); border-radius: 8px; padding: 10px; margin-top: 6px; background: rgba(255,168,60,0.05); }
+.prod-driver-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.prod-driver-form .hero-btn { align-self: flex-start; }
+/* Handover photo uploader (admin modal). */
+.prod-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.prod-photo { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(63,176,255,0.3); }
+.prod-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prod-photo-x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border: none; border-radius: 50%; background: rgba(0,0,0,0.65); color: #ff9aab; cursor: pointer; font-size: 13px; line-height: 1; }
+.prod-photo-add { width: 72px; height: 72px; border: 1px dashed rgba(63,176,255,0.45); border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; color: #8fd0ff; cursor: pointer; padding: 4px; }
+.prod-photo-add.is-busy { opacity: 0.6; cursor: default; }
 .prod-card-product { font-size: 12.5px; font-weight: 700; color: #eaf3ff; line-height: 1.3; }
 .prod-card-cust { font-size: 11.5px; color: #9fb0c6; }
 .prod-due { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11px; margin-top: 2px; }
