@@ -1117,6 +1117,13 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ status, note }) },
     );
   },
+  /** Edit an already-shipped item's delivery details (courier/tracking/phone). */
+  adminUpdateNativeItemDelivery(id: number, itemId: number, note: string) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/orders/native/${id}/items/${itemId}/delivery`,
+      { method: "PATCH", body: JSON.stringify({ note }) },
+    );
+  },
 
   // ----- Admin: customer detail -----
 
@@ -1371,7 +1378,7 @@ export type NativeOrderRow = {
   total: number;
   currency: string;
   date: string | null;
-  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string }[];
+  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string; deliveryNote?: string | null }[];
   history?: { to: string; date: string | null }[];
 };
 
@@ -1401,7 +1408,7 @@ export type NativeOrderDetail = {
   placedByAgent?: boolean;
   agentLabel?: string | null;
   date: string | null;
-  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null }[];
+  lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null; deliveryNote?: string | null }[];
   history: { to: string; date: string | null; from?: string | null; note?: string | null; by?: string | null }[];
 };
 

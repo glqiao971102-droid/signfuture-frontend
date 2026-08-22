@@ -157,30 +157,85 @@ function fmtStepTime(v: string | null): string {
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
 }
-function JobSteps({ status, history = [], placed }: { status: string; history?: StepHistory; placed?: string | null }) {
+// Split the delivery note ("Courier: J&T · Tracking No: X · Contact: Y") into
+// rows. Robust to any middot variant / newline used as the separator.
+function parseDelivery(note: string): { label: string; value: string }[] {
+  return note
+    .split(new RegExp("\s*[\u00B7\u2022\u2219\u30FB]\s*|\n|;"))
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((piece) => {
+      const idx = piece.indexOf(":");
+      return idx === -1
+        ? { label: "", value: piece }
+        : { label: piece.slice(0, idx).trim(), value: piece.slice(idx + 1).trim() };
+    });
+}
+function JobSteps({
+  status,
+  history = [],
+  placed,
+  delivery,
+}: {
+  status: string;
+  history?: StepHistory;
+  placed?: string | null;
+  delivery?: string | null;
+}) {
+  const [showDelivery, setShowDelivery] = useState(false);
   const cur = jobStepIndex(status);
   const dead = DEAD.includes(status);
+  const deliveryRows = delivery && delivery.trim() ? parseDelivery(delivery) : null;
   return (
-    <div className="job-steps">
-      {JOB_STEPS.map((st, i) => {
-        // Only reveal boxes up to the stage the job has actually reached; the
-        // ones ahead stay blank until it gets there.
-        if (i > cur) return <div key={st.key} className="job-step js-empty" aria-hidden />;
-        const active = i === cur;
-        const label = active ? meta(status).label : st.label;
-        const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
-        const when = fmtStepTime(stepReachedAt(st, history, placed));
-        return (
-          <div key={st.key} className={`job-step ${cls}`}>
-            <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
-            <span className="job-step-text">
-              <span className="job-step-label">{label}</span>
-              {when && <span className="job-step-time">{when}</span>}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    <>
+      <div className="job-steps">
+        {JOB_STEPS.map((st, i) => {
+          // Only reveal boxes up to the stage the job has actually reached; the
+          // ones ahead stay blank until it gets there.
+          if (i > cur) return <div key={st.key} className="job-step js-empty" aria-hidden />;
+          const active = i === cur;
+          const label = active ? meta(status).label : st.label;
+          const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
+          const when = fmtStepTime(stepReachedAt(st, history, placed));
+          // The delivery-details icon lives on the "Out for Delivery" (shipped) box.
+          const hasDelivery = st.statuses.includes("shipped") && deliveryRows;
+          return (
+            <div key={st.key} className={`job-step ${cls}`}>
+              <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
+              <span className="job-step-text">
+                <span className="job-step-label">
+                  {label}
+                  {hasDelivery && (
+                    <button
+                      type="button"
+                      className="job-step-info"
+                      onClick={() => setShowDelivery((v) => !v)}
+                      title="View delivery details"
+                      aria-label="View delivery details"
+                    >
+                      <span className="job-step-info-icon">🚚</span>
+                      <span className="job-step-info-text">{showDelivery ? "Hide" : "Track"}</span>
+                    </button>
+                  )}
+                </span>
+                {when && <span className="job-step-time">{when}</span>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {showDelivery && deliveryRows && (
+        <div className="job-delivery">
+          <div className="job-delivery-title">Delivery details</div>
+          {deliveryRows.map((r, i) => (
+            <div key={i} className="job-delivery-row">
+              {r.label && <span className="job-delivery-label">{r.label}</span>}
+              <span className="job-delivery-value">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 function deriveStatus(o: NativeOrderRow): string {
@@ -376,7 +431,7 @@ export default function OrderStatusList() {
                                 ))}
                               </div>
                             )}
-                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} />
+                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} delivery={l.deliveryNote} />
                           </div>
                         ))}
                       </div>

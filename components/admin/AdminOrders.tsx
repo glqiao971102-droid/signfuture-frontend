@@ -241,7 +241,7 @@ export default function AdminOrders() {
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
   // "Out for Delivery" collects courier + tracking + phone, emailed to the customer.
   // `all` marks the bulk "set every item" flow.
-  const [deliveryModal, setDeliveryModal] = useState<{ itemId?: number; itemName?: string; all?: boolean } | null>(null);
+  const [deliveryModal, setDeliveryModal] = useState<{ itemId?: number; itemName?: string; all?: boolean; edit?: boolean } | null>(null);
   const [dlvCourier, setDlvCourier] = useState("DHL");
   const [dlvCourierOther, setDlvCourierOther] = useState("");
   const [dlvTracking, setDlvTracking] = useState("");
@@ -407,9 +407,30 @@ export default function AdminOrders() {
     }
   }
 
+  // Open the delivery modal pre-filled to EDIT an already-shipped item's details.
+  function openEditDelivery(itemId: number, itemName: string, note: string) {
+    const map: Record<string, string> = {};
+    note.split(new RegExp("\\s*[\\u00B7\\u2022\\u2219\\u30FB]\\s*|\\n|;")).forEach((p) => {
+      const i = p.indexOf(":");
+      if (i !== -1) map[p.slice(0, i).trim().toLowerCase()] = p.slice(i + 1).trim();
+    });
+    const courier = map["courier"] || "";
+    const known = ["DHL", "Xendnow", "J&T", "Easy Parcel", "Ninja Van"];
+    if (courier && known.includes(courier)) {
+      setDlvCourier(courier);
+      setDlvCourierOther("");
+    } else {
+      setDlvCourier("Other");
+      setDlvCourierOther(courier);
+    }
+    setDlvTracking(map["tracking no"] || map["tracking"] || "");
+    setDlvPhone(map["contact"] || map["phone"] || "");
+    setDeliveryModal({ itemId, itemName, edit: true });
+  }
+
   // Confirm "Out for Delivery" with the courier details; sent as the status
   // note, so it lands in the status history AND the customer's email. Handles
-  // both a single item and the bulk "all items" flow.
+  // a single item, the bulk "all items" flow, and editing an existing shipment.
   async function submitDeliveryStatus() {
     if (!nativeDetail || !deliveryModal) return;
     const courier = dlvCourier === "Other" ? dlvCourierOther.trim() || "Other" : dlvCourier;
@@ -422,8 +443,21 @@ export default function AdminOrders() {
     if (dlvPhone.trim()) parts.push(`Contact: ${dlvPhone.trim()}`);
     const note = parts.join(" · ");
     const bulk = !!deliveryModal.all;
+    const edit = !!deliveryModal.edit;
     const itemId = deliveryModal.itemId;
     setDeliveryModal(null);
+    if (edit && itemId != null) {
+      setSavingItemId(itemId);
+      try {
+        await api.adminUpdateNativeItemDelivery(nativeDetail.id, itemId, note);
+        setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Could not update delivery details");
+      } finally {
+        setSavingItemId(null);
+      }
+      return;
+    }
     if (bulk) {
       setSavingAll(true);
       try {
@@ -1001,6 +1035,27 @@ export default function AdminOrders() {
                           {nativeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                         {savingItemId === l.id && <em className="adm-card-sub"> Saving…</em>}
+                        {l.status === "shipped" && l.deliveryNote && (
+                          <div className="adm-delivery-box">
+                            <div className="adm-delivery-head">
+                              <span>🚚 Delivery details</span>
+                              <button
+                                type="button"
+                                className="adm-edit-link adm-delivery-edit"
+                                onClick={() => openEditDelivery(l.id, l.name, l.deliveryNote || "")}
+                              >
+                                ✎ Edit
+                              </button>
+                            </div>
+                            {l.deliveryNote
+                              .split(new RegExp("\\s*[\\u00B7\\u2022\\u2219\\u30FB]\\s*|\\n|;"))
+                              .map((s) => s.trim())
+                              .filter(Boolean)
+                              .map((piece, pi) => (
+                                <div key={pi} className="adm-delivery-line">{piece}</div>
+                              ))}
+                          </div>
+                        )}
                       </td>
                     </tr>
                     );
@@ -1184,7 +1239,7 @@ export default function AdminOrders() {
       {deliveryModal && (
         <div className="adm-modal-overlay">
           <div className="adm-modal">
-            <h2>Out for Delivery</h2>
+            <h2>{deliveryModal.edit ? "Edit Delivery Details" : "Out for Delivery"}</h2>
             <p className="adm-card-sub" style={{ margin: 0 }}>
               {deliveryModal.all
                 ? `All ${nativeDetail?.lines.length ?? ""} items — the customer will be emailed these delivery details.`
@@ -1229,7 +1284,7 @@ export default function AdminOrders() {
                 Cancel
               </button>
               <button type="button" className="hero-btn primary" onClick={submitDeliveryStatus}>
-                Mark Out for Delivery
+                {deliveryModal.edit ? "Save changes" : "Mark Out for Delivery"}
               </button>
             </div>
           </div>
