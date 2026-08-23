@@ -6014,6 +6014,12 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-dwell-bad { color: #ff9aab; }
 .prod-modal-dwell { font-size: 11px; font-weight: 700; }
 .prod-driver-box { border: 1px solid rgba(255,168,60,0.25); border-radius: 8px; padding: 10px; margin-top: 6px; background: rgba(255,168,60,0.05); }
+/* Ready for AC / RS scheduled-release control + card badge. */
+.prod-sched { color: #c9b8ff; background: rgba(140,110,255,0.14) !important; line-height: 1.35; }
+.prod-sched-box { border: 1px solid rgba(140,110,255,0.3); border-radius: 8px; padding: 10px; margin-top: 6px; background: rgba(140,110,255,0.06); }
+.prod-sched-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.prod-sched-lbl { font-size: 11px; color: #9fb0c6; }
+.prod-sched-form .hero-btn { align-self: flex-start; }
 .prod-driver-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .prod-driver-form .hero-btn { align-self: flex-start; }
 /* Handover photo uploader (admin modal). */

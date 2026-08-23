@@ -21,6 +21,7 @@ const COLUMNS: Col[] = [
   { key: "in_progress", title: "Job In Progress", stage: "in_progress", hint: "New orders land here" },
   { key: "router_3d", title: "Router & 3D Printer", stage: "router_3d" },
   { key: "qc", title: "QC", stage: "qc" },
+  { key: "staged", title: "Ready for AC / RS", stage: "staged", hint: "Finished early — set a release time" },
   { key: "ready", title: "Available for Collection", stage: "ready", hint: "Self-collect — customer notified" },
   { key: "shipped", title: "Ready to Ship", stage: "shipped", hint: "Fill in the driver / courier details" },
   { key: "collection", title: "Collected", stage: "collection" },
@@ -36,6 +37,7 @@ const STAGE_OPTIONS: { value: string; label: string }[] = [
   { value: "in_progress", label: "Job In Progress" },
   { value: "router_3d", label: "Router & 3D Printer" },
   { value: "qc", label: "QC" },
+  { value: "staged", label: "Ready for AC / RS" },
   { value: "ready", label: "Available for Collection" },
   { value: "shipped", label: "Ready to Ship" },
   { value: "collection", label: "Collected" },
@@ -70,6 +72,7 @@ function laneOf(j: ProductionJob): string {
   if (j.status === "processing") {
     if (j.productionStage === "router_3d") return "router_3d";
     if (j.productionStage === "qc") return "qc";
+    if (j.productionStage === "staged") return "staged";
     return "in_progress";
   }
   if (j.status === "ready") return "ready";
@@ -522,6 +525,16 @@ function ProductionCard({
       {lane === "ready" && dw && (
         <div className={`prod-dwell prod-dwell-${dw.level}`}>⏱ Awaiting pickup · {dw.text}</div>
       )}
+      {lane === "staged" &&
+        (job.scheduledReleaseAt && job.scheduledReleaseTo ? (
+          <div className="prod-driver prod-sched">
+            🕒 → {job.scheduledReleaseTo === "ready" ? "Collection" : "Ready to Ship"}
+            <br />
+            {fmtStamp(job.scheduledReleaseAt)}
+          </div>
+        ) : (
+          <div className="prod-driver prod-driver-missing">⚠ Set release time</div>
+        ))}
       </button>
     </div>
   );
@@ -538,6 +551,22 @@ function fmtStamp(iso: string | null): string {
   return new Date(iso).toLocaleString("en-MY", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
   });
+}
+
+// An absolute ISO time → a <input type="datetime-local"> value in Malaysia wall time.
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(iso));
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  let hh = g("hour");
+  if (hh === "24") hh = "00";
+  return `${g("year")}-${g("month")}-${g("day")}T${hh}:${g("minute")}`;
+}
+// A datetime-local value (Malaysia wall time) → an absolute ISO with the +08:00 offset.
+function fromLocalInput(v: string): string {
+  return v.length === 16 ? `${v}:00+08:00` : `${v}+08:00`;
 }
 
 function fmtActivityTime(iso: string | null): string {
@@ -605,6 +634,10 @@ function JobModal({
   // Handover / proof photos (Available for Collection & Ready to Ship).
   const [photos, setPhotos] = useState<{ url: string; name?: string }[]>(job.handoverPhotos ?? []);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Scheduled release (Ready for AC / RS staging).
+  const [scheduleAt, setScheduleAt] = useState(toLocalInput(job.scheduledReleaseAt));
+  const [scheduleTo, setScheduleTo] = useState<"ready" | "shipped">((job.scheduledReleaseTo as "ready" | "shipped") || "ready");
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const loadActivity = useCallback(async () => {
     setLoadingAct(true);
@@ -689,6 +722,23 @@ function JobModal({
     }
   }
 
+  async function saveSchedule() {
+    if (!scheduleAt) {
+      alert("Pick the release date & time first.");
+      return;
+    }
+    setSavingSchedule(true);
+    try {
+      await api.adminScheduleRelease(job.orderId, job.id, fromLocalInput(scheduleAt), scheduleTo);
+      await loadActivity();
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not schedule the release");
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
   async function doMove(stage: string) {
     setMoving(true);
     try {
@@ -768,6 +818,34 @@ function JobModal({
             </option>
           ))}
         </select>
+
+        {laneOf(job) === "staged" && (
+          <div className="prod-sched-box">
+            <div className="prod-modal-label">
+              Auto-release schedule{" "}
+              {job.scheduledReleaseAt ? (
+                <span className="prod-driver-ok">✓ scheduled</span>
+              ) : (
+                <span className="prod-driver-missing">⚠ not set</span>
+              )}
+            </div>
+            <p className="adm-card-sub" style={{ margin: "0 0 6px" }}>
+              Finished early — it stays here until this time, then auto-moves (and notifies the customer).
+            </p>
+            <div className="prod-sched-form">
+              <label className="prod-sched-lbl">Release to</label>
+              <select className="adm-select" value={scheduleTo} disabled={savingSchedule} onChange={(e) => setScheduleTo(e.target.value as "ready" | "shipped")}>
+                <option value="ready">Available for Collection</option>
+                <option value="shipped">Ready to Ship</option>
+              </select>
+              <label className="prod-sched-lbl">Release at (Malaysia time)</label>
+              <input type="datetime-local" className="adm-input" value={scheduleAt} disabled={savingSchedule} onChange={(e) => setScheduleAt(e.target.value)} />
+              <button type="button" className="hero-btn primary" disabled={savingSchedule} onClick={saveSchedule}>
+                {savingSchedule ? "Saving…" : "Save schedule"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {laneOf(job) === "shipped" && (
           <div className="prod-driver-box">

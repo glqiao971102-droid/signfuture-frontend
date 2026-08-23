@@ -1162,6 +1162,13 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ note }) },
     );
   },
+  /** Park a job in "Ready for AC / RS" with an auto-release time + destination. */
+  adminScheduleRelease(orderId: number, itemId: number, releaseAt: string, releaseTo: "ready" | "shipped") {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}/schedule`,
+      { method: "PATCH", body: JSON.stringify({ releaseAt, releaseTo }) },
+    );
+  },
   /** Save the handover / proof photos array on a job. */
   adminSaveProductionPhotos(orderId: number, itemId: number, photos: { url: string; name?: string }[]) {
     return request<{ success: boolean }>(
@@ -1456,6 +1463,8 @@ export type ProductionJob = {
   orderDate: string | null;
   completedAt: string | null;
   finishedAt: string | null;
+  scheduledReleaseAt: string | null;
+  scheduledReleaseTo: string | null;
   collect: string | null;
   workingDays: number | null;
   dueDate: string | null;
