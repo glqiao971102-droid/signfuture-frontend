@@ -4411,17 +4411,17 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-steps {
   margin-top: 12px;
   display: grid;
-  /* Pills never shrink below ~175px, so the date+time always fits INSIDE the
-     box; columns reflow (4 → 3 → 2 → 1) as the width tightens. */
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-  gap: 10px;
+  /* All four milestones sit in ONE row; boxes are compact and the label / time
+     wrap onto extra lines inside the box when space is tight. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 .job-step {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 7px 9px;
+  border-radius: 10px;
   border: 1px solid transparent;
   min-width: 0;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -4430,12 +4430,13 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-step.js-empty { border: none; background: transparent; }
 .job-step-num {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   color: #fff;
   line-height: 1;
@@ -4446,21 +4447,21 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   min-width: 0;
 }
 .job-step-label {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  word-break: break-word;
 }
-/* Date + time a milestone was reached, shown on ONE line just under its label. */
+/* Date + time a milestone was reached, under its label — wraps to a third line
+   inside the (now narrower) box rather than overflowing. */
 .job-step-time {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
   line-height: 1.2;
   letter-spacing: 0.1px;
   color: #8aa0bd;
-  white-space: nowrap;
+  white-space: normal;
 }
 .job-step.js-done .job-step-time { color: #8fd3aa; }
 .job-step.js-active .job-step-time { color: #b7d4f7; }
@@ -4527,7 +4528,9 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .job-step.js-fail .job-step-num { background: #ef4444; }
 .job-step.js-fail .job-step-label { color: #fca5a5; }
 @media (max-width: 640px) {
-  .job-steps { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  /* Keep all four in one row on phones too; just tighten the spacing. */
+  .job-steps { gap: 4px; }
+  .job-step { padding: 6px 6px; gap: 5px; }
 }
 .order-ship-to {
   margin: 4px 0 0;
