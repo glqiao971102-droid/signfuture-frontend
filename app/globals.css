@@ -5926,6 +5926,26 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-holidays-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .prod-holiday-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #cfe0f2; }
 .prod-holiday-chip button { border: none; background: rgba(255,86,110,0.2); color: #ff8a9c; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; line-height: 1; }
+/* ---- Production Detail data page ---- */
+.prod-detail { display: flex; flex-direction: column; gap: 16px; }
+.pd-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.pd-tile { background: rgba(4,15,31,0.7); border: 1px solid rgba(63,176,255,0.18); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
+.pd-tile-num { font-size: 26px; font-weight: 800; color: #eaf3ff; line-height: 1; }
+.pd-tile-lbl { font-size: 11.5px; color: var(--muted); }
+.pd-card { background: rgba(3,12,26,0.6); border: 1px solid rgba(63,176,255,0.16); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.pd-card-head { display: flex; flex-direction: column; gap: 2px; }
+.pd-chart { display: flex; align-items: flex-end; gap: 10px; height: 150px; padding: 6px 2px 0; overflow-x: auto; }
+.pd-bar-col { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 34px; }
+.pd-bar { width: 26px; min-height: 3px; border-radius: 5px 5px 0 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(255,255,255,0.05); }
+.pd-bar-late { background: #ff566e; width: 100%; }
+.pd-bar-ontime { background: #35d8ff; width: 100%; }
+.pd-bar-x { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.pd-stagebars { display: flex; flex-direction: column; gap: 8px; }
+.pd-stagebar-row { display: grid; grid-template-columns: 160px 1fr 34px; align-items: center; gap: 10px; }
+.pd-stagebar-lbl { font-size: 12px; color: #cfe0f2; }
+.pd-stagebar-track { background: rgba(255,255,255,0.06); border-radius: 999px; height: 10px; overflow: hidden; }
+.pd-stagebar-fill { height: 100%; background: linear-gradient(90deg, var(--cyan, #35d8ff), var(--blue, #3997ff)); border-radius: 999px; min-width: 2px; }
+.pd-stagebar-n { font-size: 12px; font-weight: 800; color: #9fb0c6; text-align: right; }
 .prod-stats-tablewrap { overflow-x: auto; }
 .prod-stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .prod-stats-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #8494a8; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
@@ -5964,6 +5984,14 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-driver-missing { color: #ffbe70; }
 .prod-card .prod-driver-ok { background: rgba(62,207,142,0.14); }
 .prod-card .prod-driver-missing { background: rgba(255,168,60,0.16); }
+.prod-driver-late { color: #ff9aab; }
+.prod-card .prod-driver-late { background: rgba(255,86,110,0.18); }
+/* How long a job has sat in Available for Collection / Ready to Ship. */
+.prod-dwell { font-size: 10px; font-weight: 700; margin-top: 3px; }
+.prod-dwell-ok { color: #9fb0c6; }
+.prod-dwell-warn { color: #ffbe70; }
+.prod-dwell-bad { color: #ff9aab; }
+.prod-modal-dwell { font-size: 11px; font-weight: 700; }
 .prod-driver-box { border: 1px solid rgba(255,168,60,0.25); border-radius: 8px; padding: 10px; margin-top: 6px; background: rgba(255,168,60,0.05); }
 .prod-driver-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .prod-driver-form .hero-btn { align-self: flex-start; }
@@ -5988,12 +6016,20 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-card.prod-soon { border-left-color: #6fd0ff; }
 .prod-card.prod-today { border-left-color: #ffab3c; background: rgba(255,168,60,0.1); }
 .prod-card.prod-overdue { border-left-color: #ff566e; background: rgba(255,86,110,0.12); }
+/* Finished-job record on Available for Collection / Ready to Ship: whole box
+   outlined cyan when completed on time, red when it was completed late. */
+.prod-card.prod-ontime { border-color: #35d8ff; border-left-color: #35d8ff; background: rgba(53,216,255,0.08); }
+.prod-card.prod-late { border-color: #ff566e; border-left-color: #ff566e; background: rgba(255,86,110,0.12); }
+.prod-due-ontime .prod-due-badge { background: rgba(53,216,255,0.2); color: #7fe3ff; }
+.prod-due-late .prod-due-badge { background: rgba(255,86,110,0.22); color: #ff9aab; }
 .prod-due-ok .prod-due-badge { background: rgba(62,207,142,0.18); color: #7ee6b4; }
 .prod-due-soon .prod-due-badge { background: rgba(111,208,255,0.18); color: #9fdcff; }
 .prod-due-today .prod-due-badge { background: rgba(255,168,60,0.22); color: #ffbe70; }
 .prod-due-overdue .prod-due-badge { background: rgba(255,86,110,0.22); color: #ff9aab; }
 .prod-due-none .prod-due-badge { background: rgba(255,255,255,0.08); color: #9fb0c6; }
 
+.prod-month-pick { padding: 0 0 8px; }
+.prod-month-pick select { width: 100%; font-size: 12px; padding: 5px 8px; border-radius: 8px; background: rgba(3,15,31,0.9); color: #cfe0f2; border: 1px solid rgba(63,176,255,0.3); cursor: pointer; }
 .prod-done-group { display: flex; flex-direction: column; gap: 8px; }
 .prod-done-month { font-size: 11px; font-weight: 800; color: #9fb0c6; padding: 4px 2px 2px; display: flex; gap: 6px; align-items: center; position: sticky; top: 0; }
 

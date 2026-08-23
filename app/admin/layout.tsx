@@ -21,7 +21,16 @@ const NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "◆", section: "dashboard" },
   { href: "/admin/visitors", label: "Visitors", icon: "👣", section: "visitors" },
   { href: "/admin/orders", label: "Orders", icon: "▤", section: "orders" },
-  { href: "/admin/production", label: "Production", icon: "🏭", section: "production" },
+  {
+    href: "/admin/production",
+    label: "Production",
+    icon: "🏭",
+    section: "production",
+    children: [
+      { view: "flow", label: "Production Flow" },
+      { view: "detail", label: "Production Detail" },
+    ],
+  },
   { href: "/admin/quotations", label: "Quotations", icon: "✉", section: "quotations" },
   { href: "/admin/users", label: "Customers", icon: "☺", section: "customers" },
   { href: "/admin/wallet", label: "Wallet", icon: "◈", section: "wallet" },
@@ -77,6 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // inside that section; toggling is then fully manual.
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => ({
     "/admin/sales-listing": pathname.startsWith("/admin/sales-listing"),
+    "/admin/production": pathname.startsWith("/admin/production"),
   }));
   const toggleMenu = (href: string) =>
     setOpenMenus((m) => ({ ...m, [href]: !(m[href] ?? false) }));

@@ -1455,6 +1455,7 @@ export type ProductionJob = {
   selfCollect: boolean;
   orderDate: string | null;
   completedAt: string | null;
+  finishedAt: string | null;
   collect: string | null;
   workingDays: number | null;
   dueDate: string | null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type ProductionJob, type ProductionHoliday } from "@/lib/api";
+import { api, type ProductionJob } from "@/lib/api";
 
 /* ------------------------------------------------------------------ *
  * Production Kanban — one card per job (order item, e.g. 100049-1),
@@ -46,6 +46,15 @@ const NEXT_STAGE: Record<string, { stage: string; label: string }> = {
   ready: { stage: "collection", label: "Collected" },
   shipped: { stage: "delivered", label: "Shipped" },
 };
+const hasPhoto = (j: ProductionJob) => Array.isArray(j.handoverPhotos) && j.handoverPhotos.length > 0;
+const hasDriver = (j: ProductionJob) => !!(j.deliveryNote && j.deliveryNote.trim());
+// A job can advance to the next (hand-over) stage only once its requirements are
+// met: a handover photo everywhere, plus driver details for Ready to Ship.
+function canAdvance(j: ProductionJob, laneKey: string): boolean {
+  if (laneKey === "ready") return hasPhoto(j);
+  if (laneKey === "shipped") return hasPhoto(j) && hasDriver(j);
+  return true;
+}
 // Tail stages change the customer status → confirm (and email) before moving.
 const CONFIRM_STAGE: Record<string, string> = {
   ready: "Available for Collection",
@@ -98,11 +107,23 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / DAY_MS);
 }
 
-type Urgency = { level: "none" | "ok" | "soon" | "today" | "overdue"; label: string };
-// A job's urgency from its due date vs Malaysia "now". The 6pm cutoff only bites
-// on the due day itself. Finished jobs never show urgency.
+type Urgency = { level: "none" | "ok" | "soon" | "today" | "overdue" | "ontime" | "late"; label: string };
+// A job's urgency. In production (Job In Progress / Router / QC) it's a live
+// countdown vs the due date. Once finished (Available for Collection / Ready to
+// Ship) it becomes a fixed record: on time (cyan) or late (red), no countdown.
+// Done columns (Collected / Shipped) show nothing.
 function urgencyOf(j: ProductionJob, now: { today: string; hour: number }): Urgency {
-  if (isDoneLane(laneOf(j))) return { level: "none", label: "" };
+  const lane = laneOf(j);
+  // Finished jobs (Available for Collection / Ready to Ship, and the done
+  // columns Collected / Shipped) show a fixed on-time / late record.
+  if (lane === "ready" || lane === "shipped" || isDoneLane(lane)) {
+    if (!j.dueDate) return { level: "none", label: "" };
+    const ref = j.finishedAt ?? j.completedAt;
+    const finishedDay = ref ? klDayOf(ref) : now.today;
+    return finishedDay <= j.dueDate
+      ? { level: "ontime", label: "On time" }
+      : { level: "late", label: "Completed late" };
+  }
   if (!j.dueDate) return { level: "none", label: "No due date" };
   const diff = daysBetween(j.dueDate, now.today); // >0 future, 0 today, <0 past
   if (diff > 0) return { level: diff <= 1 ? "soon" : "ok", label: diff === 1 ? "Due tomorrow" : `${diff} days left` };
@@ -114,37 +135,57 @@ function urgencyOf(j: ProductionJob, now: { today: string; hour: number }): Urge
   const late = -diff;
   return { level: "overdue", label: `Overdue by ${late} day${late === 1 ? "" : "s"}` };
 }
+// The Malaysia calendar day (YYYY-MM-DD) of an ISO timestamp.
+function klDayOf(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+// Malaysia month (YYYY-MM) of a timestamp, and a "September 2026" label for it.
+function klMonthOf(iso: string | null): string {
+  return iso ? klDayOf(iso).slice(0, 7) : "";
+}
+function monthLabelOf(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-MY", { month: "long", year: "numeric" });
+}
+// How long a job has been sitting in its current (Available for Collection /
+// Ready to Ship) stage — since it finished production. Escalates the colour so a
+// job left too long (e.g. driver info not filled) stands out.
+function dwellOf(fromISO: string | null): { text: string; level: "ok" | "warn" | "bad" } | null {
+  if (!fromISO) return null;
+  const ms = Date.now() - new Date(fromISO).getTime();
+  if (ms < 0) return null;
+  const totalMin = Math.floor(ms / 60000);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  const text = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const hours = ms / 3600000;
+  const level = hours >= 72 ? "bad" : hours >= 24 ? "warn" : "ok";
+  return { text, level };
+}
 
 function fmtDue(d: string | null): string {
   if (!d) return "—";
   const dt = new Date(d + "T00:00:00");
   return dt.toLocaleDateString("en-MY", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }
-function monthKey(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-MY", { month: "long", year: "numeric" });
-}
 
 export default function AdminProduction() {
   const [jobs, setJobs] = useState<ProductionJob[]>([]);
-  const [holidays, setHolidays] = useState<ProductionHoliday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [openJobId, setOpenJobId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Which month each done column (Collected / Shipped) is viewing (YYYY-MM);
+  // defaults to the current month.
+  const [doneMonth, setDoneMonth] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
-  const [showHolidays, setShowHolidays] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [stats, setStats] = useState<{
-    monthly: { month: string; completed: number; onTime: number; late: number; noDue: number; onTimeRate: number | null }[];
-    currentlyOverdue: number;
-  } | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [newHolidayDay, setNewHolidayDay] = useState("");
-  const [newHolidayLabel, setNewHolidayLabel] = useState("");
   // Re-render every minute so the "due today / overdue" colours stay live.
   const [, setTick] = useState(0);
 
@@ -152,7 +193,6 @@ export default function AdminProduction() {
     try {
       const r = await api.adminProduction();
       setJobs(r.jobs);
-      setHolidays(r.holidays);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load the production board");
@@ -187,12 +227,18 @@ export default function AdminProduction() {
     const map: Record<string, ProductionJob[]> = {};
     for (const c of COLUMNS) map[c.key] = [];
     for (const j of visibleJobs) (map[laneOf(j)] ??= []).push(j);
-    // Sort active columns by urgency (most urgent first); done by completion desc.
+    // Order every column tidily by job number (100020-1, 100020-2, 100021-1, …).
+    // Done columns first group by completion month (recent first), then number.
+    const byNumber = (a: ProductionJob, b: ProductionJob) =>
+      a.ref.localeCompare(b.ref, undefined, { numeric: true, sensitivity: "base" }) || a.jobNo - b.jobNo;
     for (const key of Object.keys(map)) {
       if (isDoneLane(key)) {
-        map[key].sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
+        map[key].sort((a, b) => {
+          const mo = (b.completedAt ?? "").slice(0, 7).localeCompare((a.completedAt ?? "").slice(0, 7));
+          return mo !== 0 ? mo : byNumber(a, b);
+        });
       } else {
-        map[key].sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+        map[key].sort(byNumber);
       }
     }
     return map;
@@ -216,8 +262,17 @@ export default function AdminProduction() {
 
   async function move(j: ProductionJob, stage: string) {
     if (stage === stageValueOf(j)) return;
-    if (stage === "delivered" && !(j.deliveryNote && j.deliveryNote.trim())) {
+    if (stage === "delivered" && !hasDriver(j)) {
       alert("Fill in the driver / delivery details first before marking this job as Shipped.");
+      return;
+    }
+    if ((stage === "collection" || stage === "delivered") && !hasPhoto(j)) {
+      alert("Upload a handover photo (open the card) before moving this job here.");
+      return;
+    }
+    // Marking an overdue job done requires a reason in the Description.
+    if ((stage === "ready" || stage === "shipped") && j.dueDate && daysBetween(j.dueDate, now.today) < 0 && !(j.productionNote && j.productionNote.trim())) {
+      alert("This job is overdue — open the card and write (and save) the reason in the Description before moving it here.");
       return;
     }
     if (CONFIRM_STAGE[stage] && !window.confirm(`Mark ${j.jobRef} as "${CONFIRM_STAGE[stage]}"? The customer status changes${stage === "delivered" ? "" : " and they will be emailed"}.`)) return;
@@ -269,43 +324,6 @@ export default function AdminProduction() {
     }
   }
 
-  async function addHoliday() {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(newHolidayDay)) {
-      alert("Pick a date first.");
-      return;
-    }
-    try {
-      await api.adminAddHoliday(newHolidayDay, newHolidayLabel.trim() || undefined);
-      setNewHolidayDay("");
-      setNewHolidayLabel("");
-      await load();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not add holiday");
-    }
-  }
-  async function removeHoliday(id: number) {
-    try {
-      await api.adminDeleteHoliday(id);
-      await load();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not remove holiday");
-    }
-  }
-
-  async function openStats() {
-    const next = !showStats;
-    setShowStats(next);
-    if (next) {
-      setStatsLoading(true);
-      try {
-        setStats(await api.adminProductionStats(12));
-      } catch {
-        /* ignore */
-      } finally {
-        setStatsLoading(false);
-      }
-    }
-  }
 
   return (
     <div className="prod-wrap">
@@ -326,101 +344,8 @@ export default function AdminProduction() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button type="button" className="hero-btn ghost" onClick={() => load()}>
-            ↻ Refresh
-          </button>
-          <button type="button" className="hero-btn ghost" onClick={openStats}>
-            📊 Stats
-          </button>
-          <button type="button" className="hero-btn ghost" onClick={() => setShowHolidays((v) => !v)}>
-            📅 Holidays ({holidays.length})
-          </button>
         </div>
       </div>
-
-      {showStats && (
-        <div className="prod-holidays">
-          <div className="prod-holidays-head">
-            <strong>Production Record — On-time vs Delayed</strong>
-            <span className="adm-card-sub">
-              Per completion month: jobs finished on or before their working-day due date (on-time) vs after (delayed).
-              {stats && <> · <b style={{ color: "#ff9aab" }}>{stats.currentlyOverdue}</b> job(s) currently overdue on the floor.</>}
-            </span>
-          </div>
-          {statsLoading && <div className="adm-card-sub">Loading…</div>}
-          {!statsLoading && stats && (
-            <div className="prod-stats-tablewrap">
-              <table className="prod-stats-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th className="adm-num">Completed</th>
-                    <th className="adm-num">On-time</th>
-                    <th className="adm-num">Delayed</th>
-                    <th className="adm-num">On-time %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.monthly.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="adm-card-sub">No completed jobs yet.</td>
-                    </tr>
-                  )}
-                  {stats.monthly.map((m) => (
-                    <tr key={m.month}>
-                      <td>{new Date(m.month + "-01T00:00:00").toLocaleDateString("en-MY", { month: "long", year: "numeric" })}</td>
-                      <td className="adm-num">{m.completed}</td>
-                      <td className="adm-num" style={{ color: "#7ee6b4" }}>{m.onTime}</td>
-                      <td className="adm-num" style={{ color: m.late > 0 ? "#ff9aab" : undefined }}>{m.late}</td>
-                      <td className="adm-num">
-                        {m.onTimeRate == null ? "—" : (
-                          <span style={{ color: m.onTimeRate >= 80 ? "#7ee6b4" : m.onTimeRate >= 50 ? "#ffbe70" : "#ff9aab", fontWeight: 800 }}>
-                            {m.onTimeRate}%
-                          </span>
-                        )}
-                        {m.noDue > 0 && <span className="adm-card-sub"> ({m.noDue} no due)</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {showHolidays && (
-        <div className="prod-holidays">
-          <div className="prod-holidays-head">
-            <strong>Public Holidays</strong>
-            <span className="adm-card-sub">These dates (plus every Sunday) are skipped when computing due dates.</span>
-          </div>
-          <div className="prod-holidays-add">
-            <input type="date" className="adm-input" value={newHolidayDay} onChange={(e) => setNewHolidayDay(e.target.value)} />
-            <input
-              className="adm-input"
-              placeholder="Label (e.g. Merdeka Day)"
-              value={newHolidayLabel}
-              onChange={(e) => setNewHolidayLabel(e.target.value)}
-            />
-            <button type="button" className="hero-btn primary" onClick={addHoliday}>
-              Add
-            </button>
-          </div>
-          <div className="prod-holidays-list">
-            {holidays.length === 0 && <span className="adm-card-sub">No holidays yet.</span>}
-            {holidays.map((h) => (
-              <span key={h.id} className="prod-holiday-chip">
-                {h.day}
-                {h.label ? ` · ${h.label}` : ""}
-                <button type="button" onClick={() => removeHoliday(h.id)} aria-label="Remove">
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {loading && <div className="quote-empty">Loading the board…</div>}
       {error && <div className="quote-empty">{error}</div>}
@@ -430,20 +355,18 @@ export default function AdminProduction() {
           {COLUMNS.map((col) => {
             const list = byLane[col.key] ?? [];
             const next = NEXT_STAGE[col.key];
-            // In "Ready to Ship" only jobs with driver details filled can be
-            // selected / advanced; other bulk columns allow all cards.
-            const selectableList = next
-              ? col.key === "shipped"
-                ? list.filter((j) => j.deliveryNote && j.deliveryNote.trim())
-                : list
-              : [];
+            // Only jobs whose hand-over requirements are met (photo everywhere,
+            // + driver for Ready to Ship) can be selected / advanced.
+            const selectableList = next ? list.filter((j) => canAdvance(j, col.key)) : [];
             const selCount = selectableList.filter((j) => selected.has(j.id)).length;
             const allSel = selectableList.length > 0 && selectableList.every((j) => selected.has(j.id));
+            const doneSel = isDoneLane(col.key) ? (doneMonth[col.key] ?? now.today.slice(0, 7)) : null;
+            const headerCount = doneSel ? list.filter((j) => klMonthOf(j.completedAt) === doneSel).length : list.length;
             return (
               <div key={col.key} className="prod-col">
                 <div className="prod-col-head">
                   <span className="prod-col-title">{col.title}</span>
-                  <span className="prod-col-count">{list.length}</span>
+                  <span className="prod-col-count">{headerCount}</span>
                 </div>
                 {col.hint && <div className="prod-col-hint">{col.hint}</div>}
                 {next && list.length > 0 && (
@@ -463,7 +386,7 @@ export default function AdminProduction() {
                 )}
                 <div className="prod-col-body">
                   {isDoneLane(col.key)
-                    ? renderDoneGrouped(list)
+                    ? renderDoneMonth(col.key, list)
                     : list.map((j) => (
                         <ProductionCard
                           key={j.id}
@@ -472,7 +395,7 @@ export default function AdminProduction() {
                           saving={savingId === j.id}
                           onOpen={(x) => setOpenJobId(x.id)}
                           selectable={!!next}
-                          canSelect={col.key !== "shipped" || !!(j.deliveryNote && j.deliveryNote.trim())}
+                          canSelect={canAdvance(j, col.key)}
                           checked={selected.has(j.id)}
                           onToggle={() => toggleSelect(j.id)}
                         />
@@ -497,24 +420,31 @@ export default function AdminProduction() {
     </div>
   );
 
-  function renderDoneGrouped(list: ProductionJob[]) {
-    const groups: { month: string; jobs: ProductionJob[] }[] = [];
-    for (const j of list) {
-      const m = monthKey(j.completedAt);
-      const g = groups.find((x) => x.month === m);
-      if (g) g.jobs.push(j);
-      else groups.push({ month: m, jobs: [j] });
-    }
-    return groups.map((g) => (
-      <div key={g.month} className="prod-done-group">
-        <div className="prod-done-month">
-          {g.month} <span className="prod-col-count">{g.jobs.length}</span>
+  // A done column (Collected / Shipped) shows ONE month at a time — defaulting to
+  // the current month — with a picker to look back at earlier months.
+  function renderDoneMonth(key: string, list: ProductionJob[]) {
+    const curMonth = now.today.slice(0, 7);
+    const present = [...new Set(list.map((j) => klMonthOf(j.completedAt)).filter(Boolean))];
+    const months = [...new Set([curMonth, ...present])].sort().reverse();
+    const sel = doneMonth[key] ?? curMonth;
+    const shown = list.filter((j) => klMonthOf(j.completedAt) === sel);
+    return (
+      <>
+        <div className="prod-month-pick">
+          <select value={sel} onChange={(e) => setDoneMonth((p) => ({ ...p, [key]: e.target.value }))}>
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthLabelOf(m)} ({list.filter((j) => klMonthOf(j.completedAt) === m).length})
+              </option>
+            ))}
+          </select>
         </div>
-        {g.jobs.map((j) => (
+        {shown.length === 0 && <div className="prod-empty">No jobs in {monthLabelOf(sel)}</div>}
+        {shown.map((j) => (
           <ProductionCard key={j.id} job={j} now={now} saving={savingId === j.id} onOpen={(x) => setOpenJobId(x.id)} />
         ))}
-      </div>
-    ));
+      </>
+    );
   }
 }
 
@@ -543,6 +473,9 @@ function ProductionCard({
   const lane = laneOf(job);
   const done = isDoneLane(lane);
   const hasDelivery = !!(job.deliveryNote && job.deliveryNote.trim());
+  // How long it's been sitting in Available for Collection / Ready to Ship.
+  const dw = lane === "ready" || lane === "shipped" ? dwellOf(job.finishedAt) : null;
+  const missClass = dw?.level === "bad" ? "prod-driver-late" : "prod-driver-missing";
   return (
     <div className={`prod-card-wrap${checked ? " is-selected" : ""}`}>
       {selectable && (
@@ -564,8 +497,9 @@ function ProductionCard({
         {job.productionNote && <span className="prod-card-hasnote" title="Has a description">📝</span>}
       </div>
       {done ? (
-        <div className="prod-due prod-due-done">
-          ✓ {job.completedAt ? new Date(job.completedAt).toLocaleDateString("en-MY", { day: "2-digit", month: "short" }) : "Done"}
+        <div className={`prod-due prod-due-${u.level}`}>
+          <span className="prod-due-date">✓ {job.completedAt ? fmtStamp(job.completedAt) : "Done"}</span>
+          {u.label && <span className="prod-due-badge">{u.label}</span>}
         </div>
       ) : (
         <div className={`prod-due prod-due-${u.level}`}>
@@ -573,10 +507,20 @@ function ProductionCard({
           {u.label && <span className="prod-due-badge">{u.label}</span>}
         </div>
       )}
-      {lane === "shipped" && (
-        <div className={`prod-driver ${hasDelivery ? "prod-driver-ok" : "prod-driver-missing"}`}>
-          {hasDelivery ? "✓ Driver arranged" : "⚠ Fill driver info"}
-        </div>
+      {lane === "shipped" &&
+        (hasDelivery ? (
+          <div className="prod-driver prod-driver-ok">✓ Driver arranged</div>
+        ) : (
+          <div className={`prod-driver ${missClass}`}>⚠ Fill driver info{dw ? ` · pending ${dw.text}` : ""}</div>
+        ))}
+      {(lane === "ready" || lane === "shipped") &&
+        (hasPhoto(job) ? (
+          <div className="prod-driver prod-driver-ok">✓ Photo added</div>
+        ) : (
+          <div className="prod-driver prod-driver-missing">⚠ Add photo</div>
+        ))}
+      {lane === "ready" && dw && (
+        <div className={`prod-dwell prod-dwell-${dw.level}`}>⏱ Awaiting pickup · {dw.text}</div>
       )}
       </button>
     </div>
@@ -587,6 +531,13 @@ function fmtDueShort(d: string | null): string {
   if (!d) return "No due date";
   const dt = new Date(d + "T00:00:00");
   return dt.toLocaleDateString("en-MY", { day: "2-digit", month: "short" });
+}
+// Full date + time a job reached this (Collected / Shipped) stage.
+function fmtStamp(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-MY", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 }
 
 function fmtActivityTime(iso: string | null): string {
@@ -765,6 +716,10 @@ function JobModal({
             📅 Due {fmtDue(job.dueDate)}
             {u.label && <span className="prod-due-badge">{u.label}</span>}
             {job.workingDays != null && <span className="prod-modal-wd">{job.workingDays} working days</span>}
+            {laneOf(job) === "ready" && job.finishedAt && (() => {
+              const dw = dwellOf(job.finishedAt);
+              return dw ? <span className={`prod-modal-dwell prod-dwell-${dw.level}`}>⏱ Awaiting pickup · {dw.text}</span> : null;
+            })()}
           </div>
         ) : (
           <div className="prod-modal-due prod-due-done">
