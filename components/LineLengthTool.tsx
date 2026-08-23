@@ -42,7 +42,7 @@ function inchLabel(inches: number): string {
 }
 
 /**
- * Member-facing Line Length tool (My Account → Line Length). Upload a black &
+ * Member-facing Neon Line Length tool (My Account → Neon Line Length). Upload a black &
  * white artwork; it measures the size and the total metres of the black lines.
  */
 export default function LineLengthTool() {
@@ -92,7 +92,7 @@ export default function LineLengthTool() {
   return (
     <section className="acct-card acct-section-card">
       <div className="acct-card-head">
-        <h2>Line Length</h2>
+        <h2>Neon Line Length</h2>
         <span>
           Upload a black &amp; white artwork (.ai / .pdf) — it measures the size and
           the total length of the black lines, like the neon calculator.

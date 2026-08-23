@@ -45,7 +45,7 @@ const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] 
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
   { key: "installation", label: "My Installation", glyph: "⚒" },
-  { key: "lineLength", label: "Line Length", glyph: "📏" },
+  { key: "lineLength", label: "Neon Line Length", glyph: "📏" },
   { key: "installer", label: "Installer", glyph: "⚑", soon: true },
   { key: "account", label: "Account", glyph: "⚙", soon: true },
   { key: "materialStore", label: "Material Store", glyph: "▦", soon: true },
