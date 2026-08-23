@@ -5404,6 +5404,42 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .ll-spin { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(3, 16, 31, 0.35); border-top-color: #03101f; animation: ll-spin .7s linear infinite; }
 @keyframes ll-spin { to { transform: rotate(360deg); } }
 
+/* ---- Auto Nesting ---- */
+.nest-opts { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.nest-field { display: flex; flex-direction: column; gap: 7px; flex: 0 1 150px; min-width: 120px; }
+.nest-field input {
+  padding: 11px 12px; border-radius: 10px; background: rgba(6, 18, 36, 0.85);
+  color: var(--text, #eaf2ff); border: 1px solid rgba(120, 150, 190, 0.35);
+  font-size: 14px; font-weight: 600;
+}
+.nest-field input:focus { outline: none; border-color: var(--cyan, #35d8ff); box-shadow: 0 0 0 3px rgba(53, 216, 255, 0.18); }
+.nest-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted, #9fb4d0); padding-bottom: 11px; }
+.nest-check input { width: 16px; height: 16px; accent-color: var(--cyan, #35d8ff); }
+.nest-go { margin-left: auto; }
+
+.nest-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.nest-summary-stats { display: flex; gap: 26px; flex-wrap: wrap; }
+.nest-summary-stats > div { display: flex; flex-direction: column; }
+.nest-stat-n { font-size: 24px; font-weight: 800; color: var(--cyan, #35d8ff); letter-spacing: -0.02em; }
+.nest-stat-l { font-size: 12px; color: var(--muted, #9fb4d0); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 700; }
+
+.nest-sheets { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.nest-sheet { margin-bottom: 0; }
+.nest-sheet-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.nest-sheet-head strong { font-size: 14px; color: var(--text, #eaf2ff); }
+.nest-sheet-head span { font-size: 12px; color: var(--muted, #9fb4d0); }
+.nest-sheet img { width: 100%; height: auto; border-radius: 8px; background: #fff; border: 1px solid var(--line-soft, rgba(120, 150, 190, 0.25)); }
+
+/* Auto Nesting inside the member account dashboard (no .adm-card wrappers). */
+.nest-results { margin-top: 18px; display: flex; flex-direction: column; gap: 16px; }
+.nest-results .nest-summary,
+.nest-results .nest-sheet {
+  background: rgba(3, 15, 31, 0.5);
+  border: 1px solid rgba(120, 150, 190, 0.22);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
 .adm-key {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;

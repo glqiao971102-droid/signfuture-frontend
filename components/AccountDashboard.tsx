@@ -14,6 +14,7 @@ import MyQuotations from "@/components/MyQuotations";
 import VoucherCards from "@/components/VoucherCards";
 import MyInstallationFrame from "@/components/MyInstallationFrame";
 import LineLengthTool from "@/components/LineLengthTool";
+import NestingTool from "@/components/NestingTool";
 
 type SectionKey =
   | "consultant"
@@ -26,6 +27,7 @@ type SectionKey =
   | "reload"
   | "pending"
   | "installation"
+  | "nesting"
   | "lineLength"
   | "installer"
   | "account"
@@ -45,6 +47,7 @@ const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] 
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
   { key: "installation", label: "My Installation", glyph: "⚒" },
+  { key: "nesting", label: "Auto Nesting", glyph: "▦" },
   { key: "lineLength", label: "Neon Line Length", glyph: "📏" },
   { key: "installer", label: "Installer", glyph: "⚑", soon: true },
   { key: "account", label: "Account", glyph: "⚙", soon: true },
@@ -569,6 +572,11 @@ export default function AccountDashboard() {
         // The member's own installation records, synced with our database (the
         // same rows admins manage under Admin → Installations).
         return <MyInstallationFrame />;
+
+      case "nesting":
+        // Auto-nesting / imposition: pack an artwork's pieces onto sheets and get
+        // a ready-to-print, already-laid-out PDF.
+        return <NestingTool />;
 
       case "lineLength":
         // Artwork line-length calculator: upload a black & white artwork, get the
