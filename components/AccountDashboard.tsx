@@ -13,6 +13,7 @@ import RequestQuotation from "@/components/RequestQuotation";
 import MyQuotations from "@/components/MyQuotations";
 import VoucherCards from "@/components/VoucherCards";
 import MyInstallationFrame from "@/components/MyInstallationFrame";
+import LineLengthTool from "@/components/LineLengthTool";
 
 type SectionKey =
   | "consultant"
@@ -25,6 +26,7 @@ type SectionKey =
   | "reload"
   | "pending"
   | "installation"
+  | "lineLength"
   | "installer"
   | "account"
   | "materialStore"
@@ -43,6 +45,7 @@ const SIDE: { key: SectionKey; label: string; glyph: string; soon?: boolean }[] 
   { key: "reload", label: "Reload Status", glyph: "↻" },
   { key: "pending", label: "Pending List", glyph: "▣" },
   { key: "installation", label: "My Installation", glyph: "⚒" },
+  { key: "lineLength", label: "Line Length", glyph: "📏" },
   { key: "installer", label: "Installer", glyph: "⚑", soon: true },
   { key: "account", label: "Account", glyph: "⚙", soon: true },
   { key: "materialStore", label: "Material Store", glyph: "▦", soon: true },
@@ -566,6 +569,11 @@ export default function AccountDashboard() {
         // The member's own installation records, synced with our database (the
         // same rows admins manage under Admin → Installations).
         return <MyInstallationFrame />;
+
+      case "lineLength":
+        // Artwork line-length calculator: upload a black & white artwork, get the
+        // size + total metres of the black lines (like the neon calculator).
+        return <LineLengthTool />;
 
       case "installer": {
         const list = INSTALLERS.filter((i) => i.state === installerState);
