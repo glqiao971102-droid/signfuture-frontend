@@ -161,20 +161,31 @@ export default function AdminProductionDetail() {
           <div className="pd-card">
             <div className="pd-card-head">
               <strong>On-time vs Delayed — by month</strong>
-              <span className="adm-card-sub">Jobs finished on/before their working-day due date (cyan) vs after (red).</span>
+              <span className="adm-card-sub">Jobs finished on/before their working-day due date vs after.</span>
             </div>
             {stats && stats.monthly.length > 0 ? (
               <>
-                <div className="pd-chart">
-                  {[...stats.monthly].reverse().map((m) => (
-                    <div key={m.month} className="pd-bar-col" title={`${monthLabelOf(m.month)} — ${m.onTime} on time, ${m.late} late`}>
-                      <div className="pd-bar" style={{ height: `${(m.completed / chartMax) * 120}px` }}>
-                        <div className="pd-bar-late" style={{ height: `${m.completed ? (m.late / m.completed) * 100 : 0}%` }} />
-                        <div className="pd-bar-ontime" style={{ height: `${m.completed ? (m.onTime / m.completed) * 100 : 0}%` }} />
-                      </div>
-                      <span className="pd-bar-x">{monthLabelOf(m.month).split(" ")[0]}</span>
-                    </div>
-                  ))}
+                <div className="pd-chart2">
+                  <div className="pd-plot">
+                    {[...stats.monthly].reverse().map((m) => {
+                      const h = Math.round((m.completed / chartMax) * 150);
+                      return (
+                        <div key={m.month} className="pd-col" title={`${monthLabelOf(m.month)} — ${m.onTime} on time · ${m.late} late${m.onTimeRate != null ? ` · ${m.onTimeRate}% on-time` : ""}`}>
+                          <span className="pd-col-val">{m.completed || ""}</span>
+                          <div className="pd-stack" style={{ height: `${Math.max(h, m.completed ? 6 : 0)}px` }}>
+                            {m.late > 0 && <div className="pd-seg pd-seg-late" style={{ flexGrow: m.late }} />}
+                            {m.onTime > 0 && <div className="pd-seg pd-seg-ontime" style={{ flexGrow: m.onTime }} />}
+                            {m.completed > 0 && m.onTime === 0 && m.late === 0 && <div className="pd-seg pd-seg-none" style={{ flexGrow: 1 }} />}
+                          </div>
+                          <span className="pd-col-x">{monthLabelOf(m.month).split(" ")[0]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="pd-legend">
+                    <span className="pd-leg"><i className="pd-dot pd-dot-ontime" /> On time</span>
+                    <span className="pd-leg"><i className="pd-dot pd-dot-late" /> Delayed</span>
+                  </div>
                 </div>
                 <div className="prod-stats-tablewrap">
                   <table className="prod-stats-table">
@@ -205,6 +216,7 @@ export default function AdminProductionDetail() {
             )}
           </div>
 
+          <div className="pd-row2">
           {/* Current workload by stage */}
           <div className="pd-card">
             <div className="pd-card-head">
@@ -248,6 +260,7 @@ export default function AdminProductionDetail() {
                 </span>
               ))}
             </div>
+          </div>
           </div>
         </div>
       )}
