@@ -1,52 +1,39 @@
 // Auto-nesting / imposition: take an artwork file with scattered pieces, detect
 // each piece, pack them tightly onto sheets (default 48"×96"), and emit a new PDF
-// that opens already laid-out — vectors and colours preserved by clipping each
-// piece out of the source page and re-placing it (pdf-lib embedPage + drawPage).
-import { PDFDocument, degrees } from "pdf-lib";
+// that opens already laid-out.
+//
+// Two extraction modes:
+//  • VECTOR (preferred) — parse each object's own paths out of the content stream
+//    and re-emit them FLAT at the packed position. Every piece is an independent
+//    vector object (no clipping mask, nothing hidden behind it), so in Illustrator
+//    you can move/delete each one directly — no ungroup / release-clip needed.
+//  • RASTER (fallback, for flattened/image art or spot colours) — clip each piece
+//    out of the source page with pdf-lib embedPage and re-place it.
+import { PDFDocument, PDFName, degrees } from "pdf-lib";
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb } from "@/lib/pdf/pdfium";
 import { PNG } from "pngjs";
-import { packBest, type NestRect } from "@/lib/nest/pack";
+import { packBest, type NestRect, type PackResult } from "@/lib/nest/pack";
+import { parseVectorUnits, groupUnits, emitUnit, type VUnit, type VGroup, type Mat } from "@/lib/nest/vector";
 
 const PT = 72;
-const DET_TARGET = 1800; // detection render: long side in px
+const DET_TARGET = 1800;
 
 export type NestOptions = {
-  sheetWIn?: number;
-  sheetHIn?: number;
-  gapIn?: number;
-  allowRotate?: boolean;
-  minPieceIn?: number;
-  trim?: boolean;
+  sheetWIn?: number; sheetHIn?: number; gapIn?: number;
+  allowRotate?: boolean; minPieceIn?: number; trim?: boolean;
 };
-
-export type NestSheet = {
-  index: number;
-  usedWIn: number;
-  usedHIn: number;
-  pieceCount: number;
-  utilPct: number;
-  previewDataUrl: string;
-};
-
+export type NestSheet = { index: number; usedWIn: number; usedHIn: number; pieceCount: number; utilPct: number; previewDataUrl: string };
 export type NestResult = {
-  file: string;
-  sheetWIn: number;
-  sheetHIn: number;
-  gapIn: number;
-  rotated: boolean;
-  totalPieces: number;
-  placedPieces: number;
-  unplaced: number;
-  sheets: NestSheet[];
-  warnings: string[];
-  outName: string;
-  outPdfBase64: string;
+  file: string; mode: "vector" | "raster";
+  sheetWIn: number; sheetHIn: number; gapIn: number; rotated: boolean;
+  totalPieces: number; placedPieces: number; unplaced: number;
+  sheets: NestSheet[]; warnings: string[]; outName: string; outPdfBase64: string;
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
 type Clip = { left: number; bottom: number; right: number; top: number };
-type Piece = { clip: Clip; wIn: number; hIn: number; page: number };
+type ClipPiece = { clip: Clip; wIn: number; hIn: number; page: number };
 
 /** 4-connected components of the ink mask, as pixel bounding boxes ≥ minPx area. */
 function componentBoxes(ink: Uint8Array, w: number, h: number, minPx: number): Box[] {
@@ -65,7 +52,6 @@ function componentBoxes(ink: Uint8Array, w: number, h: number, minPx: number): B
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
       area++;
-      // 4-connectivity: avoid bridging pieces that only touch diagonally.
       if (x > 0 && ink[p - 1] && !label[p - 1]) { label[p - 1] = cur; stack.push(p - 1); }
       if (x < w - 1 && ink[p + 1] && !label[p + 1]) { label[p + 1] = cur; stack.push(p + 1); }
       if (y > 0 && ink[p - w] && !label[p - w]) { label[p - w] = cur; stack.push(p - w); }
@@ -76,20 +62,13 @@ function componentBoxes(ink: Uint8Array, w: number, h: number, minPx: number): B
   return boxes;
 }
 
-/**
- * Merge components whose bounding boxes OVERLAP into one piece (union bbox). A
- * rectangular clip captures everything in its rectangle, so two pieces with
- * overlapping bboxes (a frame around a logo, interlocking / L / ring shapes)
- * MUST be treated as one nesting unit — otherwise the clip would duplicate the
- * neighbour's ink. Touching-only bboxes (no positive overlap) stay separate.
- */
+/** Merge components whose bounding boxes overlap (a rectangular clip captures its
+ *  whole rectangle, so overlapping-bbox pieces must be one nesting unit). */
 function mergeOverlappingBoxes(boxes: Box[]): Box[] {
   const parent = boxes.map((_, i) => i);
   const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x])));
   const overlap = (a: Box, b: Box) =>
-    a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY &&
     Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) > 0 && Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) > 0;
-  // Repeat to convergence: a merged (grown) box can newly overlap a third.
   let changed = true;
   while (changed) {
     changed = false;
@@ -114,7 +93,6 @@ function mergeOverlappingBoxes(boxes: Box[]): Box[] {
   return [...out.values()];
 }
 
-/** Render one page of a PDF to a downscaled preview PNG data URL. */
 async function renderPreview(bytes: Uint8Array, pageIndex: number, targetPx: number): Promise<string> {
   const meta = await extractPdf(bytes);
   const pg = meta[pageIndex];
@@ -134,6 +112,48 @@ async function renderPreview(bytes: Uint8Array, pageIndex: number, targetPx: num
   return `data:image/png;base64,${PNG.sync.write(png).toString("base64")}`;
 }
 
+/** Flat vector output: re-emit each piece's own paths at the packed position. */
+async function buildVectorOutput(groups: VGroup[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+  const nBins = packed.bins.length;
+  const content = Array.from({ length: nBins }, () => "");
+  for (const pl of packed.placements) {
+    const g = groups[pl.id];
+    const tx = pl.x * PT, ty = pl.y * PT;
+    // One transform for the whole group so its fills stay together.
+    const T: Mat = !pl.rotated
+      ? [1, 0, 0, 1, tx - g.x0, ty - g.y0]
+      : [0, 1, -1, 0, tx + g.y1, ty - g.x0]; // 90° CCW, footprint bottom-left at (tx,ty)
+    for (const u of g.units) content[pl.bin] += emitUnit(u, T);
+  }
+  for (let i = 0; i < nBins; i++) {
+    const w = (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
+    const h = (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
+    const page = out.addPage([w, h]);
+    const ref = out.context.register(out.context.stream(content[i] || " "));
+    page.node.set(PDFName.of("Contents"), ref);
+  }
+  return out.save();
+}
+
+/** Raster output: clip each piece out of the source page and re-place it. */
+async function buildRasterOutput(src: PDFDocument, pieces: ClipPiece[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+  const nBins = packed.bins.length;
+  const pw = (i: number) => (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
+  const ph = (i: number) => (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
+  const pages = Array.from({ length: nBins }, (_, i) => out.addPage([pw(i), ph(i)]));
+  for (const pl of packed.placements) {
+    const pc = pieces[pl.id];
+    const embedded = await out.embedPage(src.getPage(pc.page), pc.clip);
+    const target = pages[pl.bin];
+    const X = pl.x * PT, Y = pl.y * PT;
+    if (!pl.rotated) target.drawPage(embedded, { x: X, y: Y });
+    else target.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
+  }
+  return out.save();
+}
+
 export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: NestOptions = {}): Promise<NestResult> {
   const sheetWIn = opts.sheetWIn ?? 48;
   const sheetHIn = opts.sheetHIn ?? 96;
@@ -145,82 +165,83 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const src = await PDFDocument.load(bytes);
   const nPages = src.getPageCount();
   if (!nPages) throw new Error("Could not read the artwork.");
-
+  const meta = await extractPdf(bytes);
   const warnings: string[] = [];
-  const pieces: Piece[] = [];
-
   for (let pi = 0; pi < nPages; pi++) {
-    const sp = src.getPage(pi);
-    const rot = (((sp.getRotation().angle || 0) % 360) + 360) % 360;
+    const rot = (((src.getPage(pi).getRotation().angle || 0) % 360) + 360) % 360;
     if (rot !== 0) warnings.push(`Page ${pi + 1} is rotated ${rot}° in the file — its pieces may come out misaligned. Please un-rotate the source page and re-upload.`);
-    // pdfium renders the CropBox; map pixels back into that box's user coordinates.
-    const cb = sp.getCropBox();
-    const detScale = Math.min(0.35, DET_TARGET / (Math.max(cb.width, cb.height) / PT) / PT);
-    const page = await renderPageRgb(bytes, pi, detScale);
-    if (!page) continue;
-    const { width: w, height: h, rgb } = page; // rgb = colour-independent detection buffer (black = drawn ink)
-    const ink = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) if (rgb[i * 3] < 128) ink[i] = 1;
-    const minPx = Math.max(6, Math.round((minPieceIn * detScale * PT) ** 2 * 0.2));
-    const boxes = mergeOverlappingBoxes(componentBoxes(ink, w, h, minPx));
-    for (const bx of boxes) {
-      const left = cb.x + bx.minX / detScale;
-      const right = cb.x + (bx.maxX + 1) / detScale;
-      const top = cb.y + cb.height - bx.minY / detScale;
-      const bottom = cb.y + cb.height - (bx.maxY + 1) / detScale;
-      pieces.push({ clip: { left, bottom, right, top }, wIn: (right - left) / PT, hIn: (top - bottom) / PT, page: pi });
-    }
   }
-  if (!pieces.length) throw new Error("No pieces were detected in this artwork.");
 
-  const rects: NestRect[] = pieces.map((p, id) => ({ id, w: p.wIn, h: p.hIn }));
+  // ---- Try VECTOR extraction (all pages) ----
+  const vunits: VUnit[] = [];
+  let vectorOk = true;
+  for (const pg of meta) {
+    const { units, unsupported } = parseVectorUnits(pg.content);
+    if (unsupported) { vectorOk = false; break; }
+    vunits.push(...units);
+  }
+  const groups = groupUnits(vunits);
+  const minAreaIn2 = minPieceIn * minPieceIn * 0.4;
+  const bigGroups = groups.filter((g) => (g.x1 - g.x0) / PT * ((g.y1 - g.y0) / PT) >= minAreaIn2);
+  const useVector = vectorOk && bigGroups.length > 0;
+
+  let sizes: { wIn: number; hIn: number }[];
+  let clipPieces: ClipPiece[] = [];
+
+  if (useVector) {
+    sizes = bigGroups.map((g) => ({ wIn: (g.x1 - g.x0) / PT, hIn: (g.y1 - g.y0) / PT }));
+  } else {
+    // Raster detection: render each page, threshold ink, connected components.
+    for (let pi = 0; pi < nPages; pi++) {
+      const sp = src.getPage(pi);
+      const cb = sp.getCropBox();
+      const detScale = Math.min(0.35, DET_TARGET / Math.max(cb.width, cb.height));
+      const page = await renderPageRgb(bytes, pi, detScale);
+      if (!page) continue;
+      const { width: w, height: h, rgb } = page;
+      const ink = new Uint8Array(w * h);
+      for (let i = 0; i < w * h; i++) if (rgb[i * 3] < 128) ink[i] = 1;
+      const minPx = Math.max(6, Math.round((minPieceIn * detScale * PT) ** 2 * 0.2));
+      const boxes = mergeOverlappingBoxes(componentBoxes(ink, w, h, minPx));
+      for (const bx of boxes) {
+        const left = cb.x + bx.minX / detScale, right = cb.x + (bx.maxX + 1) / detScale;
+        const top = cb.y + cb.height - bx.minY / detScale, bottom = cb.y + cb.height - (bx.maxY + 1) / detScale;
+        clipPieces.push({ clip: { left, bottom, right, top }, wIn: (right - left) / PT, hIn: (top - bottom) / PT, page: pi });
+      }
+    }
+    sizes = clipPieces.map((p) => ({ wIn: p.wIn, hIn: p.hIn }));
+  }
+  if (!sizes.length) throw new Error("No pieces were detected in this artwork.");
+
+  const rects: NestRect[] = sizes.map((s, id) => ({ id, w: s.wIn, h: s.hIn }));
   const packed = packBest(rects, sheetWIn, sheetHIn, gapIn, allowRotate);
 
-  // Build the output PDF: one page per sheet (trimmed to the used area by default).
-  const out = await PDFDocument.create();
-  const nBins = packed.bins.length;
-  const pageW = (i: number) => (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn);
-  const pageH = (i: number) => (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn);
-  const pagesOut = Array.from({ length: nBins }, (_, i) => out.addPage([pageW(i) * PT, pageH(i) * PT]));
-
-  for (const pl of packed.placements) {
-    const pc = pieces[pl.id];
-    const embedded = await out.embedPage(src.getPage(pc.page), pc.clip);
-    const target = pagesOut[pl.bin];
-    const X = pl.x * PT, Y = pl.y * PT;
-    if (!pl.rotated) target.drawPage(embedded, { x: X, y: Y });
-    else target.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
-  }
-  const outBytes = await out.save();
+  const outBytes = useVector
+    ? await buildVectorOutput(bigGroups, packed, sheetWIn, sheetHIn, trim)
+    : await buildRasterOutput(src, clipPieces, packed, sheetWIn, sheetHIn, trim);
 
   // Per-sheet previews + utilisation.
   const areaByBin = new Map<number, number>();
   for (const pl of packed.placements) areaByBin.set(pl.bin, (areaByBin.get(pl.bin) ?? 0) + pl.w * pl.h);
   const sheets: NestSheet[] = [];
-  for (let i = 0; i < nBins; i++) {
+  for (let i = 0; i < packed.bins.length; i++) {
     const usedWIn = Math.min(sheetWIn, packed.bins[i].usedW);
     const usedHIn = Math.min(sheetHIn, packed.bins[i].usedH);
     const count = packed.placements.filter((p) => p.bin === i).length;
     const util = usedWIn * usedHIn > 0 ? (areaByBin.get(i) ?? 0) / (usedWIn * usedHIn) : 0;
     sheets.push({
-      index: i,
-      usedWIn: +usedWIn.toFixed(1),
-      usedHIn: +usedHIn.toFixed(1),
-      pieceCount: count,
-      utilPct: Math.round(util * 100),
+      index: i, usedWIn: +usedWIn.toFixed(1), usedHIn: +usedHIn.toFixed(1),
+      pieceCount: count, utilPct: Math.round(util * 100),
       previewDataUrl: await renderPreview(new Uint8Array(outBytes), i, 520),
     });
   }
 
   const base = fileName.replace(/\.[^.]+$/, "");
   return {
-    file: fileName,
+    file: fileName, mode: useVector ? "vector" : "raster",
     sheetWIn, sheetHIn, gapIn, rotated: allowRotate,
-    totalPieces: pieces.length,
-    placedPieces: packed.placements.length,
-    unplaced: packed.unplaced.length,
-    sheets,
-    warnings,
+    totalPieces: sizes.length, placedPieces: packed.placements.length, unplaced: packed.unplaced.length,
+    sheets, warnings,
     outName: `${base} — nested ${sheetWIn}x${sheetHIn}.pdf`,
     outPdfBase64: Buffer.from(outBytes).toString("base64"),
   };
