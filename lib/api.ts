@@ -1200,6 +1200,67 @@ export const api = {
     return request<{ success: boolean }>(`/api/v1/admin/production/holidays/${id}`, { method: "DELETE" });
   },
 
+  // ----- Admin: SF Dropbox (internal file library) -----
+
+  adminDropboxStatus() {
+    return request<{ settings: DropboxSettings; folders: DropboxFolderRow[] }>("/api/v1/admin/dropbox");
+  },
+  adminDropboxSaveConfig(cfg: { rootPath?: string; donePath?: string; autoPush?: boolean }) {
+    return request<{ success: boolean; settings: DropboxSettings }>("/api/v1/admin/dropbox/config", {
+      method: "PUT",
+      body: JSON.stringify(cfg),
+    });
+  },
+  adminDropboxFolder(orderId: number) {
+    return request<{ order: DropboxFolderMeta | null; files: DropboxFileRow[] }>(
+      `/api/v1/admin/dropbox/orders/${orderId}`,
+    );
+  },
+  adminDropboxPush(orderId: number) {
+    return request<{ success: boolean; status: string; error: string | null; filesCount: number }>(
+      `/api/v1/admin/dropbox/push/${orderId}`,
+      { method: "POST" },
+    );
+  },
+  adminDropboxRemove(orderId: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/dropbox/remove/${orderId}`, { method: "POST" });
+  },
+  /** Download one SF Dropbox file (bearer-authed → blob → save under its name). */
+  async adminDropboxDownload(fileId: number, filename: string) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/dropbox/file/${fileId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError(res.status, "Could not download the file.", null);
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+  /** Download a whole order folder as one ZIP (all files inside). */
+  async adminDropboxDownloadZip(orderId: number, zipName: string) {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/v1/admin/dropbox/orders/${orderId}/zip`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(res.status, body?.message ?? "Could not download the folder.", null);
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (zipName || "folder").toLowerCase().endsWith(".zip") ? zipName : `${zipName}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
+
   // ----- Admin: customer detail -----
 
   adminUserOrders(id: number, page = 1) {
@@ -1476,6 +1537,40 @@ export type ProductionJob = {
 };
 export type ProductionHoliday = { id: number; day: string; label: string | null };
 
+export type DropboxSettings = {
+  rootPath: string;
+  donePath: string;
+  autoPush: boolean;
+};
+export type DropboxFolderRow = {
+  orderId: number;
+  orderRef: string | null;
+  folderLabel: string | null;
+  status: "synced" | "failed" | "pending";
+  error: string | null;
+  filesCount: number;
+  sizeBytes: number;
+  done: boolean;
+  lastPushedAt: string | null;
+};
+export type DropboxFolderMeta = {
+  orderId: number;
+  orderRef: string | null;
+  folderLabel: string | null;
+  status: "synced" | "failed" | "pending";
+  error: string | null;
+  done: boolean;
+  lastPushedAt: string | null;
+};
+export type DropboxFileRow = {
+  id: number;
+  name: string;
+  jobNo: number | null;
+  subFolder: string | null;
+  kind: "artwork" | "job_order" | "cnc";
+  sizeBytes: number;
+};
+
 export type NativeOrderRow = {
   id: number;
   ref: string;
@@ -1516,6 +1611,15 @@ export type NativeOrderDetail = {
   date: string | null;
   lines: { id: number; name: string; quantity: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; artworks?: { url: string; name?: string }[]; status: string; statusLabel: string; refundedAt: string | null; deliveryNote?: string | null }[];
   history: { to: string; date: string | null; from?: string | null; note?: string | null; by?: string | null }[];
+  dropbox?: {
+    status: "synced" | "failed" | "pending";
+    folderLabel: string | null;
+    filesCount: number;
+    sizeBytes: number;
+    done: boolean;
+    error: string | null;
+    lastPushedAt: string | null;
+  } | null;
 };
 
 export type ActivityVisitor = {

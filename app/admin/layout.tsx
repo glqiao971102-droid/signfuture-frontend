@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
       { view: "detail", label: "Production Detail" },
     ],
   },
+  { href: "/admin/dropbox", label: "SF Dropbox", icon: "🗂", section: "dropbox" },
   { href: "/admin/quotations", label: "Quotations", icon: "✉", section: "quotations" },
   { href: "/admin/users", label: "Customers", icon: "☺", section: "customers" },
   { href: "/admin/wallet", label: "Wallet", icon: "◈", section: "wallet" },
@@ -64,6 +65,7 @@ const NAV: NavItem[] = [
 function sectionForPath(path: string): string | null {
   if (path.startsWith("/admin/orders")) return "orders";
   if (path.startsWith("/admin/production")) return "production";
+  if (path.startsWith("/admin/dropbox")) return "dropbox";
   if (path.startsWith("/admin/quotations")) return "quotations";
   if (path.startsWith("/admin/users")) return "customers";
   if (path.startsWith("/admin/wallet")) return "wallet";

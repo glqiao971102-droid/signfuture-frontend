@@ -19,6 +19,7 @@ const SECTION_LABEL: Record<string, string> = {
   "agent-logins": "Agent Logins",
   products: "Products",
   "sales-listing": "Sales Listing",
+  dropbox: "SF Dropbox",
 };
 
 export default function AdminPermissionsPage() {

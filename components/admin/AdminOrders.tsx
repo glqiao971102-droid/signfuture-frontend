@@ -310,6 +310,7 @@ export default function AdminOrders() {
   const [nativeStatuses, setNativeStatuses] = useState<{ value: string; label: string }[]>([]);
   const [nativeDetail, setNativeDetail] = useState<NativeOrderDetail | null>(null);
   const [savingItemId, setSavingItemId] = useState<number | null>(null);
+  const [dbxPushing, setDbxPushing] = useState(false);
   // Inline "swap a same-price option" editor: which item+label is open, its draft value.
   const [editOpt, setEditOpt] = useState<{ itemId: number; label: string } | null>(null);
   const [editOptValue, setEditOptValue] = useState("");
@@ -446,6 +447,21 @@ export default function AdminOrders() {
       alert(err instanceof Error ? err.message : "Could not update item status");
     } finally {
       setSavingItemId(null);
+    }
+  }
+
+  // Manually push (or re-push) this order's files to SF Dropbox now.
+  async function pushDropbox() {
+    if (!nativeDetail) return;
+    setDbxPushing(true);
+    try {
+      const r = await api.adminDropboxPush(nativeDetail.id);
+      if (!r.success) alert(r.error || "Dropbox push failed. Check SF Dropbox settings.");
+      setNativeDetail(await api.adminNativeOrder(nativeDetail.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not push to Dropbox");
+    } finally {
+      setDbxPushing(false);
     }
   }
 
@@ -1030,6 +1046,58 @@ export default function AdminOrders() {
                 }
               >
                 🛠 Download Job Order (production)
+              </button>
+            </div>
+
+            {/* SF Dropbox sync status for this order. */}
+            <div className="dbx-order-row">
+              <span className="dbx-order-icon" aria-hidden="true">🗂</span>
+              <div className="dbx-order-main">
+                {nativeDetail.dropbox ? (
+                  <>
+                    <span
+                      className={`adm-chip ${
+                        nativeDetail.dropbox.status === "synced"
+                          ? nativeDetail.dropbox.done
+                            ? "dbx-done"
+                            : "dbx-ok"
+                          : nativeDetail.dropbox.status === "failed"
+                            ? "dbx-off"
+                            : "dbx-pending"
+                      }`}
+                    >
+                      {nativeDetail.dropbox.status === "synced"
+                        ? nativeDetail.dropbox.done
+                          ? "In Done"
+                          : "In SF Dropbox"
+                        : nativeDetail.dropbox.status === "failed"
+                          ? "SF Dropbox failed"
+                          : "Pending"}
+                    </span>
+                    <span className="dbx-order-meta">
+                      {nativeDetail.dropbox.filesCount} file
+                      {nativeDetail.dropbox.filesCount === 1 ? "" : "s"}
+                    </span>
+                    <a href="/admin/dropbox" className="adm-link">
+                      Open in SF Dropbox →
+                    </a>
+                    {nativeDetail.dropbox.status === "failed" && nativeDetail.dropbox.error && (
+                      <span className="dbx-order-err">{nativeDetail.dropbox.error}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="dbx-order-meta">
+                    Not in SF Dropbox yet — added automatically when set to Processing.
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="adm-edit-link dbx-order-push"
+                onClick={pushDropbox}
+                disabled={dbxPushing}
+              >
+                {dbxPushing ? "Pushing…" : nativeDetail.dropbox ? "Re-push" : "Push now"}
               </button>
             </div>
 

@@ -6,8 +6,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-/** The caller must be a signed-in member (verified against the backend). */
-async function requireMember(req: Request): Promise<boolean> {
+// Shared internal secret so our own backend can call this server-to-server (for
+// the SF Dropbox "Cnc router file" auto-nesting). Matches the render-artwork
+// route's default; set RENDER_ARTWORK_SECRET on both sides to rotate it.
+const RENDER_SECRET =
+  process.env.RENDER_ARTWORK_SECRET || "sf-jobrender-9f3c1e7a44b24d8ea1c6b0f2e5d78c31";
+
+/** The caller must be a signed-in member, OR our backend via the internal secret. */
+async function requireCaller(req: Request): Promise<boolean> {
+  if (req.headers.get("x-render-secret") === RENDER_SECRET) return true;
   const auth = req.headers.get("authorization");
   if (!auth) return false;
   try {
@@ -29,7 +36,7 @@ async function requireMember(req: Request): Promise<boolean> {
  */
 export async function POST(req: Request) {
   try {
-    if (!(await requireMember(req))) {
+    if (!(await requireCaller(req))) {
       return NextResponse.json({ error: "FORBIDDEN", message: "Please sign in to use this tool." }, { status: 403 });
     }
     const url = new URL(req.url);
