@@ -23,12 +23,17 @@ export type NestOptions = {
   sheetWIn?: number; sheetHIn?: number; gapIn?: number;
   allowRotate?: boolean; minPieceIn?: number; trim?: boolean;
 };
-export type NestSheet = { index: number; usedWIn: number; usedHIn: number; pieceCount: number; utilPct: number; previewDataUrl: string };
+export type NestSheet = {
+  index: number; usedWIn: number; usedHIn: number; pieceCount: number; utilPct: number;
+  previewDataUrl: string;
+  pdfBase64: string; // this sheet as its OWN single-page PDF
+  outName: string;   // download filename (named by the used size)
+};
 export type NestResult = {
   file: string; mode: "vector" | "raster";
   sheetWIn: number; sheetHIn: number; gapIn: number; rotated: boolean;
   totalPieces: number; placedPieces: number; unplaced: number;
-  sheets: NestSheet[]; warnings: string[]; outName: string; outPdfBase64: string;
+  sheets: NestSheet[]; warnings: string[];
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -112,46 +117,49 @@ async function renderPreview(bytes: Uint8Array, pageIndex: number, targetPx: num
   return `data:image/png;base64,${PNG.sync.write(png).toString("base64")}`;
 }
 
-/** Flat vector output: re-emit each piece's own paths at the packed position. */
-async function buildVectorOutput(groups: VGroup[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array> {
-  const out = await PDFDocument.create();
-  const nBins = packed.bins.length;
-  const content = Array.from({ length: nBins }, () => "");
-  for (const pl of packed.placements) {
-    const g = groups[pl.id];
-    const tx = pl.x * PT, ty = pl.y * PT;
-    // One transform for the whole group so its fills stay together.
-    const T: Mat = !pl.rotated
-      ? [1, 0, 0, 1, tx - g.x0, ty - g.y0]
-      : [0, 1, -1, 0, tx + g.y1, ty - g.x0]; // 90° CCW, footprint bottom-left at (tx,ty)
-    for (const u of g.units) content[pl.bin] += emitUnit(u, T);
-  }
-  for (let i = 0; i < nBins; i++) {
+/** Flat vector output — ONE single-page PDF per sheet (bin). */
+async function buildVectorSheets(groups: VGroup[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array[]> {
+  const out: Uint8Array[] = [];
+  for (let i = 0; i < packed.bins.length; i++) {
+    let content = "";
+    for (const pl of packed.placements) {
+      if (pl.bin !== i) continue;
+      const g = groups[pl.id];
+      const tx = pl.x * PT, ty = pl.y * PT;
+      const T: Mat = !pl.rotated
+        ? [1, 0, 0, 1, tx - g.x0, ty - g.y0]
+        : [0, 1, -1, 0, tx + g.y1, ty - g.x0];
+      for (const u of g.units) content += emitUnit(u, T);
+    }
+    const doc = await PDFDocument.create();
     const w = (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
     const h = (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
-    const page = out.addPage([w, h]);
-    const ref = out.context.register(out.context.stream(content[i] || " "));
-    page.node.set(PDFName.of("Contents"), ref);
+    const page = doc.addPage([w, h]);
+    page.node.set(PDFName.of("Contents"), doc.context.register(doc.context.stream(content || " ")));
+    out.push(await doc.save());
   }
-  return out.save();
+  return out;
 }
 
-/** Raster output: clip each piece out of the source page and re-place it. */
-async function buildRasterOutput(src: PDFDocument, pieces: ClipPiece[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array> {
-  const out = await PDFDocument.create();
-  const nBins = packed.bins.length;
-  const pw = (i: number) => (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
-  const ph = (i: number) => (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
-  const pages = Array.from({ length: nBins }, (_, i) => out.addPage([pw(i), ph(i)]));
-  for (const pl of packed.placements) {
-    const pc = pieces[pl.id];
-    const embedded = await out.embedPage(src.getPage(pc.page), pc.clip);
-    const target = pages[pl.bin];
-    const X = pl.x * PT, Y = pl.y * PT;
-    if (!pl.rotated) target.drawPage(embedded, { x: X, y: Y });
-    else target.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
+/** Raster output — ONE single-page PDF per sheet (bin). */
+async function buildRasterSheets(src: PDFDocument, pieces: ClipPiece[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array[]> {
+  const out: Uint8Array[] = [];
+  for (let i = 0; i < packed.bins.length; i++) {
+    const doc = await PDFDocument.create();
+    const w = (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
+    const h = (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
+    const page = doc.addPage([w, h]);
+    for (const pl of packed.placements) {
+      if (pl.bin !== i) continue;
+      const pc = pieces[pl.id];
+      const embedded = await doc.embedPage(src.getPage(pc.page), pc.clip);
+      const X = pl.x * PT, Y = pl.y * PT;
+      if (!pl.rotated) page.drawPage(embedded, { x: X, y: Y });
+      else page.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
+    }
+    out.push(await doc.save());
   }
-  return out.save();
+  return out;
 }
 
 export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: NestOptions = {}): Promise<NestResult> {
@@ -216,33 +224,32 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const rects: NestRect[] = sizes.map((s, id) => ({ id, w: s.wIn, h: s.hIn }));
   const packed = packBest(rects, sheetWIn, sheetHIn, gapIn, allowRotate);
 
-  const outBytes = useVector
-    ? await buildVectorOutput(bigGroups, packed, sheetWIn, sheetHIn, trim)
-    : await buildRasterOutput(src, clipPieces, packed, sheetWIn, sheetHIn, trim);
+  const sheetPdfs = useVector
+    ? await buildVectorSheets(bigGroups, packed, sheetWIn, sheetHIn, trim)
+    : await buildRasterSheets(src, clipPieces, packed, sheetWIn, sheetHIn, trim);
 
-  // Per-sheet previews + utilisation.
+  // Per-sheet previews, utilisation, and a separate PDF each (named by used size).
+  const base = fileName.replace(/\.[^.]+$/, "");
   const areaByBin = new Map<number, number>();
   for (const pl of packed.placements) areaByBin.set(pl.bin, (areaByBin.get(pl.bin) ?? 0) + pl.w * pl.h);
   const sheets: NestSheet[] = [];
   for (let i = 0; i < packed.bins.length; i++) {
-    const usedWIn = Math.min(sheetWIn, packed.bins[i].usedW);
-    const usedHIn = Math.min(sheetHIn, packed.bins[i].usedH);
+    const usedWIn = +Math.min(sheetWIn, packed.bins[i].usedW).toFixed(1);
+    const usedHIn = +Math.min(sheetHIn, packed.bins[i].usedH).toFixed(1);
     const count = packed.placements.filter((p) => p.bin === i).length;
     const util = usedWIn * usedHIn > 0 ? (areaByBin.get(i) ?? 0) / (usedWIn * usedHIn) : 0;
     sheets.push({
-      index: i, usedWIn: +usedWIn.toFixed(1), usedHIn: +usedHIn.toFixed(1),
-      pieceCount: count, utilPct: Math.round(util * 100),
-      previewDataUrl: await renderPreview(new Uint8Array(outBytes), i, 520),
+      index: i, usedWIn, usedHIn, pieceCount: count, utilPct: Math.round(util * 100),
+      previewDataUrl: await renderPreview(sheetPdfs[i], 0, 520),
+      pdfBase64: Buffer.from(sheetPdfs[i]).toString("base64"),
+      outName: `${base} — ${usedWIn}x${usedHIn}in.pdf`,
     });
   }
 
-  const base = fileName.replace(/\.[^.]+$/, "");
   return {
     file: fileName, mode: useVector ? "vector" : "raster",
     sheetWIn, sheetHIn, gapIn, rotated: allowRotate,
     totalPieces: sizes.length, placedPieces: packed.placements.length, unplaced: packed.unplaced.length,
     sheets, warnings,
-    outName: `${base} — nested ${sheetWIn}x${sheetHIn}.pdf`,
-    outPdfBase64: Buffer.from(outBytes).toString("base64"),
   };
 }

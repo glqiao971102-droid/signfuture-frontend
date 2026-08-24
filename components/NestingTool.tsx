@@ -10,6 +10,8 @@ type NestSheet = {
   pieceCount: number;
   utilPct: number;
   previewDataUrl: string;
+  pdfBase64: string;
+  outName: string;
 };
 type NestResult = {
   file: string;
@@ -22,8 +24,6 @@ type NestResult = {
   unplaced: number;
   sheets: NestSheet[];
   warnings: string[];
-  outName: string;
-  outPdfBase64: string;
 };
 
 function prettySize(bytes: number): string {
@@ -41,7 +41,7 @@ export default function NestingTool() {
   const [file, setFile] = useState<File | null>(null);
   const [sheetW, setSheetW] = useState("48");
   const [sheetH, setSheetH] = useState("96");
-  const [gapMm, setGapMm] = useState("3");
+  const [gapMm, setGapMm] = useState("10");
   const [rotate, setRotate] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,19 +85,24 @@ export default function NestingTool() {
     }
   }
 
-  function download() {
-    if (!result) return;
-    const bin = atob(result.outPdfBase64);
+  function saveSheet(s: NestSheet) {
+    const bin = atob(s.pdfBase64);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     const url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = result.outName;
+    a.download = s.outName;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  // Download every sheet as its OWN file (staggered so the browser allows them all).
+  function downloadAll() {
+    if (!result) return;
+    result.sheets.forEach((s, i) => setTimeout(() => saveSheet(s), i * 350));
   }
 
   return (
@@ -191,9 +196,9 @@ export default function NestingTool() {
               <div><span className="nest-stat-n">{result.sheets.length}</span><span className="nest-stat-l">sheet{result.sheets.length === 1 ? "" : "s"}</span></div>
               <div><span className="nest-stat-n">{result.sheetWIn}×{result.sheetHIn}</span><span className="nest-stat-l">sheet size (in)</span></div>
             </div>
-            <button type="button" className="ll-measure" onClick={download}>
+            <button type="button" className="ll-measure" onClick={downloadAll}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
-              Download nested file
+              {result.sheets.length > 1 ? `Download ${result.sheets.length} files` : "Download nested file"}
             </button>
           </div>
 
@@ -211,11 +216,15 @@ export default function NestingTool() {
             {result.sheets.map((s) => (
               <div key={s.index} className="nest-sheet">
                 <div className="nest-sheet-head">
-                  <strong>Sheet {s.index + 1}</strong>
-                  <span>{s.usedWIn}″ × {s.usedHIn}″ · {s.pieceCount} piece{s.pieceCount === 1 ? "" : "s"} · {s.utilPct}% used</span>
+                  <strong>Sheet {s.index + 1} — {s.usedWIn}″ × {s.usedHIn}″</strong>
+                  <span>{s.pieceCount} piece{s.pieceCount === 1 ? "" : "s"} · {s.utilPct}% used</span>
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s.previewDataUrl} alt={`Sheet ${s.index + 1} layout`} />
+                <button type="button" className="nest-sheet-dl" onClick={() => saveSheet(s)}>
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+                  Download this sheet ({s.usedWIn}×{s.usedHIn}in)
+                </button>
               </div>
             ))}
           </div>
