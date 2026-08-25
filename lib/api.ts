@@ -414,7 +414,7 @@ export const api = {
     name: string;
     email: string;
     password: string;
-    referralCode: string;
+    referralCode?: string;
     otp: string;
     phone?: string;
     professions?: string[];

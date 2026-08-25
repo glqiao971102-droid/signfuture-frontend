@@ -4298,6 +4298,8 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   font-weight: 600;
 }
 
+.reg-optional { color: var(--muted); font-weight: 400; font-size: 12px; }
+
 /* Admin Permissions — per-feature access level (No access / View / Operate). */
 .perm-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .perm-group {

@@ -276,7 +276,6 @@ function LoginModal({
 
     if (!regName.trim()) return setError("Please enter your name.");
     if (regPhone.replace(/\D/g, "").length < 7) return setError("Please enter a valid phone number.");
-    if (!regReferral.trim()) return setError("A referral code is required.");
     if (password.length < MIN_PASSWORD) {
       return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
     }
@@ -286,17 +285,21 @@ function LoginModal({
 
     setBusy(true);
     try {
-      // Verify the referral code EXISTS before we email an OTP — a bogus code
-      // should fail immediately, not after the whole form + verification.
-      const check = await api.checkReferral(regReferral.trim());
-      if (!check.valid) {
-        setBusy(false);
-        return setError("That referral code is invalid. Please check it and try again.");
+      // Referral code is OPTIONAL. If one was entered, verify it EXISTS before we
+      // email an OTP so a bogus code fails immediately (an empty field is fine).
+      let referrerLabel: string | null = null;
+      if (regReferral.trim()) {
+        const check = await api.checkReferral(regReferral.trim());
+        if (!check.valid) {
+          setBusy(false);
+          return setError("That referral code is invalid. Please check it, or leave it blank.");
+        }
+        referrerLabel = check.referrer ?? null;
       }
       await api.sendRegisterOtp(regEmail.trim());
       setOtpSent(true);
       setNotice(
-        `Referral verified${check.referrer ? ` — you'll join under ${check.referrer}` : ""}. We've sent a 6-digit code to ${regEmail.trim()}.`,
+        `${referrerLabel ? `Referral verified — you'll join under ${referrerLabel}. ` : ""}We've sent a 6-digit code to ${regEmail.trim()}.`,
       );
     } catch (err) {
       setError(
@@ -324,7 +327,7 @@ function LoginModal({
           name: regName.trim(),
           email: regEmail.trim(),
           password,
-          referralCode: regReferral.trim(),
+          referralCode: regReferral.trim() || undefined,
           otp: regOtp.trim(),
           phone: regPhone.trim() || undefined,
           professions: regProfessions.length ? regProfessions : undefined,
@@ -566,13 +569,12 @@ function LoginModal({
                 />
               </label>
               <label>
-                Referral code
+                Referral code <span className="reg-optional">(optional)</span>
                 <input
                   type="text"
-                  placeholder="Enter your referral code"
+                  placeholder="Enter your referral code (optional)"
                   value={regReferral}
                   onChange={(e) => setRegReferral(e.target.value.toUpperCase())}
-                  required
                 />
               </label>
 
