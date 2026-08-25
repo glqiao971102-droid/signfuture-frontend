@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { PRODUCT_MENU, SITE_NAV, flattenMenu, nodeHref, type ProductMenuItem } from "@/lib/products";
+import { PRODUCT_MENU, SITE_NAV, PARTNER_SUITE, flattenMenu, nodeHref, type ProductMenuItem } from "@/lib/products";
 import { useCart } from "@/components/CartProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { api } from "@/lib/api";
@@ -274,6 +274,30 @@ export default function Nav() {
               {item.label}
             </Link>
           ))}
+
+          <div className="nav-dropdown">
+            <button
+              type="button"
+              className={`nav-link nav-dropdown-trigger${pathname.startsWith("/account") ? " active" : ""}`}
+              aria-haspopup="true"
+            >
+              Partner Suite <span className="caret">▾</span>
+            </button>
+            <div className="nav-dropdown-menu nav-partner-menu" role="menu">
+              {PARTNER_SUITE.map((p) =>
+                p.soon ? (
+                  <span key={p.tab} className="dropdown-item is-soon" aria-disabled="true">
+                    <span><span className="nav-partner-glyph" aria-hidden="true">{p.glyph}</span>{p.label}</span>
+                    <span className="soon-tag">Soon</span>
+                  </span>
+                ) : (
+                  <Link key={p.tab} href={`/account?tab=${p.tab}`} className="dropdown-item" role="menuitem">
+                    <span><span className="nav-partner-glyph" aria-hidden="true">{p.glyph}</span>{p.label}</span>
+                  </Link>
+                )
+              )}
+            </div>
+          </div>
         </div>
       </div>
       </nav>
@@ -339,6 +363,20 @@ export default function Nav() {
               {item.label}
             </Link>
           ))}
+
+          <div className="m-tree-section">Partner Suite</div>
+          {PARTNER_SUITE.map((p) =>
+            p.soon ? (
+              <span key={p.tab} className="m-tree-link is-soon">
+                <span className="nav-partner-glyph" aria-hidden="true">{p.glyph}</span>{p.label}
+                <span className="soon-tag">Soon</span>
+              </span>
+            ) : (
+              <Link key={p.tab} href={`/account?tab=${p.tab}`} className="m-tree-link" onClick={() => setMenuOpen(false)}>
+                <span className="nav-partner-glyph" aria-hidden="true">{p.glyph}</span>{p.label}
+              </Link>
+            )
+          )}
         </nav>
 
         {/* Quick links */}

@@ -53,6 +53,11 @@ export async function POST(req: Request) {
       sheetHIn: num("h", 96),
       gapIn: num("gap", 0.25, true),
       allowRotate: url.searchParams.get("rot") !== "0",
+      drillHoles: url.searchParams.get("holes") === "1",
+      wireDiaMm: num("wire", 5),
+      screwDiaMm: num("screw", 3),
+      // Extra stable (4 corners + coverage) is the default; only "medium" opts out.
+      screwLevel: url.searchParams.get("level") === "medium" ? "medium" : "strong",
     });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {

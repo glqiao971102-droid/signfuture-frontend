@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError, type NativeOrderRow } from "@/lib/api";
 import { useAuth, type MemberTier } from "@/components/AuthProvider";
@@ -122,6 +123,20 @@ export default function AccountDashboard() {
   const { user } = useAuth();
   const [active, setActive] = useState<SectionKey>("consultant");
   const [installerState, setInstallerState] = useState("Selangor");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  // Deep-link into a section via ?tab= (used by the Partner Suite nav menu).
+  // Reacts to query changes too, so clicking another Partner Suite item while
+  // already on /account switches section instead of doing nothing.
+  useEffect(() => {
+    if (tabParam && SIDE.some((s) => s.key === tabParam)) setActive(tabParam as SectionKey);
+  }, [tabParam]);
+  // Switch section AND keep the URL (?tab=) in sync, so the two never diverge.
+  const selectSection = (key: SectionKey) => {
+    setActive(key);
+    router.replace(`/account?tab=${key}`, { scroll: false });
+  };
   // The member's consultant = the admin whose referral QR/code they registered
   // under. Falls back to the default contact when there's no referrer / not
   // signed in to the backend (e.g. preview session).
@@ -556,7 +571,7 @@ export default function AccountDashboard() {
                       <button
                         type="button"
                         className="hero-btn primary rec-btn"
-                        onClick={() => setActive("orders")}
+                        onClick={() => selectSection("orders")}
                       >
                         View Order
                       </button>
@@ -653,7 +668,7 @@ export default function AccountDashboard() {
             type="button"
             className={`acct-side-item${active === s.key ? " is-active" : ""}${s.soon ? " is-soon" : ""}`}
             onClick={() => {
-              if (!s.soon) setActive(s.key);
+              if (!s.soon) selectSection(s.key);
             }}
             disabled={s.soon}
             aria-current={active === s.key ? "page" : undefined}

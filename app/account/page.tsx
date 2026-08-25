@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import AccountDashboard from "@/components/AccountDashboard";
@@ -24,7 +25,9 @@ export default function Page() {
         </section>
 
         <section className="home-section" style={{ marginTop: 18 }}>
-          <AccountDashboard />
+          <Suspense fallback={null}>
+            <AccountDashboard />
+          </Suspense>
         </section>
       </main>
       <Footer />

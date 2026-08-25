@@ -9,20 +9,94 @@
 //    you can move/delete each one directly — no ungroup / release-clip needed.
 //  • RASTER (fallback, for flattened/image art or spot colours) — clip each piece
 //    out of the source page with pdf-lib embedPage and re-place it.
-import { PDFDocument, PDFName, degrees } from "pdf-lib";
+import { PDFDocument, PDFName, degrees, StandardFonts } from "pdf-lib";
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb } from "@/lib/pdf/pdfium";
 import { PNG } from "pngjs";
 import { packBest, type NestRect, type PackResult } from "@/lib/nest/pack";
 import { parseVectorUnits, groupUnits, emitUnit, type VUnit, type VGroup, type Mat } from "@/lib/nest/vector";
+import { computePieceHoles, mmToPt, type Hole, type ScrewLevel } from "@/lib/nest/holes";
+import { rgb } from "pdf-lib";
 
 const PT = 72;
 const DET_TARGET = 1800;
 
+// Drill-hole mark colours (wire = red, screw = cyan) and line weight.
+const WIRE_RGB: [number, number, number] = [0.9, 0.1, 0.1];
+const SCREW_RGB: [number, number, number] = [0, 0.68, 0.74];
+const HOLE_LW = 0.75;
+const LEGEND_L1 = "Red circle = 5mm wire hole (power outlet)";
+const LEGEND_L2 = "Cyan circle = 3mm screw hole (mounting)";
+
 export type NestOptions = {
   sheetWIn?: number; sheetHIn?: number; gapIn?: number;
   allowRotate?: boolean; minPieceIn?: number; trim?: boolean;
+  drillHoles?: boolean; wireDiaMm?: number; screwDiaMm?: number; screwLevel?: ScrewLevel;
 };
+
+type PageMask = { mask: Uint8Array; w: number; h: number; cbx: number; cby: number; cbh: number; S: number };
+
+/** Render a source page to a 1-bit ink mask for hole placement. */
+async function renderPageMask(bytes: Uint8Array, pi: number, cb: { x: number; y: number; width: number; height: number }): Promise<PageMask | null> {
+  const S = Math.min(0.5, Math.max(0.05, 1600 / Math.max(cb.width, cb.height)));
+  const page = await renderPageRgb(bytes, pi, S);
+  if (!page) return null;
+  const { width: w, height: h, rgb: px } = page;
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) if (px[i * 3] < 128) mask[i] = 1;
+  return { mask, w, h, cbx: cb.x, cby: cb.y, cbh: cb.height, S };
+}
+
+/** Holes (LOCAL points from the piece bbox bottom-left) for one piece's page bbox. */
+function holesForPieceBox(pm: PageMask, x0: number, y0: number, x1: number, y1: number, wireDiaPt: number, screwDiaPt: number, level: ScrewLevel): Hole[] {
+  const ix0 = Math.max(0, Math.floor((x0 - pm.cbx) * pm.S));
+  const ix1 = Math.min(pm.w, Math.ceil((x1 - pm.cbx) * pm.S));
+  const iyTop = Math.max(0, Math.floor((pm.cby + pm.cbh - y1) * pm.S));
+  const iyBot = Math.min(pm.h, Math.ceil((pm.cby + pm.cbh - y0) * pm.S));
+  const sw = ix1 - ix0, sh = iyBot - iyTop;
+  if (sw <= 0 || sh <= 0) return [];
+  const sub = new Uint8Array(sw * sh);
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) sub[y * sw + x] = pm.mask[(iyTop + y) * pm.w + (ix0 + x)];
+  return computePieceHoles(sub, sw, sh, pm.S, wireDiaPt, screwDiaPt, level);
+}
+
+/** Sheet-space centre (points) of a hole, given how its piece was placed. */
+function holeCentre(pl: PackResult["placements"][number], hole: Hole): { cx: number; cy: number } {
+  if (!pl.rotated) return { cx: pl.x * PT + hole.lx, cy: pl.y * PT + hole.ly };
+  return { cx: pl.x * PT + pl.w * PT - hole.ly, cy: pl.y * PT + hole.lx };
+}
+
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(3));
+
+/** A white-filled circle (looks like a real hole, visible on any letter colour)
+ *  with a coloured outline + centre cross, as PDF content-stream ops. */
+function circleOps(cx: number, cy: number, r: number, col: [number, number, number]): string {
+  const k = 0.5522847498 * r;
+  const [R, G, B] = col;
+  const c = Math.min(r * 0.6, 2.2); // centre cross half-length
+  return (
+    `q 1 1 1 rg ${R} ${G} ${B} RG ${HOLE_LW} w\n` +
+    `${fmt(cx + r)} ${fmt(cy)} m\n` +
+    `${fmt(cx + r)} ${fmt(cy + k)} ${fmt(cx + k)} ${fmt(cy + r)} ${fmt(cx)} ${fmt(cy + r)} c\n` +
+    `${fmt(cx - k)} ${fmt(cy + r)} ${fmt(cx - r)} ${fmt(cy + k)} ${fmt(cx - r)} ${fmt(cy)} c\n` +
+    `${fmt(cx - r)} ${fmt(cy - k)} ${fmt(cx - k)} ${fmt(cy - r)} ${fmt(cx)} ${fmt(cy - r)} c\n` +
+    `${fmt(cx + k)} ${fmt(cy - r)} ${fmt(cx + r)} ${fmt(cy - k)} ${fmt(cx + r)} ${fmt(cy)} c\nB\n` +
+    `${fmt(cx - c)} ${fmt(cy)} m ${fmt(cx + c)} ${fmt(cy)} l S\n` +
+    `${fmt(cx)} ${fmt(cy - c)} m ${fmt(cx)} ${fmt(cy + c)} l S\nQ\n`
+  );
+}
+
+const pdfStr = (t: string) => t.replace(/([()\\])/g, "\\$1");
+
+/** Legend text ops (needs an /F1 Helvetica in page Resources), top-left corner. */
+function legendOps(h: number): string {
+  const [wr, wg, wb] = WIRE_RGB;
+  const [sr, sg, sb] = SCREW_RGB;
+  return (
+    `BT /F1 9 Tf ${wr} ${wg} ${wb} rg 6 ${fmt(h - 12)} Td (${pdfStr(LEGEND_L1)}) Tj ET\n` +
+    `BT /F1 9 Tf ${sr} ${sg} ${sb} rg 6 ${fmt(h - 24)} Td (${pdfStr(LEGEND_L2)}) Tj ET\n`
+  );
+}
 export type NestSheet = {
   index: number; usedWIn: number; usedHIn: number; pieceCount: number; utilPct: number;
   previewDataUrl: string;
@@ -118,7 +192,7 @@ async function renderPreview(bytes: Uint8Array, pageIndex: number, targetPx: num
 }
 
 /** Flat vector output — ONE single-page PDF per sheet (bin). */
-async function buildVectorSheets(groups: VGroup[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array[]> {
+async function buildVectorSheets(groups: VGroup[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean, holesById?: Hole[][], drawLegend?: boolean): Promise<Uint8Array[]> {
   const out: Uint8Array[] = [];
   for (let i = 0; i < packed.bins.length; i++) {
     let content = "";
@@ -130,11 +204,20 @@ async function buildVectorSheets(groups: VGroup[], packed: PackResult, sheetWIn:
         ? [1, 0, 0, 1, tx - g.x0, ty - g.y0]
         : [0, 1, -1, 0, tx + g.y1, ty - g.x0];
       for (const u of g.units) content += emitUnit(u, T);
+      for (const hole of holesById?.[pl.id] ?? []) {
+        const { cx, cy } = holeCentre(pl, hole);
+        content += circleOps(cx, cy, hole.d / 2, hole.kind === "wire" ? WIRE_RGB : SCREW_RGB);
+      }
     }
     const doc = await PDFDocument.create();
     const w = (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
     const h = (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
     const page = doc.addPage([w, h]);
+    if (drawLegend) {
+      const helv = await doc.embedFont(StandardFonts.Helvetica);
+      content += legendOps(h);
+      page.node.set(PDFName.of("Resources"), doc.context.obj({ Font: doc.context.obj({ F1: helv.ref }) }));
+    }
     page.node.set(PDFName.of("Contents"), doc.context.register(doc.context.stream(content || " ")));
     out.push(await doc.save());
   }
@@ -142,7 +225,7 @@ async function buildVectorSheets(groups: VGroup[], packed: PackResult, sheetWIn:
 }
 
 /** Raster output — ONE single-page PDF per sheet (bin). */
-async function buildRasterSheets(src: PDFDocument, pieces: ClipPiece[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean): Promise<Uint8Array[]> {
+async function buildRasterSheets(src: PDFDocument, pieces: ClipPiece[], packed: PackResult, sheetWIn: number, sheetHIn: number, trim: boolean, holesById?: Hole[][], drawLegend?: boolean): Promise<Uint8Array[]> {
   const out: Uint8Array[] = [];
   for (let i = 0; i < packed.bins.length; i++) {
     const doc = await PDFDocument.create();
@@ -157,6 +240,22 @@ async function buildRasterSheets(src: PDFDocument, pieces: ClipPiece[], packed: 
       if (!pl.rotated) page.drawPage(embedded, { x: X, y: Y });
       else page.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
     }
+    for (const pl of packed.placements) {
+      if (pl.bin !== i) continue;
+      for (const hole of holesById?.[pl.id] ?? []) {
+        const { cx, cy } = holeCentre(pl, hole);
+        const col = hole.kind === "wire" ? WIRE_RGB : SCREW_RGB;
+        const border = rgb(col[0], col[1], col[2]);
+        page.drawEllipse({ x: cx, y: cy, xScale: hole.d / 2, yScale: hole.d / 2, color: rgb(1, 1, 1), borderColor: border, borderWidth: HOLE_LW });
+        page.drawLine({ start: { x: cx - 2, y: cy }, end: { x: cx + 2, y: cy }, color: border, thickness: HOLE_LW });
+        page.drawLine({ start: { x: cx, y: cy - 2 }, end: { x: cx, y: cy + 2 }, color: border, thickness: HOLE_LW });
+      }
+    }
+    if (drawLegend) {
+      const helv = await doc.embedFont(StandardFonts.Helvetica);
+      page.drawText(LEGEND_L1, { x: 6, y: h - 12, size: 9, font: helv, color: rgb(WIRE_RGB[0], WIRE_RGB[1], WIRE_RGB[2]) });
+      page.drawText(LEGEND_L2, { x: 6, y: h - 24, size: 9, font: helv, color: rgb(SCREW_RGB[0], SCREW_RGB[1], SCREW_RGB[2]) });
+    }
     out.push(await doc.save());
   }
   return out;
@@ -169,6 +268,10 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const allowRotate = opts.allowRotate ?? true;
   const minPieceIn = opts.minPieceIn ?? 0.4;
   const trim = opts.trim ?? true;
+  const drillHoles = opts.drillHoles ?? false;
+  const wireDiaPt = mmToPt(opts.wireDiaMm ?? 5);
+  const screwDiaPt = mmToPt(opts.screwDiaMm ?? 3);
+  const screwLevel: ScrewLevel = opts.screwLevel === "medium" ? "medium" : "strong";
 
   const src = await PDFDocument.load(bytes);
   const nPages = src.getPageCount();
@@ -224,9 +327,34 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const rects: NestRect[] = sizes.map((s, id) => ({ id, w: s.wIn, h: s.hIn }));
   const packed = packBest(rects, sheetWIn, sheetHIn, gapIn, allowRotate);
 
+  // Optional: place a 5 mm wire hole + system-chosen 3 mm screw holes per piece.
+  let holesById: Hole[][] | undefined;
+  if (drillHoles) {
+    holesById = [];
+    try {
+      if (useVector) {
+        const cb = src.getPage(0).getCropBox();
+        const pm = await renderPageMask(bytes, 0, cb);
+        holesById = bigGroups.map((g) => (pm ? holesForPieceBox(pm, g.x0, g.y0, g.x1, g.y1, wireDiaPt, screwDiaPt, screwLevel) : []));
+      } else {
+        const masks = new Map<number, PageMask | null>();
+        holesById = [];
+        for (const pc of clipPieces) {
+          if (!masks.has(pc.page)) masks.set(pc.page, await renderPageMask(bytes, pc.page, src.getPage(pc.page).getCropBox()));
+          const pm = masks.get(pc.page) ?? null;
+          holesById.push(pm ? holesForPieceBox(pm, pc.clip.left, pc.clip.bottom, pc.clip.right, pc.clip.top, wireDiaPt, screwDiaPt, screwLevel) : []);
+        }
+      }
+    } catch {
+      holesById = undefined; // holes are best-effort; never fail the whole nest
+      warnings.push("Could not place drill holes for this artwork — the layout is fine, just without hole marks.");
+    }
+  }
+
+  const drawLegend = drillHoles && !!holesById;
   const sheetPdfs = useVector
-    ? await buildVectorSheets(bigGroups, packed, sheetWIn, sheetHIn, trim)
-    : await buildRasterSheets(src, clipPieces, packed, sheetWIn, sheetHIn, trim);
+    ? await buildVectorSheets(bigGroups, packed, sheetWIn, sheetHIn, trim, holesById, drawLegend)
+    : await buildRasterSheets(src, clipPieces, packed, sheetWIn, sheetHIn, trim, holesById, drawLegend);
 
   // Per-sheet previews, utilisation, and a separate PDF each (named by used size).
   const base = fileName.replace(/\.[^.]+$/, "");

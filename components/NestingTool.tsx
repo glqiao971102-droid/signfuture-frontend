@@ -43,6 +43,7 @@ export default function NestingTool() {
   const [sheetH, setSheetH] = useState("96");
   const [gapMm, setGapMm] = useState("10");
   const [rotate, setRotate] = useState(true);
+  const [holes, setHoles] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<NestResult | null>(null);
@@ -68,7 +69,8 @@ export default function NestingTool() {
       const gapIn = ((Number(gapMm) || 0) / 25.4).toString();
       const qs = new URLSearchParams({
         w: sheetW || "48", h: sheetH || "96", gap: gapIn,
-        rot: rotate ? "1" : "0", name: file.name,
+        rot: rotate ? "1" : "0", holes: holes ? "1" : "0",
+        level: "strong", name: file.name,
       });
       const res = await fetch(`/api/nest?${qs}`, {
         method: "POST",
@@ -105,88 +107,145 @@ export default function NestingTool() {
     result.sheets.forEach((s, i) => setTimeout(() => saveSheet(s), i * 350));
   }
 
+  const step = result ? 3 : file ? 2 : 1;
+  const stepCls = (n: number) => `an-step${n === step ? " is-active" : ""}${n < step ? " is-done" : ""}`;
+
   return (
-    <section className="acct-card acct-section-card">
-      <div className="acct-card-head">
-        <h2>Auto Nesting</h2>
-        <span>
-          Upload an artwork with scattered pieces — it detects each piece and arranges
-          them tightly onto {sheetW}″×{sheetH}″ sheets (extra sheets are added if they
-          don’t all fit), then gives you a ready-to-print file that opens laid out.
+    <section className="an-tool">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".ai,.pdf,application/pdf,application/postscript,application/illustrator"
+        hidden
+        onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+      />
+
+      {/* Header */}
+      <div className="an-head">
+        <span className="an-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><path d="M17.5 14v7M14 17.5h7" /></svg>
         </span>
+        <div className="an-head-text">
+          <div className="an-title-row">
+            <h2>Auto Nesting</h2>
+            <span className="an-badge">SMART LAYOUT</span>
+          </div>
+          <p>Upload your artwork and let the system arrange every piece for maximum material efficiency.</p>
+        </div>
       </div>
 
-      <div className="ll-uploader">
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".ai,.pdf,application/pdf,application/postscript,application/illustrator"
-          hidden
-          onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-        />
-        <div
-          role="button"
-          tabIndex={0}
-          className={`ll-drop${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
-        >
-          <div className="ll-drop-inner">
-            <span className="ll-drop-ic" aria-hidden="true">
-              {file ? (
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M18 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
-              )}
-            </span>
-            <div className="ll-drop-text">
-              {file ? (
-                <>
-                  <strong>{file.name}</strong>
-                  <span>{prettySize(file.size)} · click to change file</span>
-                </>
-              ) : (
-                <>
-                  <strong>Drop your artwork here</strong>
-                  <span>or click to browse — .ai / .pdf</span>
-                </>
-              )}
+      {/* Steps */}
+      <div className="an-steps">
+        <div className={stepCls(1)}><span className="an-step-n">1</span> Upload Artwork</div>
+        <div className={`an-step-line${step > 1 ? " is-done" : ""}`} />
+        <div className={stepCls(2)}><span className="an-step-n">2</span> Sheet Setup</div>
+        <div className={`an-step-line${step > 2 ? " is-done" : ""}`} />
+        <div className={stepCls(3)}><span className="an-step-n">3</span> Generate Layout</div>
+      </div>
+
+      {/* Drop zone */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={`an-drop${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+      >
+        <span className="an-drop-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
+        </span>
+        <div className="an-drop-main">
+          <strong>{file ? file.name : "Drop your artwork here"}</strong>
+          <span>{file ? `${prettySize(file.size)} · click to change file` : "AI, PDF supported · Maximum 50 MB"}</span>
+          <button
+            type="button"
+            className="an-browse"
+            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.5l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1Z" /></svg>
+            Browse Files
+          </button>
+        </div>
+        <div className="an-secure">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></svg>
+          Your files are processed securely
+        </div>
+      </div>
+
+      {/* Config + Options panels */}
+      <div className="an-panels">
+        <div className="an-panel">
+          <div className="an-panel-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8.5 8.5 3 21 15.5 15.5 21 3 8.5Z" /><path d="M7 9l1.5 1.5M10 6l2 2M13.5 9l1.5 1.5" /></svg>
+            Sheet Configuration
+          </div>
+          <div className="an-fields">
+            <div className="an-field">
+              <span className="an-field-label">Sheet width (in)</span>
+              <div className="an-input"><input type="number" min="1" value={sheetW} onChange={(e) => setSheetW(e.target.value)} /><span className="an-unit">in</span></div>
+            </div>
+            <div className="an-field">
+              <span className="an-field-label">Sheet height (in)</span>
+              <div className="an-input"><input type="number" min="1" value={sheetH} onChange={(e) => setSheetH(e.target.value)} /><span className="an-unit">in</span></div>
+            </div>
+            <div className="an-field">
+              <span className="an-field-label">Spacing (mm)</span>
+              <div className="an-input"><input type="number" min="0" step="0.5" value={gapMm} onChange={(e) => setGapMm(e.target.value)} /><span className="an-unit">mm</span></div>
             </div>
           </div>
         </div>
 
-        <div className="nest-opts">
-          <label className="nest-field">
-            <span className="ll-field-label">Sheet width (in)</span>
-            <input type="number" min="1" value={sheetW} onChange={(e) => setSheetW(e.target.value)} />
-          </label>
-          <label className="nest-field">
-            <span className="ll-field-label">Sheet height (in)</span>
-            <input type="number" min="1" value={sheetH} onChange={(e) => setSheetH(e.target.value)} />
-          </label>
-          <label className="nest-field">
-            <span className="ll-field-label">Spacing (mm)</span>
-            <input type="number" min="0" step="0.5" value={gapMm} onChange={(e) => setGapMm(e.target.value)} />
-          </label>
-          <label className="nest-check">
-            <input type="checkbox" checked={rotate} onChange={(e) => setRotate(e.target.checked)} />
-            <span>Allow rotating pieces</span>
-          </label>
-          <button type="button" className="ll-measure nest-go" onClick={run} disabled={busy || !file}>
-            {busy ? (<><span className="ll-spin" aria-hidden="true" /> Arranging…</>) : (
-              <>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="5" rx="1" /><rect x="13" y="10" width="8" height="11" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /></svg>
-                Arrange
-              </>
-            )}
-          </button>
+        <div className="an-panel">
+          <div className="an-panel-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="14" cy="18" r="2" /></svg>
+            Optimization Options
+          </div>
+          <div className="an-opts">
+            <div className="an-opt-row">
+              <div className="an-opt-text">
+                <span className="an-opt-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg></span>
+                <span>Allow piece rotation</span>
+              </div>
+              <button type="button" role="switch" aria-checked={rotate} className={`an-toggle${rotate ? " is-on" : ""}`} onClick={() => setRotate(!rotate)}><span /></button>
+            </div>
+            <div className="an-opt-row">
+              <div className="an-opt-text">
+                <span className="an-opt-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.5" /></svg></span>
+                <div className="an-opt-sub">
+                  <span>Add drill holes</span>
+                  <em><span style={{ color: "#ff5b5b" }}>5 mm wire</span> + <span style={{ color: "#22c7d6" }}>3 mm screws</span></em>
+                </div>
+              </div>
+              <button type="button" role="switch" aria-checked={holes} className={`an-toggle${holes ? " is-on" : ""}`} onClick={() => setHoles(!holes)}><span /></button>
+            </div>
+          </div>
         </div>
       </div>
-      {busy && <p className="ll-hint">Detecting pieces &amp; packing the sheets… large artwork can take several seconds.</p>}
-      {error && <p className="ll-error">⚠ {error}</p>}
+
+      {/* Bottom bar */}
+      <div className="an-bottom">
+        <div className="an-summary">
+          <span className="an-summary-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg></span>
+          <div>
+            <strong>{sheetW || "48"} × {sheetH || "96"} in Sheet</strong>
+            <span className="an-summary-status">{busy ? "Arranging…" : file ? "Ready to arrange" : "Waiting for artwork"}<i className={file && !busy ? "on" : ""} /></span>
+          </div>
+        </div>
+        <button type="button" className="an-generate" onClick={run} disabled={busy || !file}>
+          {busy ? (<><span className="ll-spin" aria-hidden="true" /> Arranging…</>) : (
+            <>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="5" rx="1" /><rect x="13" y="10" width="8" height="11" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /></svg>
+              Generate Layout
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </>
+          )}
+        </button>
+      </div>
+
+      {error && <p className="ll-error an-error">⚠ {error}</p>}
 
       {result && (
         <div className="nest-results">

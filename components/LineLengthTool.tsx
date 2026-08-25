@@ -89,92 +89,110 @@ export default function LineLengthTool() {
     }
   }
 
+  const step = file ? 2 : 1;
+  const stepCls = (n: number) => `an-step${n === step ? " is-active" : ""}${n < step ? " is-done" : ""}`;
+
   return (
-    <section className="acct-card acct-section-card">
-      <div className="acct-card-head">
-        <h2>Neon Line Length</h2>
-        <span>
-          Upload a black &amp; white artwork (.ai / .pdf) — it measures the size and
-          the total length of the black lines, like the neon calculator.
+    <section className="an-tool">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".ai,.pdf,application/pdf,application/postscript,application/illustrator"
+        hidden
+        onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+      />
+
+      {/* Header */}
+      <div className="an-head">
+        <span className="an-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
         </span>
+        <div className="an-head-text">
+          <div className="an-title-row">
+            <h2>Neon Line Length</h2>
+            <span className="an-badge">NEON CALCULATOR</span>
+          </div>
+          <p>Upload a black &amp; white artwork (.ai / .pdf) — it measures the size and the total length of the black lines, like the neon calculator.</p>
+        </div>
       </div>
 
-      <div className="ll-uploader">
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".ai,.pdf,application/pdf,application/postscript,application/illustrator"
-          hidden
-          onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-        />
+      {/* Steps */}
+      <div className="an-steps">
+        <div className={stepCls(1)}><span className="an-step-n">1</span> Upload Artwork</div>
+        <div className={`an-step-line${step > 1 ? " is-done" : ""}`} />
+        <div className={stepCls(2)}><span className="an-step-n">2</span> Measure</div>
+      </div>
 
-        <div
-          role="button"
-          tabIndex={0}
-          className={`ll-drop${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
-        >
-          {file ? (
-            <div className="ll-drop-inner">
-              <span className="ll-drop-ic" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M18 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2Z" />
-                </svg>
-              </span>
-              <div className="ll-drop-text">
-                <strong>{file.name}</strong>
-                <span>{prettySize(file.size)} · click to change file</span>
-              </div>
-            </div>
-          ) : (
-            <div className="ll-drop-inner">
-              <span className="ll-drop-ic" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" />
-                </svg>
-              </span>
-              <div className="ll-drop-text">
-                <strong>Drop your artwork here</strong>
-                <span>or click to browse — .ai / .pdf</span>
-              </div>
-            </div>
-          )}
+      {/* Drop zone */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={`an-drop${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+      >
+        <span className="an-drop-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
+        </span>
+        <div className="an-drop-main">
+          <strong>{file ? file.name : "Drop your artwork here"}</strong>
+          <span>{file ? `${prettySize(file.size)} · click to change file` : "AI, PDF supported · black & white line art"}</span>
+          <button type="button" className="an-browse" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.5l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1Z" /></svg>
+            Browse Files
+          </button>
         </div>
+        <div className="an-secure">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></svg>
+          Your files are processed securely
+        </div>
+      </div>
 
-        <div className="ll-actions">
-          <label className="ll-field">
-            <span className="ll-field-label">File scale</span>
-            <div className="ll-select">
+      {/* Options */}
+      <div className="an-panels an-panels-one">
+        <div className="an-panel">
+          <div className="an-panel-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="14" cy="18" r="2" /></svg>
+            Measurement Options
+          </div>
+          <div className="an-field">
+            <span className="an-field-label">File scale</span>
+            <div className="an-select">
               <select value={scale} onChange={(e) => setScale(e.target.value as "1" | "10")}>
                 <option value="1">Original file (1:1)</option>
                 <option value="10">10× reduced (show real size)</option>
               </select>
-              <span className="ll-select-chev" aria-hidden="true">
+              <span className="an-select-chev" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
               </span>
             </div>
-          </label>
-
-          <button type="button" className="ll-measure" onClick={run} disabled={busy || !file}>
-            {busy ? (
-              <><span className="ll-spin" aria-hidden="true" /> Measuring…</>
-            ) : (
-              <>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="m7 15 4-4 3 3 5-6" /></svg>
-                Measure
-              </>
-            )}
-          </button>
+          </div>
         </div>
       </div>
-      {busy && (
-        <p className="ll-hint">Rendering &amp; tracing the black lines… large artwork can take several seconds.</p>
-      )}
-      {error && <p className="ll-error">⚠ {error}</p>}
+
+      {/* Bottom bar */}
+      <div className="an-bottom">
+        <div className="an-summary">
+          <span className="an-summary-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg></span>
+          <div>
+            <strong>{scale === "1" ? "Original file (1:1)" : "10× reduced"}</strong>
+            <span className="an-summary-status">{busy ? "Measuring…" : file ? "Ready to measure" : "Waiting for artwork"}<i className={file && !busy ? "on" : ""} /></span>
+          </div>
+        </div>
+        <button type="button" className="an-generate" onClick={run} disabled={busy || !file}>
+          {busy ? (<><span className="ll-spin" aria-hidden="true" /> Measuring…</>) : (
+            <>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="m7 15 4-4 3 3 5-6" /></svg>
+              Measure
+            </>
+          )}
+        </button>
+      </div>
+
+      {error && <p className="ll-error an-error">⚠ {error}</p>}
 
       {result && (
         <div className="ll-results ll-results-acct">

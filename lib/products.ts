@@ -450,3 +450,16 @@ export const SITE_NAV: SiteNavItem[] = [
   // Opens the company profile PDF in a new browser tab.
   { label: "Company Profile", href: "/sign-future-company-profile.pdf", newTab: true },
 ];
+
+/** Partner Suite dropdown (after Company Profile) — member tools surfaced on the
+ *  storefront. Each links into My Account via ?tab=<key>; "soon" items are shown
+ *  but not yet clickable. Mirrors the My Account sidebar tools. */
+export type PartnerSuiteItem = { label: string; tab: string; glyph: string; soon?: boolean };
+export const PARTNER_SUITE: PartnerSuiteItem[] = [
+  { label: "My Installation", tab: "installation", glyph: "⚒" },
+  { label: "Auto Nesting", tab: "nesting", glyph: "▦" },
+  { label: "Neon Line Length", tab: "lineLength", glyph: "📏" },
+  { label: "Installer", tab: "installer", glyph: "⚑", soon: true },
+  { label: "Account", tab: "account", glyph: "⚙", soon: true },
+  { label: "Material Store", tab: "materialStore", glyph: "▦", soon: true },
+];
