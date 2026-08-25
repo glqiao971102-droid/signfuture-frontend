@@ -254,6 +254,8 @@ export default function CartPage() {
         artworks: i.artworks && i.artworks.length ? i.artworks : undefined,
         // Special request (e.g. express collect date) → Pending Confirmation.
         requiresConfirmation: i.requiresConfirmation || undefined,
+        // Box-up UV / Inkjet per-record data (invisible to the buyer).
+        boxupRecords: i.boxupRecords && i.boxupRecords.length ? i.boxupRecords : undefined,
       })),
       subtotal,
       coupon: null,

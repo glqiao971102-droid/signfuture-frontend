@@ -4298,6 +4298,48 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
   font-weight: 600;
 }
 
+/* Admin Permissions — per-feature access level (No access / View / Operate). */
+.perm-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.perm-group {
+  margin: 12px 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+.perm-label { font-size: 13.5px; color: var(--text); }
+.perm-seg {
+  display: inline-flex;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(3, 10, 22, 0.8);
+}
+.perm-seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-left: 1px solid var(--line-soft);
+}
+.perm-seg-btn:first-child { border-left: 0; }
+.perm-seg-btn:hover { color: var(--text); }
+.perm-seg-btn.is-none { background: rgba(120, 130, 150, 0.18); color: var(--text); font-weight: 600; }
+.perm-seg-btn.is-view { background: rgba(53, 216, 255, 0.16); color: var(--cyan); font-weight: 600; }
+.perm-seg-btn.is-edit { background: rgba(80, 220, 130, 0.18); color: #63e39a; font-weight: 600; }
+
 /* "What do you do?" trades block inside Edit Detail. */
 .edit-detail-professions { margin: 4px 0 18px; }
 .edit-detail-professions-label {
@@ -6127,6 +6169,15 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-col-hint { font-size: 10.5px; color: var(--muted); padding: 0 12px 4px; }
 .prod-col-body { display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; }
 .prod-empty { text-align: center; color: rgba(159,176,198,0.4); font-size: 12px; padding: 10px 0; }
+.prod-readonly-note {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(53, 216, 255, 0.1);
+  color: var(--cyan);
+  font-size: 12.5px;
+}
 
 .prod-card-wrap { position: relative; }
 .prod-card-check { position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; cursor: pointer; z-index: 2; accent-color: var(--cyan, #5fd0ff); }

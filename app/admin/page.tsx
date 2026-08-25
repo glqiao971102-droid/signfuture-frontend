@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
+import { canOpen } from "@/lib/adminPerms";
 
 /**
  * /admin lands on the Dashboard when the account may see it, otherwise on the
@@ -15,9 +16,7 @@ export default function AdminIndex() {
 
   useEffect(() => {
     if (loading || !user) return;
-    const isSuper = Boolean(user.isSuperAdmin);
-    const perms = user.adminPermissions ?? [];
-    const can = (s: string) => isSuper || perms.includes(s);
+    const can = (s: string) => canOpen(user, s);
     const dest = can("dashboard")
       ? "/admin/dashboard"
       : can("orders")

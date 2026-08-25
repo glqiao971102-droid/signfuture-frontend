@@ -4,9 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-type AdminRow = { id: number; login: string; email: string; level: "super" | "admin"; permissions: string[] };
+type Level = "view" | "edit";
+type Perms = Record<string, Level>;
+type AdminRow = { id: number; login: string; email: string; level: "super" | "admin"; permissions: Perms };
+type Section = { key: string; editable: boolean };
 
-const SECTION_LABEL: Record<string, string> = {
+// Display names + optional group heading, in the order sections should appear.
+const LABEL: Record<string, string> = {
   dashboard: "Dashboard",
   orders: "Orders",
   quotations: "Quotations",
@@ -19,11 +23,22 @@ const SECTION_LABEL: Record<string, string> = {
   "agent-logins": "Agent Logins",
   products: "Products",
   "sales-listing": "Sales Listing",
+  installations: "Installations",
+  visitors: "Visitors",
+  "production-flow": "Production Flow (Kanban)",
+  "production-detail": "Production Detail (stats & holidays)",
+  "production-nesting": "3D Printer Nesting",
   dropbox: "SF Dropbox",
+};
+// Sub-features that render under a shared group heading.
+const GROUP: Record<string, string> = {
+  "production-flow": "Production",
+  "production-detail": "Production",
+  "production-nesting": "Production",
 };
 
 export default function AdminPermissionsPage() {
-  const [sections, setSections] = useState<string[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,19 +60,23 @@ export default function AdminPermissionsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  function toggle(id: number, section: string) {
+  // Set a section to No access (null), View, or Operate for one admin.
+  function setLevel(id: number, key: string, level: Level | null) {
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, permissions: r.permissions.includes(section) ? r.permissions.filter((p) => p !== section) : [...r.permissions, section] }
-          : r,
-      ),
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const next: Perms = { ...r.permissions };
+        if (level == null) delete next[key];
+        else next[key] = level;
+        return { ...r, permissions: next };
+      }),
     );
   }
 
   async function save(row: AdminRow) {
     setSavingId(row.id);
     setSavedId(null);
+    setError(null);
     try {
       await api.adminSetAccess(row.id, row.permissions);
       setSavedId(row.id);
@@ -73,7 +92,11 @@ export default function AdminPermissionsPage() {
     <>
       <div className="adm-page-head">
         <h1>Permissions</h1>
-        <p>Super admins have full access. For other admins, choose which sections they can open.</p>
+        <p>
+          Super admins have full access. For other admins, set each feature to{" "}
+          <strong>No access</strong>, <strong>View only</strong> (can open &amp; read, cannot change),
+          or <strong>Operate</strong> (can also create / edit / delete).
+        </p>
       </div>
       <div className="adm-wrap">
         {error && <div className="quote-empty">{error}</div>}
@@ -97,17 +120,45 @@ export default function AdminPermissionsPage() {
             {r.level === "super" ? (
               <p className="adm-card-sub">Full access to everything (set via SUPER_ADMIN_EMAILS).</p>
             ) : (
-              <div className="reg-chips">
-                {sections.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={`reg-chip${r.permissions.includes(s) ? " is-active" : ""}`}
-                    onClick={() => toggle(r.id, s)}
-                  >
-                    {SECTION_LABEL[s] ?? s}
-                  </button>
-                ))}
+              <div className="perm-grid">
+                {sections.map((s, i) => {
+                  const cur = r.permissions[s.key] ?? null;
+                  const group = GROUP[s.key];
+                  const showHead = group && GROUP[sections[i - 1]?.key] !== group;
+                  return (
+                    <div key={s.key} style={{ display: "contents" }}>
+                      {showHead && <div className="perm-group">{group}</div>}
+                      <div className="perm-row">
+                        <span className="perm-label">{LABEL[s.key] ?? s.key}</span>
+                        <div className="perm-seg" role="group" aria-label={LABEL[s.key] ?? s.key}>
+                          <button
+                            type="button"
+                            className={`perm-seg-btn${cur == null ? " is-none" : ""}`}
+                            onClick={() => setLevel(r.id, s.key, null)}
+                          >
+                            No access
+                          </button>
+                          <button
+                            type="button"
+                            className={`perm-seg-btn${cur === "view" ? " is-view" : ""}`}
+                            onClick={() => setLevel(r.id, s.key, "view")}
+                          >
+                            View
+                          </button>
+                          {s.editable && (
+                            <button
+                              type="button"
+                              className={`perm-seg-btn${cur === "edit" ? " is-edit" : ""}`}
+                              onClick={() => setLevel(r.id, s.key, "edit")}
+                            >
+                              Operate
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

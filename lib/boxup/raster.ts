@@ -158,7 +158,7 @@ function contentArtBboxPx(page: RenderedPage): PxBbox | null {
 // rendered page is used only for the masked thumbnail. This bypasses all pixel/vector
 // detection so the result matches the AI file's real grouping and dimensions.
 export type SpecItem = { box: PxBbox; isLogo: boolean; sizeIn: { x_in: number; y_in: number; width_in: number; height_in: number } };
-export function recordsFromSpec(page: RenderedPage, items: SpecItem[]): RasterEntry[] {
+export function recordsFromSpec(page: RenderedPage, items: SpecItem[], colorPixels = false): RasterEntry[] {
   const content = contentArtBboxPx(page);
   const entries: RasterEntry[] = [];
   let letterN = 0, logoN = 0;
@@ -167,7 +167,7 @@ export function recordsFromSpec(page: RenderedPage, items: SpecItem[]): RasterEn
     const box = it.box;
     const rawArea = (box[2] - box[0] + 1) * (box[3] - box[1] + 1);
     const maskInfo = rawArea <= 600_000 ? connectedMaskForBbox(page, box) : null;
-    const cropUrl = rasterCropDataUrl(page, box, 150, maskInfo != null, maskInfo);
+    const cropUrl = rasterCropDataUrl(page, box, 150, maskInfo != null, maskInfo, colorPixels);
     let highlightPct: RasterEntry["highlight_pct"] = null;
     if (content) {
       const [cx1, cy1, cx2, cy2] = content;
@@ -188,6 +188,67 @@ export function recordsFromSpec(page: RenderedPage, items: SpecItem[]): RasterEn
     });
   }
   return entries;
+}
+
+// Records for BITMAP / image-based artwork (embedded images, clipping-mask logos).
+// Row-based letter detection shatters a gradient logo into dozens of colour pieces,
+// so instead we CLOSE the ink mask (bridge a logo's internal gaps) and keep each
+// connected blob as ONE record with its true visible size. Well-separated logos on a
+// page each become their own record.
+export function recordsFromImageLogos(page: RenderedPage, renderScale: number, measurementScale = 1.0): RasterEntry[] {
+  const { width: W, height: H, rgb } = page;
+  const pxPerRealIn = (renderScale * POINTS_PER_INCH) / measurementScale;
+  const ink = new Uint8Array(W * H);
+  for (let p = 0, j = 0; p < W * H; p++, j += 3) if (rgb[j] < 245 || rgb[j + 1] < 245 || rgb[j + 2] < 245) ink[p] = 1;
+
+  // Close by ~6 mm: distance-to-ink ≤ closePx counts as filled (bridges gaps).
+  const closePx = Math.max(2, Math.round((6 / 25.4) * pxPerRealIn));
+  const INF = closePx + 1;
+  const d = new Float32Array(W * H);
+  for (let p = 0; p < W * H; p++) d[p] = ink[p] ? 0 : INF;
+  const relax = (p: number, q: number, c: number) => { const v = d[q] + c; if (v < d[p]) d[p] = v; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const p = y * W + x;
+    if (x > 0) relax(p, p - 1, 1); if (y > 0) relax(p, p - W, 1);
+    if (x > 0 && y > 0) relax(p, p - W - 1, 1.414); if (x < W - 1 && y > 0) relax(p, p - W + 1, 1.414); }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const p = y * W + x;
+    if (x < W - 1) relax(p, p + 1, 1); if (y < H - 1) relax(p, p + W, 1);
+    if (x < W - 1 && y < H - 1) relax(p, p + W + 1, 1.414); if (x > 0 && y < H - 1) relax(p, p + W - 1, 1.414); }
+  const dil = new Uint8Array(W * H);
+  for (let p = 0; p < W * H; p++) if (d[p] <= closePx) dil[p] = 1;
+
+  // 8-connected components on the closed mask; box from the ORIGINAL ink inside.
+  const label = new Int32Array(W * H);
+  const stack = new Int32Array(W * H);
+  const boxes: PxBbox[] = [];
+  const minArea = Math.max(9, Math.round((0.5 * pxPerRealIn) * (0.5 * pxPerRealIn)));
+  let next = 1;
+  for (let s = 0; s < W * H; s++) {
+    if (!dil[s] || label[s]) continue;
+    let sp = 0; stack[sp++] = s; label[s] = next;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1, inkArea = 0;
+    while (sp > 0) {
+      const q = stack[--sp]; const x = q % W, y = (q / W) | 0;
+      if (ink[q]) { inkArea++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      for (let dy = -1; dy <= 1; dy++) { const ny = y + dy; if (ny < 0 || ny >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) { const nx = x + dx; if (nx < 0 || nx >= W || (!dx && !dy)) continue;
+          const np = ny * W + nx; if (dil[np] && !label[np]) { label[np] = next; stack[sp++] = np; } } }
+    }
+    next++;
+    if (inkArea >= minArea && x1 >= x0 && y1 >= y0) boxes.push([x0, y0, x1, y1]);
+  }
+  boxes.sort((a, b) => a[1] - b[1] || a[0] - b[0]); // top-to-bottom, left-to-right
+
+  const items: SpecItem[] = boxes.map((b) => ({
+    box: b,
+    isLogo: true,
+    sizeIn: {
+      x_in: (b[0] / pxPerRealIn),
+      y_in: (b[1] / pxPerRealIn),
+      width_in: (b[2] - b[0] + 1) / pxPerRealIn,
+      height_in: (b[3] - b[1] + 1) / pxPerRealIn,
+    },
+  }));
+  return recordsFromSpec(page, items, true); // colour thumbnails for image logos
 }
 
 // Merge candidate letter boxes that belong to the same compound-path fill group
@@ -903,8 +964,11 @@ function downscaleRgb(src: Uint8Array, sw: number, sh: number, dw: number, dh: n
 
 type MaskInfo = { mask: Uint8Array; width: number; height: number; x1: number; y1: number };
 
-function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false, precomputedMask: MaskInfo | null = null): string {
+function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false, precomputedMask: MaskInfo | null = null, colorPixels = false): string {
   const { width: imgW, height: imgH, rgb } = page;
+  // Detection/mask uses the normalised black-on-white buffer; the pixels we PAINT
+  // come from the real-colour buffer when colorPixels is set (image/bitmap logos).
+  const src = colorPixels ? page.rgbColor : rgb;
   const [x1, y1, x2, y2] = bboxPx;
   const pad = 16;
   const selectedMask = maskShape ? (precomputedMask ?? connectedMaskForBbox(page, bboxPx)) : null;
@@ -926,7 +990,7 @@ function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, ma
         inMask = mx <= gx && gx <= x2 && my <= gy && gy <= y2 && !!mask[(gy - my) * mw + (gx - mx)];
       }
       if (selectedMask && !inMask) { r = 255; g = 255; b = 255; }
-      else { const i = (gy * imgW + gx) * 3; r = rgb[i]; g = rgb[i + 1]; b = rgb[i + 2]; }
+      else { const i = (gy * imgW + gx) * 3; r = src[i]; g = src[i + 1]; b = src[i + 2]; }
       const o = (yy * cw + xx) * 3;
       crop[o] = r; crop[o + 1] = g; crop[o + 2] = b;
     }

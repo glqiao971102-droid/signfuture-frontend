@@ -31,9 +31,21 @@ export type CartItem = {
    * needs sales approval — it becomes a Pending Confirmation job at checkout.
    */
   requiresConfirmation?: boolean;
+  /**
+   * Box-up per-letter/logo records for the SF Dropbox UV / Inkjet auto-layout —
+   * invisible to the buyer. Carries each piece's bbox + finishing/colour so the
+   * backend lays out only the letters marked "UV Printing".
+   */
+  boxupRecords?: BoxupRecord[];
 };
 
-type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[]; noArtwork?: boolean; requiresConfirmation?: boolean };
+export type BoxupRecord = {
+  bbox: { xIn: number; yIn: number; wIn: number; hIn: number };
+  finishing?: string;
+  color?: string;
+};
+
+type AddInput = { label: string; href: string; price?: number; image?: string; meta?: string; deliverable?: boolean; tierPrices?: number[]; spec?: Record<string, unknown>; artworks?: { url: string; name: string }[]; noArtwork?: boolean; requiresConfirmation?: boolean; boxupRecords?: BoxupRecord[] };
 
 type CartContextValue = {
   items: CartItem[];
@@ -80,6 +92,7 @@ function normalizeItems(raw: string | null): CartItem[] {
         artworks: Array.isArray(i.artworks) ? i.artworks : undefined,
         noArtwork: i.noArtwork || undefined,
         requiresConfirmation: i.requiresConfirmation || undefined,
+        boxupRecords: Array.isArray(i.boxupRecords) ? i.boxupRecords : undefined,
       };
       return { id: i.id ?? signatureOf(base), ...base };
     });
@@ -178,6 +191,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           artworks,
           noArtwork: item.noArtwork || undefined,
           requiresConfirmation: item.requiresConfirmation || undefined,
+          boxupRecords: Array.isArray(item.boxupRecords) && item.boxupRecords.length ? item.boxupRecords : undefined,
         },
       ];
     });

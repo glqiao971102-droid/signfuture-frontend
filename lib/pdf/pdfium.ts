@@ -16,6 +16,9 @@ export type RenderedPage = {
   rgb: Uint8Array;
   /** Same size, but the ORIGINAL colours composited on white (for the "Original" preview). */
   rgbColor: Uint8Array;
+  /** Per-pixel drawn coverage 0..255 (the clip/silhouette shape). length = width*height.
+   *  For clipped artwork this IS the crisp vector silhouette — used by the UV outset. */
+  alpha: Uint8Array;
 };
 
 /**
@@ -61,8 +64,10 @@ export async function renderPageRgb(
     const transparentBg = borderSamples > 0 && borderTransparent / borderSamples > 0.5;
     const rgb = new Uint8Array(width * height * 3);      // black-on-white (detection + Dimension Preview)
     const rgbColor = new Uint8Array(width * height * 3); // original colours (the "Original" preview)
-    for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    const alpha = new Uint8Array(width * height);        // drawn coverage = clip/silhouette shape
+    for (let i = 0, j = 0, k = 0; i < data.length; i += 4, j += 3, k++) {
       const a = data[i + 3];
+      alpha[k] = a;
       if (a < 8) {
         // Not drawn → background → white (both buffers).
         rgb[j] = 255; rgb[j + 1] = 255; rgb[j + 2] = 255;
@@ -89,7 +94,7 @@ export async function renderPageRgb(
       if (black) { rgb[j] = 0; rgb[j + 1] = 0; rgb[j + 2] = 0; }
       else { rgb[j] = 255; rgb[j + 1] = 255; rgb[j + 2] = 255; }
     }
-    return { width, height, rgb, rgbColor };
+    return { width, height, rgb, rgbColor, alpha };
   } catch {
     return null;
   } finally {

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type ProductionJob } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
+import { canOperate } from "@/lib/adminPerms";
 
 /* ------------------------------------------------------------------ *
  * Production Kanban — one card per job (order item, e.g. 100049-1),
@@ -178,6 +180,10 @@ function fmtDue(d: string | null): string {
 }
 
 export default function AdminProduction() {
+  const { user } = useAuth();
+  // Read-only when the admin only has 'view' on Production Flow: they can see the
+  // board but not move cards or edit anything (the backend also blocks writes).
+  const readOnly = !canOperate(user, "production-flow");
   const [jobs, setJobs] = useState<ProductionJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -350,6 +356,9 @@ export default function AdminProduction() {
         </div>
       </div>
 
+      {readOnly && (
+        <div className="prod-readonly-note">👁 View-only access — you can browse the board but can’t move cards or make changes.</div>
+      )}
       {loading && <div className="quote-empty">Loading the board…</div>}
       {error && <div className="quote-empty">{error}</div>}
 
@@ -372,7 +381,7 @@ export default function AdminProduction() {
                   <span className="prod-col-count">{headerCount}</span>
                 </div>
                 {col.hint && <div className="prod-col-hint">{col.hint}</div>}
-                {next && list.length > 0 && (
+                {next && list.length > 0 && !readOnly && (
                   <div className="prod-bulk">
                     <label className="prod-bulk-all">
                       <input type="checkbox" checked={!!allSel} disabled={selectableList.length === 0} onChange={() => toggleSelectAll(col.key, selectableList)} /> Select all
@@ -397,7 +406,7 @@ export default function AdminProduction() {
                           now={now}
                           saving={savingId === j.id}
                           onOpen={(x) => setOpenJobId(x.id)}
-                          selectable={!!next}
+                          selectable={!!next && !readOnly}
                           canSelect={canAdvance(j, col.key)}
                           checked={selected.has(j.id)}
                           onToggle={() => toggleSelect(j.id)}
@@ -415,6 +424,7 @@ export default function AdminProduction() {
         <JobModal
           job={openJob}
           now={now}
+          readOnly={readOnly}
           onClose={() => setOpenJobId(null)}
           onMove={move}
           onSavedNote={load}
@@ -609,12 +619,14 @@ function buildDriverNote(courier: string, tracking: string, phone: string): stri
 function JobModal({
   job,
   now,
+  readOnly = false,
   onClose,
   onMove,
   onSavedNote,
 }: {
   job: ProductionJob;
   now: { today: string; hour: number };
+  readOnly?: boolean;
   onClose: () => void;
   onMove: (j: ProductionJob, stage: string) => Promise<void>;
   onSavedNote: () => void;
@@ -805,11 +817,15 @@ function JobModal({
           </div>
         )}
 
-        <label className="prod-modal-label">Move to stage</label>
+        {readOnly && (
+          <div className="prod-readonly-note" style={{ margin: "10px 0 0" }}>👁 View-only — you can’t change this job.</div>
+        )}
+
+        <label className="prod-modal-label">{readOnly ? "Stage" : "Move to stage"}</label>
         <select
           className="adm-select"
           value={stageValueOf(job)}
-          disabled={moving}
+          disabled={moving || readOnly}
           onChange={(e) => doMove(e.target.value)}
         >
           {STAGE_OPTIONS.map((s) => (
@@ -834,15 +850,17 @@ function JobModal({
             </p>
             <div className="prod-sched-form">
               <label className="prod-sched-lbl">Release to</label>
-              <select className="adm-select" value={scheduleTo} disabled={savingSchedule} onChange={(e) => setScheduleTo(e.target.value as "ready" | "shipped")}>
+              <select className="adm-select" value={scheduleTo} disabled={savingSchedule || readOnly} onChange={(e) => setScheduleTo(e.target.value as "ready" | "shipped")}>
                 <option value="ready">Available for Collection</option>
                 <option value="shipped">Ready to Ship</option>
               </select>
               <label className="prod-sched-lbl">Release at (Malaysia time)</label>
-              <input type="datetime-local" className="adm-input" value={scheduleAt} disabled={savingSchedule} onChange={(e) => setScheduleAt(e.target.value)} />
-              <button type="button" className="hero-btn primary" disabled={savingSchedule} onClick={saveSchedule}>
-                {savingSchedule ? "Saving…" : "Save schedule"}
-              </button>
+              <input type="datetime-local" className="adm-input" value={scheduleAt} disabled={savingSchedule || readOnly} onChange={(e) => setScheduleAt(e.target.value)} />
+              {!readOnly && (
+                <button type="button" className="hero-btn primary" disabled={savingSchedule} onClick={saveSchedule}>
+                  {savingSchedule ? "Saving…" : "Save schedule"}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -858,19 +876,21 @@ function JobModal({
               )}
             </div>
             <div className="prod-driver-form">
-              <select className="adm-select" value={courier} disabled={savingDriver} onChange={(e) => setCourier(e.target.value)}>
+              <select className="adm-select" value={courier} disabled={savingDriver || readOnly} onChange={(e) => setCourier(e.target.value)}>
                 {COURIERS.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
               {courier === "Other" && (
-                <input className="adm-input" placeholder="Courier name" value={courierOther} disabled={savingDriver} onChange={(e) => setCourierOther(e.target.value)} />
+                <input className="adm-input" placeholder="Courier name" value={courierOther} disabled={savingDriver || readOnly} onChange={(e) => setCourierOther(e.target.value)} />
               )}
-              <input className="adm-input" placeholder="Tracking number" value={tracking} disabled={savingDriver} onChange={(e) => setTracking(e.target.value)} />
-              <input className="adm-input" placeholder="Contact phone" value={phone} disabled={savingDriver} onChange={(e) => setPhone(e.target.value)} />
-              <button type="button" className="hero-btn primary" disabled={savingDriver} onClick={saveDriver}>
-                {savingDriver ? "Saving…" : "Save driver details"}
-              </button>
+              <input className="adm-input" placeholder="Tracking number" value={tracking} disabled={savingDriver || readOnly} onChange={(e) => setTracking(e.target.value)} />
+              <input className="adm-input" placeholder="Contact phone" value={phone} disabled={savingDriver || readOnly} onChange={(e) => setPhone(e.target.value)} />
+              {!readOnly && (
+                <button type="button" className="hero-btn primary" disabled={savingDriver} onClick={saveDriver}>
+                  {savingDriver ? "Saving…" : "Save driver details"}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -887,22 +907,27 @@ function JobModal({
                   <a href={p.url} target="_blank" rel="noreferrer">
                     <img src={p.url} alt={p.name || "Handover photo"} />
                   </a>
-                  <button type="button" className="prod-photo-x" onClick={() => removePhoto(p.url)} aria-label="Remove photo">
-                    ×
-                  </button>
+                  {!readOnly && (
+                    <button type="button" className="prod-photo-x" onClick={() => removePhoto(p.url)} aria-label="Remove photo">
+                      ×
+                    </button>
+                  )}
                 </div>
               ))}
-              <label className={`prod-photo-add${uploadingPhoto ? " is-busy" : ""}`}>
-                {uploadingPhoto ? "Uploading…" : "＋ Add photo"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  hidden
-                  disabled={uploadingPhoto}
-                  onChange={(e) => e.target.files && e.target.files.length && addPhotos(e.target.files)}
-                />
-              </label>
+              {readOnly && photos.length === 0 && <div className="prod-empty">No photos</div>}
+              {!readOnly && (
+                <label className={`prod-photo-add${uploadingPhoto ? " is-busy" : ""}`}>
+                  {uploadingPhoto ? "Uploading…" : "＋ Add photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    disabled={uploadingPhoto}
+                    onChange={(e) => e.target.files && e.target.files.length && addPhotos(e.target.files)}
+                  />
+                </label>
+              )}
             </div>
           </>
         )}
@@ -911,15 +936,18 @@ function JobModal({
         <textarea
           className="adm-input prod-modal-note"
           rows={3}
-          placeholder="Production notes for this job…"
+          placeholder={readOnly ? "" : "Production notes for this job…"}
           value={note}
+          readOnly={readOnly}
           onChange={(e) => setNote(e.target.value)}
         />
-        <div className="prod-modal-note-actions">
-          <button type="button" className="hero-btn primary" disabled={savingNote || note === (job.productionNote ?? "")} onClick={saveNote}>
-            {savingNote ? "Saving…" : "Save description"}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="prod-modal-note-actions">
+            <button type="button" className="hero-btn primary" disabled={savingNote || note === (job.productionNote ?? "")} onClick={saveNote}>
+              {savingNote ? "Saving…" : "Save description"}
+            </button>
+          </div>
+        )}
 
         <div className="prod-modal-label">Activity</div>
         <div className="prod-activity">

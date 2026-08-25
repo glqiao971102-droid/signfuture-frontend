@@ -37,7 +37,7 @@ function metaToOptions(meta?: string): { label: string; value: string }[] {
 }
 
 type Artwork = { url: string; name: string };
-type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[]; requiresConfirmation?: boolean };
+type OrderItem = { label: string; meta?: string; qty: number; price: number; image?: string; href: string; spec?: Record<string, unknown>; artworks?: Artwork[]; requiresConfirmation?: boolean; boxupRecords?: { bbox: { xIn: number; yIn: number; wIn: number; hIn: number }; finishing?: string; color?: string }[] };
 type Address = {
   profile?: string; receiver?: string; mobile?: string; tel?: string;
   address1?: string; address2?: string; postcode?: string; city?: string; state?: string;
@@ -128,6 +128,8 @@ export default function CheckoutPage() {
         artworks: it.artworks && it.artworks.length ? it.artworks : undefined,
         // Express-date / special requests start as Pending Confirmation.
         requiresConfirmation: it.requiresConfirmation || undefined,
+        // Box-up UV / Inkjet per-record data (invisible to the buyer).
+        boxupRecords: it.boxupRecords && it.boxupRecords.length ? it.boxupRecords : undefined,
       }));
       const a = order.address;
       const res = await api.createOrder({

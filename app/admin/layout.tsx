@@ -14,7 +14,9 @@ import { useAuth } from "@/components/AuthProvider";
  * reaches these pages.
  */
 
-type NavChild = { view?: string; label: string; href?: string };
+// A child with its own `section` is gated independently; without one it inherits
+// the parent item's section (e.g. Sales Listing sub-views).
+type NavChild = { view?: string; label: string; href?: string; section?: string };
 type NavItem = { href: string; label: string; icon: string; section: string; children?: NavChild[] };
 
 const NAV: NavItem[] = [
@@ -27,9 +29,9 @@ const NAV: NavItem[] = [
     icon: "🏭",
     section: "production",
     children: [
-      { view: "flow", label: "Production Flow" },
-      { view: "detail", label: "Production Detail" },
-      { href: "/admin/3d-nesting", label: "3D Printer Nesting" },
+      { view: "flow", label: "Production Flow", section: "production-flow" },
+      { view: "detail", label: "Production Detail", section: "production-detail" },
+      { href: "/admin/3d-nesting", label: "3D Printer Nesting", section: "production-nesting" },
     ],
   },
   { href: "/admin/dropbox", label: "SF Dropbox", icon: "🗂", section: "dropbox" },
@@ -61,12 +63,14 @@ const NAV: NavItem[] = [
   },
 ];
 
-// Which permission section a given admin path belongs to. Returns null for
-// pages every admin may open (the /admin root redirect, Launch Tests).
-function sectionForPath(path: string): string | null {
+// Which permission section(s) a given admin path belongs to. Returns null for
+// pages every admin may open (the /admin root redirect, Launch Tests). An array
+// means "any of these grants access" (the Production page hosts Flow + Detail;
+// per-view gating happens inside that page).
+function sectionForPath(path: string): string | string[] | null {
   if (path.startsWith("/admin/orders")) return "orders";
-  if (path.startsWith("/admin/production")) return "production";
-  if (path.startsWith("/admin/3d-nesting")) return "production";
+  if (path.startsWith("/admin/3d-nesting")) return "production-nesting";
+  if (path.startsWith("/admin/production")) return ["production-flow", "production-detail"];
   if (path.startsWith("/admin/dropbox")) return "dropbox";
   if (path.startsWith("/admin/quotations")) return "quotations";
   if (path.startsWith("/admin/users")) return "customers";
@@ -97,10 +101,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setOpenMenus((m) => ({ ...m, [href]: !(m[href] ?? false) }));
 
   // Sidebar reflects the account's permissions. Super admins see everything
-  // plus the Permissions tab; other admins only see their granted sections.
+  // plus the Permissions tab; other admins only see their granted sections
+  // (any level — view or edit — is enough to open a section).
   const isSuper = Boolean(user?.isSuperAdmin);
-  const perms = user?.adminPermissions ?? [];
-  const nav: NavItem[] = NAV.filter((i) => isSuper || perms.includes(i.section));
+  const perms = user?.adminPermissions ?? {};
+  const has = (section: string) => isSuper || Boolean(perms[section]);
+  // Children carrying their own `section` are gated individually; the rest
+  // inherit the parent's section (Sales Listing sub-views).
+  const visibleChildren = (item: NavItem): NavChild[] =>
+    (item.children ?? []).filter((c) => (c.section ? has(c.section) : has(item.section)));
+  const nav: NavItem[] = NAV.filter((item) => {
+    if (isSuper) return true;
+    if (item.children) return visibleChildren(item).length > 0;
+    return has(item.section);
+  });
   // Launch QA checklist — available to every admin.
   nav.push({ href: "/admin/launch-tests", label: "Launch Tests", icon: "🚀", section: "launch-tests" });
   if (isSuper) nav.push({ href: "/admin/permissions", label: "Permissions", icon: "⚙", section: "permissions" });
@@ -108,10 +122,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Gate the current page: a non-super admin may only open sections they were
   // granted (Orders + Customers by default). Permissions is super-only.
   const currentSection = sectionForPath(pathname);
-  const pageAllowed =
-    isSuper ||
-    (!pathname.startsWith("/admin/permissions") &&
-      (currentSection == null || perms.includes(currentSection)));
+  const currentAllowed =
+    currentSection == null ||
+    (Array.isArray(currentSection) ? currentSection.some(has) : has(currentSection));
+  const pageAllowed = isSuper || (!pathname.startsWith("/admin/permissions") && currentAllowed);
 
   // Gate states get the full-screen centred treatment, without the sidebar.
   if (loading || !user || !user.isAdmin) {
@@ -207,7 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </button>
                     {open && (
                       <div className="adm-subnav">
-                        {item.children.map((c) => {
+                        {visibleChildren(item).map((c) => {
                           const childHref = c.href ?? `${item.href}?view=${c.view}`;
                           const childActive = c.href
                             ? pathname === c.href || pathname.startsWith(c.href + "/")

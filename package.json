@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hyzyla/pdfium": "^2.1.13",
+    "jpeg-js": "^0.4.4",
     "next": "15.5.19",
     "pako": "2.1.0",
     "pdf-lib": "1.17.1",

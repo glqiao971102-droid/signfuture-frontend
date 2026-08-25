@@ -29,8 +29,9 @@ export type MemberProfile = {
   isAdmin: boolean;
   /** True when the account is a Super Admin (full access + manage permissions). */
   isSuperAdmin?: boolean;
-  /** Admin sidebar sections this account may access (all for super admins). */
-  adminPermissions?: string[];
+  /** Admin sections this account may access, as {section: 'view'|'edit'}
+   *  (every section at 'edit' for super admins). */
+  adminPermissions?: Record<string, "view" | "edit">;
   memberNo: string;
   registeredAt: string | null;
   roles: string[];
@@ -515,15 +516,15 @@ export const api = {
   // ----- Super admin: permissions -----
 
   adminAccessSections() {
-    return request<{ sections: string[] }>("/api/v1/admin/access/sections");
+    return request<{ sections: { key: string; editable: boolean }[] }>("/api/v1/admin/access/sections");
   },
   adminAccessAdmins() {
-    return request<{ data: { id: number; login: string; email: string; level: "super" | "admin"; permissions: string[] }[] }>(
+    return request<{ data: { id: number; login: string; email: string; level: "super" | "admin"; permissions: Record<string, "view" | "edit"> }[] }>(
       "/api/v1/admin/access/admins",
     );
   },
-  adminSetAccess(id: number, permissions: string[]) {
-    return request<{ success: boolean; permissions: string[] }>(
+  adminSetAccess(id: number, permissions: Record<string, "view" | "edit">) {
+    return request<{ success: boolean; permissions: Record<string, "view" | "edit"> }>(
       `/api/v1/admin/access/admins/${id}`,
       { method: "PUT", body: JSON.stringify({ permissions }) },
     );
@@ -642,6 +643,7 @@ export const api = {
       artworks?: { url: string; name?: string }[];
       spec?: Record<string, unknown>;
       requiresConfirmation?: boolean;
+      boxupRecords?: { bbox: { xIn: number; yIn: number; wIn: number; hIn: number }; finishing?: string; color?: string }[];
     }[];
     billing?: Record<string, string>;
     shipping?: Record<string, string>;

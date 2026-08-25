@@ -3,7 +3,7 @@
 // uses pdfium-WASM rasterization (same engine as the original pypdfium2).
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb, type RenderedPage } from "@/lib/pdf/pdfium";
-import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, ledLengthForBox, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
+import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, recordsFromImageLogos, ledLengthForBox, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
 import { ocrRelabel } from "@/lib/boxup/ocr";
 import {
   PdfPathAnalyzer,
@@ -205,6 +205,24 @@ export type BoxupSpec = {
   records: { name?: string; type?: string; x_pt: number; y_pt: number; w_pt: number; h_pt: number }[];
 };
 
+/** True when the page has genuinely colourful artwork (a good chunk of saturated,
+ *  non-near-white pixels). Black text and white-ink artwork return false, so their
+ *  previews stay on the visible black-on-white buffer. */
+function pageIsColorful(page: RenderedPage | null): boolean {
+  if (!page) return false;
+  const { width, height, rgbColor } = page;
+  const total = width * height;
+  const step = Math.max(1, Math.floor(total / 200000));
+  let drawn = 0, colored = 0;
+  for (let p = 0; p < total; p += step) {
+    const i = p * 3, R = rgbColor[i], G = rgbColor[i + 1], B = rgbColor[i + 2];
+    if (R >= 244 && G >= 244 && B >= 244) continue; // near-white background
+    drawn++;
+    if (Math.max(R, G, B) - Math.min(R, G, B) > 40) colored++; // saturated colour
+  }
+  return drawn > 0 && colored / drawn > 0.15;
+}
+
 export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurementScale = 1.0, spec: BoxupSpec | null = null): Promise<BoxupResult> {
   const scale = measurementScale || 1.0;
   const specRecords = spec && Array.isArray(spec.records) && spec.records.length > 0 ? spec : null;
@@ -234,6 +252,10 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
   const renderScales = new Map<number, number>();
   const rasterDims = new Map<number, RasterEntry[]>();
   const rasterContent = new Map<number, Bbox | null>();
+  // Whether a page has genuinely colourful artwork (saturated colours), so previews
+  // and thumbnails show the real colour. Black text / white-ink artwork is NOT
+  // colourful, so it keeps the visible black-on-white preview.
+  const colorfulByPage = new Map<number, boolean>();
   for (const page of pages) {
     const renderScale = computeRenderScale(page.width_pt, page.height_pt);
     renderScales.set(page.page, renderScale);
@@ -260,6 +282,18 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
           };
         });
       rasterDims.set(page.page, await classifyRecords(recordsFromSpec(r, items)));
+      rasterContent.set(page.page, rasterContentBbox(r, renderScale));
+      continue;
+    }
+    // Bitmap / image-based artwork (embedded images or clipping-mask logos, no
+    // vector fills): row-based letter detection shatters gradient logos into colour
+    // pieces, so detect each WHOLE logo from the pixels (close + connected blobs).
+    const pageImageCount = analyzer.images.filter((im) => im.page === page.page).length;
+    const pageFillCount = analyzer.fills.filter((f) => f.page === page.page).length;
+    if (r && pageImageCount >= 1 && pageFillCount === 0) {
+      // Image logos are ALL logos — keep them labelled "Logo N" (skip OCR letter/logo
+      // classification, which would mislabel an icon like the Instagram square).
+      rasterDims.set(page.page, recordsFromImageLogos(r, renderScale, scale));
       rasterContent.set(page.page, rasterContentBbox(r, renderScale));
       continue;
     }
@@ -290,7 +324,37 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       .map((c) => c.bbox)
       .filter((b) => !((b[2] - b[0]) > page.width_pt * 0.85 && (b[3] - b[1]) > page.height_pt * 0.85))
       .map(toPx);
-    const recs = r ? rasterWordDimensions(r, scale, 120, renderScale, fillGroupsPx as [number, number, number, number][], fillBoxesPx as [number, number, number, number][], logoClustersPx as [number, number, number, number][], clipBoxesPx as [number, number, number, number][]) : [];
+    let recs = r ? rasterWordDimensions(r, scale, 120, renderScale, fillGroupsPx as [number, number, number, number][], fillBoxesPx as [number, number, number, number][], logoClustersPx as [number, number, number, number][], clipBoxesPx as [number, number, number, number][]) : [];
+    // Group over-split LOGO pieces back into whole logos. An Illustrator GROUP (Ctrl+G)
+    // is flattened on PDF export, so a multi-piece logo (e.g. a lotus of 12 petals)
+    // arrives as many separate fills with no grouping metadata and detects as many
+    // records. We cluster the artwork by a 6 mm morphological close (recordsFromImageLogos):
+    // pieces of one logo touch/nearly-touch and merge, while separate letters/logos
+    // (spaced well apart) stay separate — verified: a 3-logo file -> 3 blobs, an
+    // 11-letter word -> 11 blobs (letters unaffected). Only a blob that swallows 2+ raw
+    // records is a multi-piece shape; replace those with the single blob record. A blob
+    // holding exactly one record keeps that record (its refined vector size / LED data).
+    const colorful = pageIsColorful(r);
+    colorfulByPage.set(page.page, colorful);
+    if (r && recs.length) {
+      const blobs = recordsFromImageLogos(r, renderScale, scale);
+      const covers = (b: RasterEntry, rc: RasterEntry) => {
+        const cx = rc.bbox_in.x_in + rc.bbox_in.width_in / 2, cy = rc.bbox_in.y_in + rc.bbox_in.height_in / 2;
+        return cx >= b.bbox_in.x_in - 0.05 && cx <= b.bbox_in.x_in + b.width_in + 0.05 &&
+          cy >= b.bbox_in.y_in - 0.05 && cy <= b.bbox_in.y_in + b.height_in + 0.05;
+      };
+      const used = new Set<RasterEntry>();
+      const out: RasterEntry[] = [];
+      for (const b of blobs) {
+        const inside = recs.filter((rc) => !used.has(rc) && covers(b, rc));
+        if (inside.length >= 2) { out.push(b); inside.forEach((rc) => used.add(rc)); }
+        // Single clean shape: keep its refined record; borrow the blob's colour
+        // thumbnail on a colourful page (so a solid logo isn't shown as a black block).
+        else if (inside.length === 1) { out.push(colorful ? { ...inside[0], image_data_url: b.image_data_url } : inside[0]); used.add(inside[0]); }
+      }
+      for (const rc of recs) if (!used.has(rc)) out.push(rc); // any record no blob covered
+      if (out.length) recs = out;
+    }
     // Override each logo record's SIZE with the exact vector dimensions (points ->
     // inches, no pixel round-trip), so the reported size equals the AI file exactly.
     // Match by SPATIAL identity — the record whose box contains the cluster centre —
@@ -344,6 +408,16 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
     const pageContentBbox = rasterContent.get(pageNumber) || pageClipBbox || pageImageBbox || unionBbox(pageNeon);
     if (pageContentBbox === null && pageNeon.length === 0) continue;
     let designBboxes = designBboxesForPage(pageClips, pageImages, pageNeon, [page.width_pt, page.height_pt]);
+    // Image-based artwork (embedded bitmaps / clipping-mask logos, no vector fills):
+    // records come from recordsFromImageLogos — each WHOLE logo is one record. But
+    // every placed bitmap carries its own clip, so designBboxesForPage would split the
+    // page into one Design per logo. Keep them together as ONE design listing every
+    // logo, exactly like a letters file shows one design with N records. (This gate is
+    // the same one that selected recordsFromImageLogos above.)
+    const pageIsImageBased = pageImages.length >= 1 && pageFills.length === 0;
+    if (pageIsImageBased && pageContentBbox) designBboxes = [pageContentBbox];
+    // Show colour previews for image logos AND colourful vector logos.
+    const colorPreview = pageIsImageBased || (colorfulByPage.get(pageNumber) ?? false);
 
     // Prefer the accurate raster records over the vector-outline fallback. The raster
     // records are the letters/logos actually detected on the page; assign each to the
@@ -402,11 +476,11 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
         total_outline_length_m: designOutlineM,
         path_count_neon: designNeon.length,
         by_color: summarizeNeonColors(designStrokes, scale),
-        dimension_preview_url: buildDimensionPreview(rendered.get(pageNumber) || null, designBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0),
+        dimension_preview_url: buildDimensionPreview(rendered.get(pageNumber) || null, designBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, colorPreview),
         // "Original" = the same content region in its REAL colours (image only).
         original_preview_url: buildArtworkCrop(rendered.get(pageNumber) || null, designBbox, page.height_pt, renderScales.get(pageNumber) || 1.0, 560, true)?.url ?? null,
         // Signboard wants the WHOLE uploaded artboard, not the trimmed content.
-        artwork_preview_url: buildArtworkCrop(rendered.get(pageNumber) || null, [0, 0, page.width_pt, page.height_pt], page.height_pt, renderScales.get(pageNumber) || 1.0)?.url ?? null,
+        artwork_preview_url: buildArtworkCrop(rendered.get(pageNumber) || null, [0, 0, page.width_pt, page.height_pt], page.height_pt, renderScales.get(pageNumber) || 1.0, 560, colorPreview)?.url ?? null,
         line_preview_url: buildLinePreview(designStrokes, designBbox),
       });
     });
@@ -429,9 +503,9 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       path_count_neon: pageNeon.length,
       by_color: summarizeNeonColors(pageStrokes, scale),
       designs,
-      dimension_preview_url: single ? buildDimensionPreview(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0) : null,
+      dimension_preview_url: single ? buildDimensionPreview(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, colorPreview) : null,
       original_preview_url: single ? (buildArtworkCrop(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, renderScales.get(pageNumber) || 1.0, 560, true)?.url ?? null) : null,
-      artwork_preview_url: single ? (buildArtworkCrop(rendered.get(pageNumber) || null, [0, 0, page.width_pt, page.height_pt], page.height_pt, renderScales.get(pageNumber) || 1.0)?.url ?? null) : null,
+      artwork_preview_url: single ? (buildArtworkCrop(rendered.get(pageNumber) || null, [0, 0, page.width_pt, page.height_pt], page.height_pt, renderScales.get(pageNumber) || 1.0, 560, colorPreview)?.url ?? null) : null,
       line_preview_url: single ? buildLinePreview(pageStrokes, pageContentBbox) : null,
     });
   }
@@ -678,9 +752,9 @@ function buildArtworkCrop(
   return { url: "data:image/png;base64," + PNG.sync.write(out).toString("base64"), dw, dh };
 }
 
-function buildDimensionPreview(page: RenderedPage | null, contentBbox: Bbox | null, pageHeightPt: number, scale = 1.0, renderScale = 1.0): string | null {
+function buildDimensionPreview(page: RenderedPage | null, contentBbox: Bbox | null, pageHeightPt: number, scale = 1.0, renderScale = 1.0, useColor = false): string | null {
   if (!page || contentBbox === null) return null;
-  const crop = buildArtworkCrop(page, contentBbox, pageHeightPt, renderScale);
+  const crop = buildArtworkCrop(page, contentBbox, pageHeightPt, renderScale, 560, useColor);
   if (!crop) return null;
   const cropUrl = crop.url;
   const dw = crop.dw;

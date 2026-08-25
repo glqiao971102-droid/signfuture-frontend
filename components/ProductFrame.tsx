@@ -3,11 +3,30 @@
 import { useEffect, useRef } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
-import { useCart } from "@/components/CartProvider";
+import { useCart, type BoxupRecord } from "@/components/CartProvider";
 import { track } from "@/lib/track";
 import { useAuth } from "@/components/AuthProvider";
 import { tierIndex } from "@/lib/tier";
 import { api } from "@/lib/api";
+
+/** Validate the box-up UV records from the (same-origin) calculator iframe. */
+function sanitizeBoxupRecords(raw: unknown): BoxupRecord[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: BoxupRecord[] = [];
+  for (const r of raw) {
+    const b = (r as { bbox?: Record<string, unknown> })?.bbox;
+    if (!b) continue;
+    const xIn = Number(b.xIn), yIn = Number(b.yIn), wIn = Number(b.wIn), hIn = Number(b.hIn);
+    if (![xIn, yIn, wIn, hIn].every(Number.isFinite) || wIn <= 0 || hIn <= 0) continue;
+    const rec = r as { finishing?: unknown; color?: unknown };
+    out.push({
+      bbox: { xIn, yIn, wIn, hIn },
+      finishing: typeof rec.finishing === "string" ? rec.finishing.slice(0, 60) : undefined,
+      color: typeof rec.color === "string" ? rec.color.slice(0, 40) : undefined,
+    });
+  }
+  return out.length ? out : undefined;
+}
 
 type CardLook = {
   hl: Record<string, string>;
@@ -156,6 +175,8 @@ export default function ProductFrame({
           // Calculators flag express/special requests with a "Pending Confirmation"
           // status — carry it through so the job starts awaiting sales approval.
           requiresConfirmation: item.status === "Pending Confirmation",
+          // Box-up UV / Inkjet per-record data (invisible to the buyer).
+          boxupRecords: sanitizeBoxupRecords(item.boxupRecords),
         });
       })();
     };
