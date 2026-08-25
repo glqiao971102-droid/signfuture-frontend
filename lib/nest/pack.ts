@@ -102,12 +102,24 @@ class MaxRectsBin {
   }
 }
 
+/** Optional density caps per sheet (used by the 3D-printer Slow/Medium/Fast modes).
+ *  timeCap + pieceTime pack pieces so each sheet's total print time stays under a
+ *  target (small pieces combined onto plates up to the slowest piece's time). */
+export type PackCaps = { maxPerBin?: number; maxFill?: number; timeCap?: number; pieceTime?: number[] };
+
 /** Pack with a fixed heuristic + a pre-sorted piece order. */
-export function pack(rects: NestRect[], W: number, H: number, gap: number, allowRotate: boolean, heur: Heuristic = "bssf", order?: NestRect[]): PackResult {
+export function pack(rects: NestRect[], W: number, H: number, gap: number, allowRotate: boolean, heur: Heuristic = "bssf", order?: NestRect[], caps?: PackCaps): PackResult {
   const g = Math.max(0, gap);
   const half = g / 2;
+  const maxPerBin = caps?.maxPerBin ?? Infinity;
+  const areaCap = (caps?.maxFill ?? 1) * W * H;
+  const timeCap = caps?.timeCap ?? Infinity;
+  const pieceTime = caps?.pieceTime;
   const seq = order ?? [...rects].sort((a, b) => b.w * b.h - a.w * a.h);
   const bins: MaxRectsBin[] = [];
+  const binCount: number[] = [];
+  const binArea: number[] = [];
+  const binTime: number[] = [];
   const placements: Placement[] = [];
   const unplaced: number[] = [];
   const put = (r: NestRect, bin: number, n: Node) =>
@@ -117,16 +129,21 @@ export function pack(rects: NestRect[], W: number, H: number, gap: number, allow
     const iw = r.w + g, ih = r.h + g;
     const fitsEmpty = (iw <= W + 1e-6 && ih <= H + 1e-6) || (allowRotate && ih <= W + 1e-6 && iw <= H + 1e-6);
     if (!fitsEmpty) { unplaced.push(r.id); continue; }
+    const area = r.w * r.h;
+    const t = pieceTime ? pieceTime[r.id] ?? 0 : 0;
     let done = false;
     for (let b = 0; b < bins.length; b++) {
+      // Caps: a non-empty bin won't exceed maxPerBin pieces, the fill target, or
+      // the time cap (an empty bin always accepts at least one piece).
+      if (binCount[b] > 0 && (binCount[b] >= maxPerBin || binArea[b] + area > areaCap + 1e-9 || binTime[b] + t > timeCap + 1e-9)) continue;
       const n = bins[b].insert(iw, ih, allowRotate, heur);
-      if (n) { put(r, b, n); done = true; break; }
+      if (n) { put(r, b, n); binCount[b]++; binArea[b] += area; binTime[b] += t; done = true; break; }
     }
     if (done) continue;
     const bin = new MaxRectsBin(W, H);
-    bins.push(bin);
+    bins.push(bin); binCount.push(0); binArea.push(0); binTime.push(0);
     const n = bin.insert(iw, ih, allowRotate, heur);
-    if (n) put(r, bins.length - 1, n); else unplaced.push(r.id);
+    if (n) { put(r, bins.length - 1, n); binCount[bins.length - 1]++; binArea[bins.length - 1] += area; binTime[bins.length - 1] += t; } else unplaced.push(r.id);
   }
 
   const usage: BinUsage[] = bins.map((_, i) => ({ index: i, usedW: 0, usedH: 0 }));
@@ -142,7 +159,7 @@ export function pack(rects: NestRect[], W: number, H: number, gap: number, allow
  * Try several heuristics × sort orders and keep the tightest result — fewest
  * unplaced, then fewest sheets, then least total used area (i.e. least material).
  */
-export function packBest(rects: NestRect[], W: number, H: number, gap: number, allowRotate: boolean): PackResult {
+export function packBest(rects: NestRect[], W: number, H: number, gap: number, allowRotate: boolean, caps?: PackCaps): PackResult {
   const heurs: Heuristic[] = ["bssf", "baf", "bl", "blsf"];
   const sorts: ((a: NestRect, b: NestRect) => number)[] = [
     (a, b) => b.w * b.h - a.w * a.h,           // area
@@ -156,7 +173,7 @@ export function packBest(rects: NestRect[], W: number, H: number, gap: number, a
   for (const h of heurs) {
     for (const s of sorts) {
       const order = [...rects].sort(s);
-      const r = pack(rects, W, H, gap, allowRotate, h, order);
+      const r = pack(rects, W, H, gap, allowRotate, h, order, caps);
       const areaSum = r.bins.reduce((acc, b) => acc + b.usedW * b.usedH, 0);
       const score = r.unplaced.length * 1e18 + r.bins.length * 1e12 + areaSum;
       if (score < bestScore) { bestScore = score; best = r; }

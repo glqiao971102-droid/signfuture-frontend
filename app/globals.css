@@ -6494,10 +6494,64 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .an-generate:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 .an-error { margin-top: 14px; }
 .an-tool .nest-results { margin-top: 24px; }
+
+/* Print-speed mode selector (3D Printer nesting) */
+.an-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 640px) { .an-modes { grid-template-columns: 1fr; } }
+.an-mode {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; cursor: pointer;
+  padding: 14px 15px; border-radius: 12px; border: 1px solid rgba(79, 195, 255, 0.22);
+  background: rgba(6, 14, 26, 0.6); color: #eaf2ff; transition: border-color .15s, background .15s;
+}
+.an-mode:hover { border-color: rgba(79, 195, 255, 0.5); }
+.an-mode.is-on { border-color: #4fc3ff; background: rgba(53, 150, 255, 0.10); box-shadow: 0 0 0 3px rgba(79, 195, 255, 0.12); }
+.an-mode-title { font-size: 15px; font-weight: 800; color: #fff; }
+.an-mode.is-on .an-mode-title { color: #7fd4ff; }
+.an-mode-desc { font-size: 12px; line-height: 1.45; color: #8ba3c0; }
+
+/* 3D print-time estimate */
+.an-time { margin-top: 18px; border: 1px solid rgba(79, 195, 255, 0.22); border-radius: 14px; background: rgba(12, 24, 42, 0.55); padding: 16px 18px; }
+.an-time-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+@media (max-width: 480px) { .an-time-row { grid-template-columns: 1fr; } }
+.an-time-cell { display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; }
+.an-time-n { font-size: 26px; font-weight: 800; color: #7fd4ff; line-height: 1; }
+.an-time-l { font-size: 11.5px; color: #8ba3c0; line-height: 1.4; }
+.an-time-note { margin: 12px 0 0; font-size: 12px; color: #7d93b0; }
 .an-tool .ll-results { margin-top: 24px; }
+
+/* Download format picker (PDF / DXF / SVG) */
+.an-dl { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.an-fmts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.an-fmts-label { font-size: 12px; font-weight: 700; color: #8ba3c0; text-transform: uppercase; letter-spacing: 0.04em; }
+.an-fmt { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid rgba(79, 195, 255, 0.28); border-radius: 9px; background: rgba(12, 24, 42, 0.5); cursor: pointer; font-size: 13px; color: #d6e4f5; user-select: none; }
+.an-fmt:hover { border-color: rgba(79, 195, 255, 0.5); }
+.an-fmt input { accent-color: #4fc3ff; width: 15px; height: 15px; cursor: pointer; }
+.an-fmt b { font-weight: 700; }
+.an-fmt span { font-size: 11px; color: #8ba3c0; }
+.an-fmt.is-off { opacity: 0.45; cursor: not-allowed; }
+.an-fmt.is-off input { cursor: not-allowed; }
+.an-fmt-note { margin: 8px 0 0; font-size: 12px; color: #7d93b0; }
+.nest-summary .ll-measure:disabled, .nest-sheet-dl:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Single-panel variant (Neon Line Length) + styled select */
 .an-panels-one { grid-template-columns: 1fr; }
+
+/* 3D Printer Nesting — Upload (narrow) + Print Setup (wide), matching the mockup */
+.an-panels-3d { grid-template-columns: minmax(290px, 0.92fr) 1.55fr; align-items: stretch; }
+@media (max-width: 820px) { .an-panels-3d { grid-template-columns: 1fr; } }
+.an-panel-upload { display: flex; flex-direction: column; }
+.an-drop-fill { flex: 1 1 auto; margin: 0; padding: 26px 18px; min-height: 210px; }
+.an-drop-fill .an-drop-icon { width: 58px; height: 58px; }
+.an-drop-fill .an-drop-main strong { font-size: 18px; }
+
+/* Compact print-speed cards: title + one-line subtitle, centred */
+.an-mode-compact { align-items: center; text-align: center; gap: 3px; padding: 13px 12px; }
+.an-mode-compact.is-on { background: linear-gradient(135deg, #2f7bf6, #22b6ff); border-color: transparent; box-shadow: 0 6px 18px rgba(34, 150, 255, 0.35); }
+.an-mode-compact.is-on .an-mode-title { color: #fff; }
+.an-mode-tag { font-size: 12px; color: #8ba3c0; }
+.an-mode-compact.is-on .an-mode-tag { color: rgba(255, 255, 255, 0.9); }
+.an-setup-note { margin: 16px 0 0; font-size: 12.5px; line-height: 1.6; color: #8ba3c0; }
+.an-setup-note strong { color: #cfe6ff; font-weight: 700; }
 .an-select { position: relative; display: flex; align-items: center; border: 1px solid rgba(79, 195, 255, 0.25); border-radius: 10px; background: rgba(6, 14, 26, 0.7); max-width: 420px; }
 .an-select:focus-within { border-color: #4fc3ff; box-shadow: 0 0 0 3px rgba(79, 195, 255, 0.12); }
 .an-select select {

@@ -48,6 +48,17 @@ export async function POST(req: Request) {
     const bytes = new Uint8Array(await req.arrayBuffer());
     if (!bytes.length) return NextResponse.json({ error: "EMPTY", message: "No file uploaded." }, { status: 400 });
 
+    // 3D-printer mode: slow = pack tight (fewest plates). medium/fast are
+    // TIME-BALANCED — combine small pieces onto plates up to (mult × the slowest
+    // single piece), so no plate is slower than the biggest letter and the total
+    // parallel time stays the same while using fewer plates/machines.
+    const mode = url.searchParams.get("mode");
+    const balanceByTime = mode === "fast" ? 1 : mode === "medium" ? 2 : undefined;
+    const printHeightMm = (Number(url.searchParams.get("h3d")) || 5) * 10;
+    // trim=0 keeps every sheet the FULL bed size (3D printer shows the 80×80 plate
+    // with the piece placed inside, not cropped to the piece).
+    const trim = url.searchParams.get("trim") === "0" ? false : undefined;
+
     const result = await analyzeNesting(bytes, name, {
       sheetWIn: num("w", 48),
       sheetHIn: num("h", 96),
@@ -58,6 +69,11 @@ export async function POST(req: Request) {
       screwDiaMm: num("screw", 3),
       // Extra stable (4 corners + coverage) is the default; only "medium" opts out.
       screwLevel: url.searchParams.get("level") === "medium" ? "medium" : "strong",
+      balanceByTime,
+      printHeightMm,
+      trim,
+      measurePerimeter: url.searchParams.get("perim") === "1",
+      vectorFormats: (url.searchParams.get("fmt") ?? "").split(",").some((f) => f === "svg" || f === "dxf"),
     });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {

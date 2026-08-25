@@ -14,7 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
  * reaches these pages.
  */
 
-type NavChild = { view: string; label: string };
+type NavChild = { view?: string; label: string; href?: string };
 type NavItem = { href: string; label: string; icon: string; section: string; children?: NavChild[] };
 
 const NAV: NavItem[] = [
@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
     children: [
       { view: "flow", label: "Production Flow" },
       { view: "detail", label: "Production Detail" },
+      { href: "/admin/3d-nesting", label: "3D Printer Nesting" },
     ],
   },
   { href: "/admin/dropbox", label: "SF Dropbox", icon: "🗂", section: "dropbox" },
@@ -65,6 +66,7 @@ const NAV: NavItem[] = [
 function sectionForPath(path: string): string | null {
   if (path.startsWith("/admin/orders")) return "orders";
   if (path.startsWith("/admin/production")) return "production";
+  if (path.startsWith("/admin/3d-nesting")) return "production";
   if (path.startsWith("/admin/dropbox")) return "dropbox";
   if (path.startsWith("/admin/quotations")) return "quotations";
   if (path.startsWith("/admin/users")) return "customers";
@@ -88,7 +90,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // inside that section; toggling is then fully manual.
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => ({
     "/admin/sales-listing": pathname.startsWith("/admin/sales-listing"),
-    "/admin/production": pathname.startsWith("/admin/production"),
+    "/admin/production":
+      pathname.startsWith("/admin/production") || pathname.startsWith("/admin/3d-nesting"),
   }));
   const toggleMenu = (href: string) =>
     setOpenMenus((m) => ({ ...m, [href]: !(m[href] ?? false) }));
@@ -175,7 +178,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <aside className="adm-sidebar">
           <nav>
             {nav.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              const active =
+                pathname === item.href ||
+                pathname.startsWith(item.href + "/") ||
+                (item.children?.some((c) => c.href && (pathname === c.href || pathname.startsWith(c.href + "/"))) ?? false);
 
               // Parent with children → click toggles the sub-menu open/closed.
               if (item.children) {
@@ -201,15 +207,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </button>
                     {open && (
                       <div className="adm-subnav">
-                        {item.children.map((c) => (
-                          <Link
-                            key={c.view}
-                            href={`${item.href}?view=${c.view}`}
-                            className="adm-subnav-item"
-                          >
-                            {c.label}
-                          </Link>
-                        ))}
+                        {item.children.map((c) => {
+                          const childHref = c.href ?? `${item.href}?view=${c.view}`;
+                          const childActive = c.href
+                            ? pathname === c.href || pathname.startsWith(c.href + "/")
+                            : false;
+                          return (
+                            <Link
+                              key={c.href ?? c.view}
+                              href={childHref}
+                              className={`adm-subnav-item${childActive ? " is-active" : ""}`}
+                            >
+                              {c.label}
+                            </Link>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

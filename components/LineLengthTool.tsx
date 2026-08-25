@@ -123,40 +123,43 @@ export default function LineLengthTool() {
         <div className={stepCls(2)}><span className="an-step-n">2</span> Measure</div>
       </div>
 
-      {/* Drop zone */}
-      <div
-        role="button"
-        tabIndex={0}
-        className={`an-drop${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
-      >
-        <span className="an-drop-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
-        </span>
-        <div className="an-drop-main">
-          <strong>{file ? file.name : "Drop your artwork here"}</strong>
-          <span>{file ? `${prettySize(file.size)} · click to change file` : "AI, PDF supported · black & white line art"}</span>
-          <button type="button" className="an-browse" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.5l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1Z" /></svg>
-            Browse Files
-          </button>
+      {/* Upload + Measurement Setup (two panels, side by side) */}
+      <div className="an-panels an-panels-3d">
+        {/* Left: Upload */}
+        <div className="an-panel an-panel-upload">
+          <div className="an-panel-head">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
+            Upload Artwork
+          </div>
+          <div
+            role="button"
+            tabIndex={0}
+            className={`an-drop an-drop-fill${dragOver ? " is-drag" : ""}${file ? " has-file" : ""}`}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+          >
+            <span className="an-drop-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></svg>
+            </span>
+            <div className="an-drop-main">
+              <strong>{file ? file.name : "Drop artwork here"}</strong>
+              <span>{file ? `${prettySize(file.size)} · click to change file` : "AI, PDF supported · black & white line art"}</span>
+              <button type="button" className="an-browse" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.5l-2-2H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1Z" /></svg>
+                Browse Files
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="an-secure">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></svg>
-          Your files are processed securely
-        </div>
-      </div>
 
-      {/* Options */}
-      <div className="an-panels an-panels-one">
+        {/* Right: Measurement Setup */}
         <div className="an-panel">
           <div className="an-panel-head">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="14" cy="18" r="2" /></svg>
-            Measurement Options
+            Measurement Setup
           </div>
           <div className="an-field">
             <span className="an-field-label">File scale</span>
@@ -170,6 +173,11 @@ export default function LineLengthTool() {
               </span>
             </div>
           </div>
+          <p className="an-setup-note">
+            Choose <strong>10× reduced</strong> if your file was drawn at 1:10 — the size and line
+            length will be shown at real scale. Vector art is measured exactly; flattened images are
+            estimated to within ~5%.
+          </p>
         </div>
       </div>
 

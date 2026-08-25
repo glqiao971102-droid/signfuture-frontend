@@ -13,8 +13,8 @@ import { PDFDocument, PDFName, degrees, StandardFonts } from "pdf-lib";
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb } from "@/lib/pdf/pdfium";
 import { PNG } from "pngjs";
-import { packBest, type NestRect, type PackResult } from "@/lib/nest/pack";
-import { parseVectorUnits, groupUnits, emitUnit, type VUnit, type VGroup, type Mat } from "@/lib/nest/vector";
+import { packBest, type NestRect, type PackResult, type PackCaps } from "@/lib/nest/pack";
+import { parseVectorUnits, groupUnits, emitUnit, compose, type VUnit, type VGroup, type Mat } from "@/lib/nest/vector";
 import { computePieceHoles, mmToPt, type Hole, type ScrewLevel } from "@/lib/nest/holes";
 import { rgb } from "pdf-lib";
 
@@ -32,7 +32,134 @@ export type NestOptions = {
   sheetWIn?: number; sheetHIn?: number; gapIn?: number;
   allowRotate?: boolean; minPieceIn?: number; trim?: boolean;
   drillHoles?: boolean; wireDiaMm?: number; screwDiaMm?: number; screwLevel?: ScrewLevel;
+  maxPerSheet?: number; fillTarget?: number; // density caps (3D-printer Slow/Medium/Fast)
+  measurePerimeter?: boolean; // include each piece's outline length (3D print-time estimate)
+  balanceByTime?: number; printHeightMm?: number; // pack plates to ≤ (mult × slowest piece) print time
+  vectorFormats?: boolean; // also emit SVG + DXF per sheet (vector artwork only)
 };
+
+// 3D print-time model (must match the frontend estimate): outline only, layer
+// 0.3 mm, head speed 25 mm/s for pieces < 6″, 50 mm/s otherwise.
+const PRINT_LAYER_MM = 0.3;
+function pieceSecondsFor(perimeterIn: number, wIn: number, hIn: number, heightMm: number): number {
+  const speed = Math.max(wIn, hIn) < 6 ? 25 : 50;
+  return (heightMm / PRINT_LAYER_MM) * (perimeterIn * 25.4) / speed;
+}
+
+/** A vector unit's outline as flattened polylines (beziers sampled), in target
+ *  coords via matrix M — used to emit the same shapes as SVG / DXF. */
+function unitPolylines(u: VUnit, T: Mat): number[][][] {
+  const M = compose(u.ctm, T);
+  const tx = (x: number, y: number): [number, number] => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]];
+  const toks = u.path.split(/\s+/).filter(Boolean);
+  const nums: number[] = [];
+  const subs: number[][][] = [];
+  let cur: number[][] | null = null;
+  let sx = 0, sy = 0, cx = 0, cy = 0;
+  const push = (x: number, y: number) => { cur!.push(tx(x, y)); cx = x; cy = y; };
+  const cubic = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => {
+    const N = 16;
+    for (let s = 1; s <= N; s++) {
+      const t = s / N, mt = 1 - t;
+      const bx = mt * mt * mt * cx + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3;
+      const by = mt * mt * mt * cy + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3;
+      cur!.push(tx(bx, by));
+    }
+    cx = x3; cy = y3;
+  };
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (/^[-+.\d]/.test(t)) { nums.push(parseFloat(t)); continue; }
+    switch (t) {
+      case "m": cur = []; subs.push(cur); sx = nums[0]; sy = nums[1]; push(nums[0], nums[1]); break;
+      case "l": if (cur) push(nums[0], nums[1]); break;
+      case "c": if (cur) cubic(nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]); break;
+      case "v": if (cur) cubic(cx, cy, nums[0], nums[1], nums[2], nums[3]); break;
+      case "y": if (cur) cubic(nums[0], nums[1], nums[2], nums[3], nums[2], nums[3]); break;
+      case "re": { const x = nums[0], y = nums[1], w = nums[2], h = nums[3]; cur = []; subs.push(cur); push(x, y); push(x + w, y); push(x + w, y + h); push(x, y + h); push(x, y); break; }
+      case "h": if (cur) push(sx, sy); break;
+    }
+    nums.length = 0;
+  }
+  return subs.filter((s) => s.length > 1);
+}
+
+/** The (unit, placement-matrix) pairs placed on one sheet/bin. */
+function placedUnits(groups: VGroup[], packed: PackResult, bin: number): { u: VUnit; T: Mat }[] {
+  const out: { u: VUnit; T: Mat }[] = [];
+  for (const pl of packed.placements) {
+    if (pl.bin !== bin) continue;
+    const g = groups[pl.id];
+    const tx = pl.x * PT, ty = pl.y * PT;
+    const T: Mat = !pl.rotated ? [1, 0, 0, 1, tx - g.x0, ty - g.y0] : [0, 1, -1, 0, tx + g.y1, ty - g.x0];
+    for (const u of g.units) out.push({ u, T });
+  }
+  return out;
+}
+
+const f3 = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(3));
+
+/** One sheet's placed shapes as an SVG (points; y flipped to SVG's top-left origin). */
+function sheetSvg(placed: { u: VUnit; T: Mat }[], wPt: number, hPt: number): string {
+  let paths = "";
+  for (const { u, T } of placed) {
+    const subs = unitPolylines(u, T);
+    if (!subs.length) continue;
+    let d = "";
+    for (const sub of subs) d += "M" + sub.map(([x, y], i) => `${i === 0 ? "" : "L"}${f3(x)} ${f3(hPt - y)}`).join(" ") + "Z";
+    paths += `<path d="${d}" fill="#000" fill-rule="evenodd"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${f3(wPt)}pt" height="${f3(hPt)}pt" viewBox="0 0 ${f3(wPt)} ${f3(hPt)}">${paths}</svg>`;
+}
+
+/** One sheet's placed shapes as a DXF (LWPOLYLINEs, millimetres, y up). */
+function sheetDxf(placed: { u: VUnit; T: Mat }[]): string {
+  const MM = 25.4 / PT; // points → mm
+  let ents = "";
+  for (const { u, T } of placed) {
+    for (const sub of unitPolylines(u, T)) {
+      ents += `0\nLWPOLYLINE\n8\nCUT\n90\n${sub.length}\n70\n1\n43\n0\n`;
+      for (const [x, y] of sub) ents += `10\n${(x * MM).toFixed(3)}\n20\n${(y * MM).toFixed(3)}\n`;
+    }
+  }
+  return `0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}0\nENDSEC\n0\nEOF\n`;
+}
+
+/** Total length (points) of a vector unit's outline path, following its CTM. */
+function unitPerimeterPt(u: VUnit): number {
+  const M = u.ctm;
+  const tx = (x: number, y: number): [number, number] => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]];
+  const toks = u.path.split(/\s+/).filter(Boolean);
+  const nums: number[] = [];
+  let curX = 0, curY = 0, startX = 0, startY = 0, px = 0, py = 0, len = 0;
+  const setCur = (x: number, y: number) => { curX = x; curY = y; [px, py] = tx(x, y); };
+  const lineTo = (x: number, y: number) => { const [nx, ny] = tx(x, y); len += Math.hypot(nx - px, ny - py); px = nx; py = ny; curX = x; curY = y; };
+  const cubic = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => {
+    const N = 8; let ppx = px, ppy = py;
+    for (let s = 1; s <= N; s++) {
+      const t = s / N, mt = 1 - t;
+      const bx = mt * mt * mt * curX + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3;
+      const by = mt * mt * mt * curY + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3;
+      const [nx, ny] = tx(bx, by); len += Math.hypot(nx - ppx, ny - ppy); ppx = nx; ppy = ny;
+    }
+    px = ppx; py = ppy; curX = x3; curY = y3;
+  };
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (/^[-+.\d]/.test(t)) { nums.push(parseFloat(t)); continue; }
+    switch (t) {
+      case "m": setCur(nums[0], nums[1]); startX = nums[0]; startY = nums[1]; break;
+      case "l": lineTo(nums[0], nums[1]); break;
+      case "c": cubic(nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]); break;
+      case "v": cubic(curX, curY, nums[0], nums[1], nums[2], nums[3]); break;
+      case "y": cubic(nums[0], nums[1], nums[2], nums[3], nums[2], nums[3]); break;
+      case "re": { const x = nums[0], y = nums[1], w = nums[2], h = nums[3]; setCur(x, y); lineTo(x + w, y); lineTo(x + w, y + h); lineTo(x, y + h); lineTo(x, y); break; }
+      case "h": lineTo(startX, startY); break;
+    }
+    nums.length = 0;
+  }
+  return len;
+}
 
 type PageMask = { mask: Uint8Array; w: number; h: number; cbx: number; cby: number; cbh: number; S: number };
 
@@ -101,6 +228,8 @@ export type NestSheet = {
   index: number; usedWIn: number; usedHIn: number; pieceCount: number; utilPct: number;
   previewDataUrl: string;
   pdfBase64: string; // this sheet as its OWN single-page PDF
+  svg?: string;      // same sheet as SVG (vector artwork only)
+  dxf?: string;      // same sheet as DXF for AutoCAD / routers (vector only)
   outName: string;   // download filename (named by the used size)
 };
 export type NestResult = {
@@ -108,6 +237,8 @@ export type NestResult = {
   sheetWIn: number; sheetHIn: number; gapIn: number; rotated: boolean;
   totalPieces: number; placedPieces: number; unplaced: number;
   sheets: NestSheet[]; warnings: string[];
+  // Per placed piece (for the 3D print-time estimate): which plate, size, outline length.
+  pieces?: { bin: number; wIn: number; hIn: number; perimeterIn: number }[];
 };
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
@@ -325,7 +456,29 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   if (!sizes.length) throw new Error("No pieces were detected in this artwork.");
 
   const rects: NestRect[] = sizes.map((s, id) => ({ id, w: s.wIn, h: s.hIn }));
-  const packed = packBest(rects, sheetWIn, sheetHIn, gapIn, allowRotate);
+
+  // Outline length per piece (needed for the print-time estimate and, in the
+  // time-balanced modes, to decide which pieces share a plate).
+  const needPerim = opts.measurePerimeter || !!opts.balanceByTime;
+  const perimById = new Map<number, number>();
+  if (needPerim) {
+    if (useVector) bigGroups.forEach((g, id) => { let pt = 0; for (const u of g.units) pt += unitPerimeterPt(u); perimById.set(id, pt / PT); });
+    else clipPieces.forEach((p, id) => perimById.set(id, 2 * (p.wIn + p.hIn)));
+  }
+
+  let caps: PackCaps | undefined;
+  if (opts.balanceByTime && needPerim) {
+    // Time-balanced: fill each plate up to (mult × the slowest single piece).
+    const heightMm = opts.printHeightMm ?? 50;
+    const pieceTime = sizes.map((s, id) =>
+      pieceSecondsFor(perimById.get(id) ?? 2 * (s.wIn + s.hIn), s.wIn, s.hIn, heightMm)
+    );
+    const timeCap = Math.max(...pieceTime, 1) * opts.balanceByTime;
+    caps = { pieceTime, timeCap };
+  } else if (opts.maxPerSheet || opts.fillTarget) {
+    caps = { maxPerBin: opts.maxPerSheet, maxFill: opts.fillTarget };
+  }
+  const packed = packBest(rects, sheetWIn, sheetHIn, gapIn, allowRotate, caps);
 
   // Optional: place a 5 mm wire hole + system-chosen 3 mm screw holes per piece.
   let holesById: Hole[][] | undefined;
@@ -360,24 +513,45 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const base = fileName.replace(/\.[^.]+$/, "");
   const areaByBin = new Map<number, number>();
   for (const pl of packed.placements) areaByBin.set(pl.bin, (areaByBin.get(pl.bin) ?? 0) + pl.w * pl.h);
+  const wantVecFmt = !!opts.vectorFormats && useVector;
   const sheets: NestSheet[] = [];
   for (let i = 0; i < packed.bins.length; i++) {
     const usedWIn = +Math.min(sheetWIn, packed.bins[i].usedW).toFixed(1);
     const usedHIn = +Math.min(sheetHIn, packed.bins[i].usedH).toFixed(1);
     const count = packed.placements.filter((p) => p.bin === i).length;
     const util = usedWIn * usedHIn > 0 ? (areaByBin.get(i) ?? 0) / (usedWIn * usedHIn) : 0;
+    let svg: string | undefined, dxf: string | undefined;
+    if (wantVecFmt) {
+      const placed = placedUnits(bigGroups, packed, i);
+      const wPt = (trim ? usedWIn : sheetWIn) * PT;
+      const hPt = (trim ? usedHIn : sheetHIn) * PT;
+      svg = sheetSvg(placed, wPt, hPt);
+      dxf = sheetDxf(placed);
+    }
     sheets.push({
       index: i, usedWIn, usedHIn, pieceCount: count, utilPct: Math.round(util * 100),
       previewDataUrl: await renderPreview(sheetPdfs[i], 0, 520),
       pdfBase64: Buffer.from(sheetPdfs[i]).toString("base64"),
+      svg, dxf,
       outName: `${base} — ${usedWIn}x${usedHIn}in.pdf`,
     });
+  }
+
+  // Per placed piece (for the 3D print-time estimate): plate, size, outline length.
+  let pieces: NestResult["pieces"];
+  if (opts.measurePerimeter) {
+    pieces = packed.placements.map((pl) => ({
+      bin: pl.bin,
+      wIn: sizes[pl.id].wIn,
+      hIn: sizes[pl.id].hIn,
+      perimeterIn: perimById.get(pl.id) ?? 2 * (sizes[pl.id].wIn + sizes[pl.id].hIn),
+    }));
   }
 
   return {
     file: fileName, mode: useVector ? "vector" : "raster",
     sheetWIn, sheetHIn, gapIn, rotated: allowRotate,
     totalPieces: sizes.length, placedPieces: packed.placements.length, unplaced: packed.unplaced.length,
-    sheets, warnings,
+    sheets, warnings, pieces,
   };
 }
