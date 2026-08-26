@@ -44,6 +44,8 @@ export default function NestingTool() {
   const [gapMm, setGapMm] = useState("10");
   const [rotate, setRotate] = useState(true);
   const [holes, setHoles] = useState(false);
+  // When the artwork is drawn 10× smaller (a 1:10 file), scale it up ×10 for the layout.
+  const [scaledx10, setScaledx10] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<NestResult | null>(null);
@@ -70,6 +72,7 @@ export default function NestingTool() {
       const qs = new URLSearchParams({
         w: sheetW || "48", h: sheetH || "96", gap: gapIn,
         rot: rotate ? "1" : "0", holes: holes ? "1" : "0",
+        mscale: scaledx10 ? "10" : "1",
         level: "strong", name: file.name,
       });
       const res = await fetch(`/api/nest?${qs}`, {
@@ -218,6 +221,16 @@ export default function NestingTool() {
                 </div>
               </div>
               <button type="button" role="switch" aria-checked={holes} className={`an-toggle${holes ? " is-on" : ""}`} onClick={() => setHoles(!holes)}><span /></button>
+            </div>
+            <div className="an-opt-row">
+              <div className="an-opt-text">
+                <span className="an-opt-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg></span>
+                <div className="an-opt-sub">
+                  <span>File drawn at 1:10 scale</span>
+                  <em>artwork is 10× smaller — system scales it up ×10</em>
+                </div>
+              </div>
+              <button type="button" role="switch" aria-checked={scaledx10} className={`an-toggle${scaledx10 ? " is-on" : ""}`} onClick={() => setScaledx10(!scaledx10)}><span /></button>
             </div>
           </div>
         </div>

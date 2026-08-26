@@ -9,7 +9,10 @@
 //    you can move/delete each one directly — no ungroup / release-clip needed.
 //  • RASTER (fallback, for flattened/image art or spot colours) — clip each piece
 //    out of the source page with pdf-lib embedPage and re-place it.
-import { PDFDocument, PDFName, degrees, StandardFonts } from "pdf-lib";
+import {
+  PDFDocument, PDFName, degrees, StandardFonts,
+  pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath,
+} from "pdf-lib";
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb } from "@/lib/pdf/pdfium";
 import { PNG } from "pngjs";
@@ -36,6 +39,7 @@ export type NestOptions = {
   measurePerimeter?: boolean; // include each piece's outline length (3D print-time estimate)
   balanceByTime?: number; printHeightMm?: number; // pack plates to ≤ (mult × slowest piece) print time
   vectorFormats?: boolean; // also emit SVG + DXF per sheet (vector artwork only)
+  measurementScale?: number; // artwork drawn N× smaller (e.g. 10 for a 1:10 file) → scale up N× before nesting
 };
 
 // 3D print-time model (must match the frontend estimate): outline only, layer
@@ -363,13 +367,33 @@ async function buildRasterSheets(src: PDFDocument, pieces: ClipPiece[], packed: 
     const w = (trim ? Math.min(sheetWIn, packed.bins[i].usedW) : sheetWIn) * PT;
     const h = (trim ? Math.min(sheetHIn, packed.bins[i].usedH) : sheetHIn) * PT;
     const page = doc.addPage([w, h]);
+    // Embed each SOURCE page only ONCE (pdf-lib copies the page's image/resources
+    // into every embedPage call — embedding per piece duplicates the artwork's big
+    // rasters N times and can balloon the output to hundreds of MB, overflowing the
+    // base64 string). We then place each piece by drawing the shared embedded page
+    // through a CLIP rectangle = the piece's box on the sheet.
+    const embCache = new Map<number, Awaited<ReturnType<typeof doc.embedPage>>>();
+    const getEmbed = async (p: number) => {
+      let e = embCache.get(p);
+      if (!e) { e = await doc.embedPage(src.getPage(p)); embCache.set(p, e); }
+      return e;
+    };
     for (const pl of packed.placements) {
       if (pl.bin !== i) continue;
       const pc = pieces[pl.id];
-      const embedded = await doc.embedPage(src.getPage(pc.page), pc.clip);
-      const X = pl.x * PT, Y = pl.y * PT;
-      if (!pl.rotated) page.drawPage(embedded, { x: X, y: Y });
-      else page.drawPage(embedded, { x: X + pl.w * PT, y: Y, rotate: degrees(90) });
+      const embedded = await getEmbed(pc.page);
+      const X = pl.x * PT, Y = pl.y * PT, W = pl.w * PT, H = pl.h * PT;
+      const { left, bottom } = pc.clip;
+      // Clip the sheet to this piece's placed box, then draw the whole (shared) page
+      // offset so the piece's source region lands inside that box.
+      page.pushOperators(
+        pushGraphicsState(),
+        moveTo(X, Y), lineTo(X + W, Y), lineTo(X + W, Y + H), lineTo(X, Y + H), closePath(),
+        clip(), endPath(),
+      );
+      if (!pl.rotated) page.drawPage(embedded, { x: X - left, y: Y - bottom });
+      else page.drawPage(embedded, { x: X + W + bottom, y: Y - left, rotate: degrees(90) });
+      page.pushOperators(popGraphicsState());
     }
     for (const pl of packed.placements) {
       if (pl.bin !== i) continue;
@@ -403,6 +427,17 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
   const wireDiaPt = mmToPt(opts.wireDiaMm ?? 5);
   const screwDiaPt = mmToPt(opts.screwDiaMm ?? 3);
   const screwLevel: ScrewLevel = opts.screwLevel === "medium" ? "medium" : "strong";
+
+  // Measurement scale: when the artwork was drawn N× smaller (e.g. a 1:10 file),
+  // scale the whole PDF up N× ONCE here so every downstream step — piece detection,
+  // packing, the laid-out output and drill holes — works in real-world size with no
+  // other changes. pdf-lib's page.scale() scales the media box AND the content.
+  const mScale = opts.measurementScale && opts.measurementScale > 0 ? opts.measurementScale : 1;
+  if (mScale !== 1) {
+    const doc = await PDFDocument.load(bytes);
+    for (const p of doc.getPages()) p.scale(mScale, mScale);
+    bytes = await doc.save();
+  }
 
   const src = await PDFDocument.load(bytes);
   const nPages = src.getPageCount();
@@ -527,6 +562,12 @@ export async function analyzeNesting(bytes: Uint8Array, fileName: string, opts: 
       const hPt = (trim ? usedHIn : sheetHIn) * PT;
       svg = sheetSvg(placed, wPt, hPt);
       dxf = sheetDxf(placed);
+    }
+    // A base64 string tops out at ~512 MB; a ~380 MB+ PDF would overflow it and
+    // crash. With single-embed output this needs a genuinely huge artwork, but
+    // guard anyway so the user gets a clear message instead of a cryptic crash.
+    if (sheetPdfs[i].length > 380_000_000) {
+      throw new Error("The laid-out file is too large to build — the artwork is very heavy (large embedded images). Try flattening/downsizing the artwork or nesting fewer pieces.");
     }
     sheets.push({
       index: i, usedWIn, usedHIn, pieceCount: count, utilPct: Math.round(util * 100),

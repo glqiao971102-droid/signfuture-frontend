@@ -74,6 +74,8 @@ export async function POST(req: Request) {
       trim,
       measurePerimeter: url.searchParams.get("perim") === "1",
       vectorFormats: (url.searchParams.get("fmt") ?? "").split(",").some((f) => f === "svg" || f === "dxf"),
+      // Artwork drawn N× smaller (e.g. mscale=10 for a 1:10 file) → scaled up before nesting.
+      measurementScale: num("mscale", 1),
     });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
