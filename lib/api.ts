@@ -512,6 +512,11 @@ export const api = {
     const qs = date ? `?date=${encodeURIComponent(date)}` : "";
     return request<AdminActivity>(`/api/v1/admin/activity${qs}`);
   },
+  /** Which members were active in a month (YYYY-MM), ranked by activity. */
+  adminActivityMonthly(month?: string) {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    return request<AdminActivityMonthly>(`/api/v1/admin/activity/monthly${qs}`);
+  },
 
   // ----- Super admin: permissions -----
 
@@ -1642,6 +1647,22 @@ export type ActivityVisitor = {
 export type AdminActivity = {
   summary: { date: string; visitors: number; members: number; guests: number; pageviews: number; actions: number };
   visitors: ActivityVisitor[];
+};
+
+export type ActiveMember = {
+  userId: number;
+  name: string;
+  email: string | null;
+  days: number;
+  pageviews: number;
+  actions: number;
+  uploads: number;
+  firstSeen: string;
+  lastSeen: string;
+};
+export type AdminActivityMonthly = {
+  summary: { month: string; activeMembers: number; pageviews: number; actions: number };
+  members: ActiveMember[];
 };
 
 export type AdminWalletSummary = {

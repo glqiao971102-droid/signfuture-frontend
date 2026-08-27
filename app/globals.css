@@ -5182,6 +5182,21 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 /* ---- Admin Visitors (activity) ---- */
 .vis-toolbar { display: flex; gap: 12px; align-items: center; margin: 4px 0 18px; flex-wrap: wrap; }
+/* Daily vs monthly-active-members mode toggle. */
+.vis-mode { display: inline-flex; border: 1px solid rgba(112, 164, 255, 0.28); border-radius: 999px; overflow: hidden; margin-right: 6px; }
+.vis-mode-btn {
+  border: 0; background: transparent; color: #9fb4d4; padding: 7px 15px; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.vis-mode-btn + .vis-mode-btn { border-left: 1px solid rgba(112, 164, 255, 0.28); }
+.vis-mode-btn.is-on { background: rgba(53, 216, 255, 0.16); color: #35d8ff; }
+/* Monthly active-member row: rank + identity + activity metrics on one line. */
+.vis-member-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
+.vis-member-row .vis-id { flex: 1; min-width: 0; }
+.vis-rank {
+  flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: rgba(112, 164, 255, 0.16); color: #9fb4d4; font-size: 12px; font-weight: 800;
+}
 .vis-datefield { display: inline-flex; align-items: center; gap: 8px; color: #9fb4d4; font-size: 13px; font-weight: 700; }
 .vis-datefield input {
   background: rgba(13, 32, 57, 0.9);

@@ -1,10 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type AdminActivity, type ActivityVisitor } from "@/lib/api";
+import { api, type AdminActivity, type ActivityVisitor, type AdminActivityMonthly } from "@/lib/api";
 
 function todayISO(): string {
   return new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
+}
+function thisMonthISO(): string {
+  return new Date().toLocaleDateString("en-CA").slice(0, 7); // YYYY-MM, local
+}
+function dateOf(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", timeZone: "Asia/Kuala_Lumpur" });
 }
 function timeOf(iso: string): string {
   const d = new Date(iso);
@@ -135,8 +144,11 @@ function VisitorCard({
 }
 
 export default function AdminVisitors() {
+  const [mode, setMode] = useState<"daily" | "monthly">("daily");
   const [date, setDate] = useState(todayISO());
+  const [month, setMonth] = useState(thisMonthISO());
   const [data, setData] = useState<AdminActivity | null>(null);
+  const [monthData, setMonthData] = useState<AdminActivityMonthly | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -145,18 +157,20 @@ export default function AdminVisitors() {
     setLoading(true);
     setError(null);
     try {
-      setData(await api.adminActivity(date));
+      if (mode === "monthly") setMonthData(await api.adminActivityMonthly(month));
+      else setData(await api.adminActivity(date));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load activity.");
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [mode, date, month]);
   useEffect(() => {
     void load();
   }, [load]);
 
   const s = data?.summary;
+  const ms = monthData?.summary;
 
   return (
     <div>
@@ -166,45 +180,85 @@ export default function AdminVisitors() {
       </div>
 
       <div className="vis-toolbar">
-        <label className="vis-datefield">
-          <span>Date</span>
-          <input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <button type="button" className="adm-filter" onClick={() => setDate(todayISO())}>
-          Today
-        </button>
+        <div className="vis-mode">
+          <button type="button" className={`vis-mode-btn${mode === "daily" ? " is-on" : ""}`} onClick={() => setMode("daily")}>
+            Daily visitors
+          </button>
+          <button type="button" className={`vis-mode-btn${mode === "monthly" ? " is-on" : ""}`} onClick={() => setMode("monthly")}>
+            Active members (month)
+          </button>
+        </div>
+        {mode === "daily" ? (
+          <>
+            <label className="vis-datefield">
+              <span>Date</span>
+              <input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <button type="button" className="adm-filter" onClick={() => setDate(todayISO())}>
+              Today
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="vis-datefield">
+              <span>Month</span>
+              <input type="month" value={month} max={thisMonthISO()} onChange={(e) => setMonth(e.target.value)} />
+            </label>
+            <button type="button" className="adm-filter" onClick={() => setMonth(thisMonthISO())}>
+              This month
+            </button>
+          </>
+        )}
       </div>
 
-      <div className="dash-kpis">
-        <div className="dash-kpi is-accent">
-          <span className="dash-kpi-label">Visitors</span>
-          <strong className="dash-kpi-value">{s?.visitors ?? 0}</strong>
+      {mode === "daily" ? (
+        <div className="dash-kpis">
+          <div className="dash-kpi is-accent">
+            <span className="dash-kpi-label">Visitors</span>
+            <strong className="dash-kpi-value">{s?.visitors ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">Members</span>
+            <strong className="dash-kpi-value">{s?.members ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">New people (guests)</span>
+            <strong className="dash-kpi-value">{s?.guests ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">Page views</span>
+            <strong className="dash-kpi-value">{s?.pageviews ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">Actions</span>
+            <strong className="dash-kpi-value">{s?.actions ?? 0}</strong>
+          </div>
         </div>
-        <div className="dash-kpi">
-          <span className="dash-kpi-label">Members</span>
-          <strong className="dash-kpi-value">{s?.members ?? 0}</strong>
+      ) : (
+        <div className="dash-kpis">
+          <div className="dash-kpi is-accent">
+            <span className="dash-kpi-label">Active members</span>
+            <strong className="dash-kpi-value">{ms?.activeMembers ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">Page views</span>
+            <strong className="dash-kpi-value">{ms?.pageviews ?? 0}</strong>
+          </div>
+          <div className="dash-kpi">
+            <span className="dash-kpi-label">Actions</span>
+            <strong className="dash-kpi-value">{ms?.actions ?? 0}</strong>
+          </div>
         </div>
-        <div className="dash-kpi">
-          <span className="dash-kpi-label">New people (guests)</span>
-          <strong className="dash-kpi-value">{s?.guests ?? 0}</strong>
-        </div>
-        <div className="dash-kpi">
-          <span className="dash-kpi-label">Page views</span>
-          <strong className="dash-kpi-value">{s?.pageviews ?? 0}</strong>
-        </div>
-        <div className="dash-kpi">
-          <span className="dash-kpi-label">Actions</span>
-          <strong className="dash-kpi-value">{s?.actions ?? 0}</strong>
-        </div>
-      </div>
+      )}
 
       {loading && <div className="adm-empty">Loading…</div>}
       {!loading && error && <div className="adm-empty">{error}</div>}
-      {!loading && !error && data && data.visitors.length === 0 && (
+
+      {/* Daily */}
+      {mode === "daily" && !loading && !error && data && data.visitors.length === 0 && (
         <div className="adm-empty">No visitors recorded on this day yet.</div>
       )}
-
-      {!loading && !error && data && data.visitors.length > 0 && (
+      {mode === "daily" && !loading && !error && data && data.visitors.length > 0 && (
         <div className="vis-list">
           {data.visitors.map((v) => (
             <VisitorCard
@@ -213,6 +267,32 @@ export default function AdminVisitors() {
               open={open === v.visitorId}
               onToggle={() => setOpen(open === v.visitorId ? null : v.visitorId)}
             />
+          ))}
+        </div>
+      )}
+
+      {/* Monthly active members */}
+      {mode === "monthly" && !loading && !error && monthData && monthData.members.length === 0 && (
+        <div className="adm-empty">No members were active in this month yet.</div>
+      )}
+      {mode === "monthly" && !loading && !error && monthData && monthData.members.length > 0 && (
+        <div className="vis-list">
+          {monthData.members.map((m, i) => (
+            <div key={m.userId} className="vis-card is-member vis-member-row">
+              <span className="vis-rank">{i + 1}</span>
+              <span className="vis-id">
+                <span className="vis-badge is-member">MEMBER</span>
+                <strong>{m.name}</strong>
+                {m.email && <span className="vis-email">{m.email}</span>}
+              </span>
+              <span className="vis-metrics">
+                <span title="Active days this month">📅 {m.days} day{m.days === 1 ? "" : "s"}</span>
+                <span title="Page views">👁 {m.pageviews}</span>
+                <span title="Actions">⚡ {m.actions}</span>
+                {m.uploads > 0 && <span title="Uploads / configured items">📎 {m.uploads}</span>}
+                <span className="vis-time" title="Last active">last: {dateOf(m.lastSeen)}</span>
+              </span>
+            </div>
           ))}
         </div>
       )}
