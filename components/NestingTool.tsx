@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { getToken } from "@/lib/api";
+import { getToken, API_BASE } from "@/lib/api";
 
 type NestSheet = {
   index: number;
@@ -75,10 +75,16 @@ export default function NestingTool() {
         mscale: scaledx10 ? "10" : "1",
         level: "strong", name: file.name,
       });
-      const res = await fetch(`/api/nest?${qs}`, {
+      // Uploads to the BACKEND (EC2) — not a Vercel function — so large files
+      // aren't capped by Vercel's 4.5 MB payload limit. Sent as multipart so the
+      // browser streams the file; no Content-Type header (the browser sets the
+      // multipart boundary itself).
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch(`${API_BASE}/api/v1/tools/nest?${qs}`, {
         method: "POST",
-        headers: { "Content-Type": "application/octet-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: await file.arrayBuffer(),
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: fd,
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.message || `Nesting failed (${res.status})`);

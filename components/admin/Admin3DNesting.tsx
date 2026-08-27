@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { getToken } from "@/lib/api";
+import { getToken, API_BASE } from "@/lib/api";
 import { makeZip, b64ToBytes } from "@/lib/zip";
 
 /** 80 cm print bed, in inches (the nesting engine works in inches). */
@@ -106,10 +106,13 @@ export default function Admin3DNesting() {
         fmt: "svg,dxf", // also emit vector SVG + DXF so the download can offer them
         name: file.name,
       });
-      const res = await fetch(`/api/nest?${qs}`, {
+      // Backend (EC2) processing — avoids Vercel's 4.5 MB upload cap on big files.
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await fetch(`${API_BASE}/api/v1/tools/nest?${qs}`, {
         method: "POST",
-        headers: { "Content-Type": "application/octet-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: await file.arrayBuffer(),
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: fd,
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.message || `Nesting failed (${res.status})`);
