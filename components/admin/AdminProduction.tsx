@@ -133,9 +133,9 @@ function urgencyOf(j: ProductionJob, now: { today: string; hour: number }): Urge
   const diff = daysBetween(j.dueDate, now.today); // >0 future, 0 today, <0 past
   if (diff > 0) return { level: diff <= 1 ? "soon" : "ok", label: diff === 1 ? "Due tomorrow" : `${diff} days left` };
   if (diff === 0) {
-    return now.hour < 18
-      ? { level: "today", label: "Due TODAY — before 6pm" }
-      : { level: "overdue", label: "Overdue — past 6pm today" };
+    // Due today counts as "due today" for the WHOLE day (until midnight KL).
+    // It only flips to overdue once the calendar rolls to the next day (diff < 0).
+    return { level: "today", label: "Due TODAY" };
   }
   const late = -diff;
   return { level: "overdue", label: `Overdue by ${late} day${late === 1 ? "" : "s"}` };
@@ -340,7 +340,7 @@ export default function AdminProduction() {
         <div>
           <h1>Production</h1>
           <p className="adm-card-sub">
-            Every job on the floor, due dates from working days. Orange = due today (before 6pm) · Red = overdue.
+            Every job on the floor, due dates from working days. Orange = due today · Red = overdue (from the next day).
           </p>
         </div>
         <div className="prod-head-right">
