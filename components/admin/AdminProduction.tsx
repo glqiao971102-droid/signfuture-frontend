@@ -646,6 +646,9 @@ function JobModal({
   // Handover / proof photos (Available for Collection & Ready to Ship).
   const [photos, setPhotos] = useState<{ url: string; name?: string }[]>(job.handoverPhotos ?? []);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // QC photos (QC stage). Separate set; shown to the customer at Available for Collection.
+  const [qcPhotos, setQcPhotos] = useState<{ url: string; name?: string }[]>(job.qcPhotos ?? []);
+  const [uploadingQc, setUploadingQc] = useState(false);
   // Scheduled release (Ready for AC / RS staging).
   const [scheduleAt, setScheduleAt] = useState(toLocalInput(job.scheduledReleaseAt));
   const [scheduleTo, setScheduleTo] = useState<"ready" | "shipped">((job.scheduledReleaseTo as "ready" | "shipped") || "ready");
@@ -731,6 +734,34 @@ function JobModal({
       onSavedNote();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not remove the photo");
+    }
+  }
+  async function addQcPhotos(files: FileList) {
+    setUploadingQc(true);
+    try {
+      const uploaded: { url: string; name?: string }[] = [];
+      for (const f of Array.from(files)) {
+        const r = await api.adminUploadPhoto(f);
+        uploaded.push({ url: r.url, name: f.name });
+      }
+      const next = [...qcPhotos, ...uploaded];
+      setQcPhotos(next);
+      await api.adminSaveProductionQcPhotos(job.orderId, job.id, next);
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not upload the QC photo");
+    } finally {
+      setUploadingQc(false);
+    }
+  }
+  async function removeQcPhoto(url: string) {
+    const next = qcPhotos.filter((p) => p.url !== url);
+    setQcPhotos(next);
+    try {
+      await api.adminSaveProductionQcPhotos(job.orderId, job.id, next);
+      onSavedNote();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not remove the QC photo");
     }
   }
 
@@ -893,6 +924,43 @@ function JobModal({
               )}
             </div>
           </div>
+        )}
+
+        {laneOf(job) === "qc" && (
+          <>
+            <label className="prod-modal-label">QC photos</label>
+            <p className="adm-card-sub" style={{ margin: "0 0 6px" }}>
+              QC photos of this job — the customer can view these once it&apos;s Available for Collection. Optional.
+            </p>
+            <div className="prod-photos">
+              {qcPhotos.map((p, i) => (
+                <div key={i} className="prod-photo">
+                  <a href={p.url} target="_blank" rel="noreferrer">
+                    <img src={p.url} alt={p.name || "QC photo"} />
+                  </a>
+                  {!readOnly && (
+                    <button type="button" className="prod-photo-x" onClick={() => removeQcPhoto(p.url)} aria-label="Remove photo">
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              {readOnly && qcPhotos.length === 0 && <div className="prod-empty">No photos</div>}
+              {!readOnly && (
+                <label className={`prod-photo-add${uploadingQc ? " is-busy" : ""}`}>
+                  {uploadingQc ? "Uploading…" : "＋ Add photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    disabled={uploadingQc}
+                    onChange={(e) => e.target.files && e.target.files.length && addQcPhotos(e.target.files)}
+                  />
+                </label>
+              )}
+            </div>
+          </>
         )}
 
         {(laneOf(job) === "ready" || laneOf(job) === "shipped") && (

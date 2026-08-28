@@ -1183,6 +1183,13 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ photos }) },
     );
   },
+  /** Save the QC-stage photos on a job. */
+  adminSaveProductionQcPhotos(orderId: number, itemId: number, photos: { url: string; name?: string }[]) {
+    return request<{ success: boolean }>(
+      `/api/v1/admin/production/orders/${orderId}/items/${itemId}/qc-photos`,
+      { method: "PATCH", body: JSON.stringify({ photos }) },
+    );
+  },
   /** Upload one handover photo; returns its public URL. */
   async adminUploadPhoto(file: File) {
     const form = new FormData();
@@ -1541,6 +1548,7 @@ export type ProductionJob = {
   deliveryNote: string | null;
   productionNote: string | null;
   handoverPhotos: { url: string; name?: string }[];
+  qcPhotos: { url: string; name?: string }[];
 };
 export type ProductionHoliday = { id: number; day: string; label: string | null };
 
@@ -1586,7 +1594,7 @@ export type NativeOrderRow = {
   total: number;
   currency: string;
   date: string | null;
-  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string; deliveryNote?: string | null; handoverPhotos?: { url: string; name?: string }[] }[];
+  items: { name: string; qty: number; unitPrice: number; total: number; options: { label: string; value: string }[]; artworkUrl: string | null; status?: string; statusLabel?: string; deliveryNote?: string | null; handoverPhotos?: { url: string; name?: string }[]; qcPhotos?: { url: string; name?: string }[] }[];
   history?: { to: string; date: string | null }[];
 };
 

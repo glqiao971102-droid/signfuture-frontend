@@ -177,19 +177,26 @@ function JobSteps({
   placed,
   delivery,
   photos = [],
+  qcPhotos = [],
 }: {
   status: string;
   history?: StepHistory;
   placed?: string | null;
   delivery?: string | null;
   photos?: { url: string; name?: string }[];
+  qcPhotos?: { url: string; name?: string }[];
 }) {
-  const [showDelivery, setShowDelivery] = useState(false);
+  // Which step's info panel is open (its key), or null. QC photos live on the
+  // "ready" box (Available for Collection); delivery details + handover photos
+  // live on the final "done" box (Shipped / Collected).
+  const [openStep, setOpenStep] = useState<string | null>(null);
   const cur = jobStepIndex(status);
   const dead = DEAD.includes(status);
   const deliveryRows = delivery && delivery.trim() ? parseDelivery(delivery) : null;
   const photoList = Array.isArray(photos) ? photos : [];
-  const hasInfo = !!deliveryRows || photoList.length > 0;
+  const qcList = Array.isArray(qcPhotos) ? qcPhotos : [];
+  const hasHandoverInfo = !!deliveryRows || photoList.length > 0;
+  const hasQcInfo = qcList.length > 0;
   return (
     <>
       <div className="job-steps">
@@ -208,9 +215,12 @@ function JobSteps({
           const label = boxStatus ? meta(boxStatus).label : st.label;
           const cls = active ? (dead ? "js-fail" : "js-active") : "js-done";
           const when = fmtStepTime(stepReachedAt(st, history, placed));
-          // Delivery details + handover photos live on the final box (Shipped /
-          // Collected) — the customer sees them only once the job is done.
-          const showToggleHere = st.statuses.includes("delivered") && hasInfo;
+          // QC photos toggle on the "ready" (Available for Collection) box;
+          // delivery details + handover photos toggle on the final box.
+          const isDoneBox = st.statuses.includes("delivered");
+          const isReadyBox = st.key === "ready";
+          const showToggleHere = (isDoneBox && hasHandoverInfo) || (isReadyBox && hasQcInfo);
+          const toggleTitle = isReadyBox ? "View QC photos" : "View delivery details & photos";
           return (
             <div key={st.key} className={`job-step ${cls}`}>
               <span className="job-step-num">{active ? (dead ? "✕" : i + 1) : "✓"}</span>
@@ -221,12 +231,12 @@ function JobSteps({
                     <button
                       type="button"
                       className="job-step-info"
-                      onClick={() => setShowDelivery((v) => !v)}
-                      title="View delivery details & photos"
-                      aria-label="View delivery details & photos"
+                      onClick={() => setOpenStep((v) => (v === st.key ? null : st.key))}
+                      title={toggleTitle}
+                      aria-label={toggleTitle}
                     >
-                      <span className="job-step-info-icon">📦</span>
-                      <span className="job-step-info-text">{showDelivery ? "Hide" : "View"}</span>
+                      <span className="job-step-info-icon">{isReadyBox ? "🔍" : "📦"}</span>
+                      <span className="job-step-info-text">{openStep === st.key ? "Hide" : "View"}</span>
                     </button>
                   )}
                 </span>
@@ -236,7 +246,19 @@ function JobSteps({
           );
         })}
       </div>
-      {showDelivery && hasInfo && (
+      {openStep === "ready" && hasQcInfo && (
+        <div className="job-delivery">
+          <div className="job-delivery-title">QC photos</div>
+          <div className="job-photos">
+            {qcList.map((p, i) => (
+              <a key={i} href={p.url} target="_blank" rel="noreferrer" className="job-photo">
+                <img src={p.url} alt={p.name || "QC photo"} loading="lazy" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {openStep !== null && openStep !== "ready" && hasHandoverInfo && (
         <div className="job-delivery">
           {deliveryRows && (
             <>
@@ -459,7 +481,7 @@ export default function OrderStatusList() {
                                 ))}
                               </div>
                             )}
-                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} delivery={l.deliveryNote} photos={l.handoverPhotos} />
+                            <JobSteps status={l.status ?? o.status} history={o.history} placed={o.date} delivery={l.deliveryNote} photos={l.handoverPhotos} qcPhotos={l.qcPhotos} />
                           </div>
                         ))}
                       </div>
