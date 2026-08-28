@@ -35,6 +35,7 @@ export default function CustomTopUp() {
   const [busy, setBusy] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [manualDone, setManualDone] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const num = parseFloat(amount) || 0;
   const tier = TIERS.find((t) => num >= t.min) || null;
@@ -197,6 +198,43 @@ export default function CustomTopUp() {
             <p className="topup-manual-hint">
               Transferred manually? Enter the amount above, then upload your transfer receipt.
             </p>
+
+            <div className="topup-bank">
+              <div className="topup-bank-info">
+                <div className="topup-bank-title">Bank transfer details</div>
+                <div className="topup-bank-row">
+                  <span>Bank</span>
+                  <strong>Maybank</strong>
+                </div>
+                <div className="topup-bank-row">
+                  <span>Account name</span>
+                  <strong>SIGN FUTURE INDUSTRY SDN. BHD.</strong>
+                </div>
+                <div className="topup-bank-row">
+                  <span>Account no.</span>
+                  <span className="topup-bank-acct">
+                    <strong>5621 0681 5897</strong>
+                    <button
+                      type="button"
+                      className="topup-bank-copy"
+                      onClick={() => {
+                        navigator.clipboard?.writeText("562106815897");
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      }}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </span>
+                </div>
+              </div>
+              <div className="topup-bank-qr">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/duitnow-qr.jpg" alt="DuitNow QR — SIGN FUTURE INDUSTRY" />
+                <span>Scan to pay with DuitNow QR (any bank / e-wallet app)</span>
+              </div>
+            </div>
+
             <label className="topup-receipt-picker">
               <span className="topup-receipt-btn">Choose receipt</span>
               <input
