@@ -6323,6 +6323,12 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-modal-opts b { color: #9fb0c6; font-weight: 600; }
 .prod-modal-arts { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
 .prod-modal-label { font-size: 11px; font-weight: 800; color: #9fb0c6; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; }
+.prod-photo-tag {
+  display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 10px; font-weight: 900;
+  letter-spacing: 0.06em; vertical-align: middle; margin-right: 5px;
+}
+.prod-photo-tag--qc { color: #ffce7a; background: rgba(240, 180, 60, 0.16); border: 1px solid rgba(240, 180, 60, 0.5); }
+.prod-photo-tag--handover { color: #7fd3ff; background: rgba(60, 170, 235, 0.16); border: 1px solid rgba(60, 170, 235, 0.5); }
 .prod-modal-note { width: 100%; resize: vertical; font-family: inherit; }
 .prod-modal-note-actions { display: flex; justify-content: flex-end; }
 .prod-activity { display: flex; flex-direction: column; gap: 0; max-height: 240px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.06); }

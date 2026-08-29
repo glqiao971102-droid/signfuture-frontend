@@ -926,11 +926,13 @@ function JobModal({
           </div>
         )}
 
-        {laneOf(job) === "qc" && (
+        {(laneOf(job) === "qc" || qcPhotos.length > 0) && (
           <>
-            <label className="prod-modal-label">QC photos</label>
+            <label className="prod-modal-label">
+              <span className="prod-photo-tag prod-photo-tag--qc">QC</span> QC photos
+            </label>
             <p className="adm-card-sub" style={{ margin: "0 0 6px" }}>
-              QC photos of this job — the customer can view these once it&apos;s Available for Collection. Optional.
+              Taken at the QC stage. Stays visible in every stage. The customer sees these when the job is Available for Collection. Optional.
             </p>
             <div className="prod-photos">
               {qcPhotos.map((p, i) => (
@@ -963,11 +965,13 @@ function JobModal({
           </>
         )}
 
-        {(laneOf(job) === "ready" || laneOf(job) === "shipped") && (
+        {(laneOf(job) === "ready" || laneOf(job) === "shipped" || done || photos.length > 0) && (
           <>
-            <label className="prod-modal-label">Handover / proof photos</label>
+            <label className="prod-modal-label">
+              <span className="prod-photo-tag prod-photo-tag--handover">AC</span> Handover / proof photos
+            </label>
             <p className="adm-card-sub" style={{ margin: "0 0 6px" }}>
-              Photo of the goods at collection / ship-out — the customer can view it later.
+              Uploaded at Available for Collection / ship-out — the customer sees these once the job is Collected. Stays visible in every stage. Separate from the QC photos above.
             </p>
             <div className="prod-photos">
               {photos.map((p, i) => (
