@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type AdminStats } from "@/lib/api";
+import { costLinesOf, costMoneyOf } from "@/lib/cost";
 
 const rm = (n: number) =>
   `RM ${n.toLocaleString("en-MY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -433,20 +434,38 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* ---- Membership tiers ---- */}
-        {data.tiers && data.tiers.length > 0 && (
-          <section className="adm-card">
-            <h2>Membership</h2>
-            <div className="dash-status-list">
-              {data.tiers.map((t) => (
-                <div className="dash-status-row" key={t.tier}>
-                  <span className="dash-status-name">{t.tier}</span>
-                  <span className="dash-status-count">{t.members}</span>
+        {/* ---- 3D Printer Box Up — profit estimate (auto-nested items in range) ---- */}
+        {(() => {
+          const lines = costLinesOf(data.boxUpItems ?? []);
+          const sold = lines.reduce((s, c) => s + c.sell, 0);
+          const cost = lines.reduce((s, c) => s + costMoneyOf(c).cost, 0);
+          const profit = sold - cost;
+          const margin = sold > 0 ? (profit / sold) * 100 : 0;
+          return (
+            <section className="adm-card">
+              <h2>3D Printer Box Up — profit (est.)</h2>
+              <div className="dash-status-list">
+                <div className="dash-status-row">
+                  <span className="dash-status-name">Sold</span>
+                  <span className="dash-status-rev">{rm2(sold)}</span>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+                <div className="dash-status-row">
+                  <span className="dash-status-name">Est. cost</span>
+                  <span className="dash-status-rev">{rm2(cost)}</span>
+                </div>
+                <div className="dash-status-row">
+                  <span className="dash-status-name">Profit{sold > 0 ? ` (${margin.toFixed(1)}% margin)` : ""}</span>
+                  <span className="dash-status-rev" style={{ color: profit < 0 ? "#ff9aab" : "#7ee6b4" }}>{rm2(profit)}</span>
+                </div>
+              </div>
+              <p className="adm-card-sub" style={{ marginTop: 8 }}>
+                {lines.length
+                  ? `${lines.length} auto-nested box-up item${lines.length === 1 ? "" : "s"} in this range.`
+                  : "No auto-nested box-up items in this range yet."}
+              </p>
+            </section>
+          );
+        })()}
 
         {/* ---- Reloads (wallet top-ups) ---- */}
         <section className="adm-card">

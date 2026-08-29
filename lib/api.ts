@@ -1779,6 +1779,8 @@ export type AdminStats = {
     amount: number;
     top: { name: string; email: string | null; reloads: number; amount: number }[];
   };
+  /** 3D-printer Box Up items (auto-nested) in the range, for the profit box. */
+  boxUpItems?: { name: string; total: number; options: { label: string; value: string }[]; nestingSummary: NestingSummary | null }[];
 };
 
 export type AdminProductRow = {
