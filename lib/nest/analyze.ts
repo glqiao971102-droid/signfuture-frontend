@@ -103,17 +103,27 @@ function placedUnits(groups: VGroup[], packed: PackResult, bin: number): { u: VU
 
 const f3 = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(3));
 
-/** One sheet's placed shapes as an SVG (points; y flipped to SVG's top-left origin). */
+/**
+ * One sheet's placed shapes as an SVG (y flipped to SVG's top-left origin).
+ *
+ * Emitted in MILLIMETRES (1 user unit = 1 mm) with a mm `width`/`height`, so the
+ * physical size is unambiguous. This matters for 3D-print slicers / CAM tools
+ * that ignore the SVG unit and treat 1 user unit = 1 mm — a pt-based SVG
+ * (72 units = 1 in) imported into such a tool as-if-mm blows up by 72/25.4 ≈ 2.83×.
+ */
 function sheetSvg(placed: { u: VUnit; T: Mat }[], wPt: number, hPt: number): string {
+  const MM = 25.4 / PT; // pt → mm
   let paths = "";
   for (const { u, T } of placed) {
     const subs = unitPolylines(u, T);
     if (!subs.length) continue;
     let d = "";
-    for (const sub of subs) d += "M" + sub.map(([x, y], i) => `${i === 0 ? "" : "L"}${f3(x)} ${f3(hPt - y)}`).join(" ") + "Z";
+    for (const sub of subs) d += "M" + sub.map(([x, y], i) => `${i === 0 ? "" : "L"}${f3(x * MM)} ${f3((hPt - y) * MM)}`).join(" ") + "Z";
     paths += `<path d="${d}" fill="#000" fill-rule="evenodd"/>`;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${f3(wPt)}pt" height="${f3(hPt)}pt" viewBox="0 0 ${f3(wPt)} ${f3(hPt)}">${paths}</svg>`;
+  const wMm = wPt * MM;
+  const hMm = hPt * MM;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${f3(wMm)}mm" height="${f3(hMm)}mm" viewBox="0 0 ${f3(wMm)} ${f3(hMm)}">${paths}</svg>`;
 }
 
 /** One sheet's placed shapes as a DXF (LWPOLYLINEs, millimetres, y up). */

@@ -36,6 +36,11 @@ type Mode = "slow" | "medium" | "fast";
 // 3D print-time model: outline only. time = layers × (outline mm ÷ head speed).
 const LAYER_MM = 0.3;
 const speedFor = (wIn: number, hIn: number) => (Math.max(wIn, hIn) < 6 ? 25 : 50); // mm/s
+// Filament actually consumed per metre of print LINE (toolpath): the round 1.75 mm
+// filament is squished into a wide flat bead, so far less filament than line length.
+// Calibrated to the slicer: Plate 1 = 729 m line → 116.22 m filament (0.3 mm layer,
+// 1.2 mm line width, 1.75 mm filament).
+const FILAMENT_PER_LINE_M = 116.22 / 729;
 function fmtTime(s: number): string {
   if (!s || !isFinite(s)) return "—";
   const h = Math.floor(s / 3600);
@@ -148,8 +153,10 @@ export default function Admin3DNesting() {
   const totalSeconds = allPlateSeconds.reduce((a, b) => a + b, 0);
   const maxPlateSeconds = allPlateSeconds.length ? Math.max(...allPlateSeconds) : 0;
 
-  // Printed-line (filament) length: outline perimeter × number of layers.
-  const pieceMeters = (p: { perimeterIn: number }) => (p.perimeterIn * 25.4 * layers) / 1000;
+  // Filament length actually consumed = print-line length × the extrusion ratio.
+  // (Print line = outline perimeter × number of layers; the time model uses the raw
+  //  line length via pieceSeconds — only this metres figure is filament.)
+  const pieceMeters = (p: { perimeterIn: number }) => ((p.perimeterIn * 25.4 * layers) / 1000) * FILAMENT_PER_LINE_M;
   const plateMeters = (idx: number) =>
     (result?.pieces ?? []).filter((p) => p.bin === idx).reduce((sum, p) => sum + pieceMeters(p), 0);
   const totalMeters = result ? result.sheets.reduce((s, sh) => s + plateMeters(sh.index), 0) : 0;
@@ -358,7 +365,7 @@ export default function Admin3DNesting() {
                 </div>
                 <div className="an-time-cell">
                   <span className="an-time-n">{fmtM(totalMeters)}</span>
-                  <span className="an-time-l">total 3D-print line<br />(filament) all plates</span>
+                  <span className="an-time-l">total filament<br />all plates</span>
                 </div>
                 <div className="an-time-cell">
                   <span className="an-time-n">{result.sheets.length}</span>
@@ -384,7 +391,7 @@ export default function Admin3DNesting() {
               <div key={s.index} className="nest-sheet">
                 <div className="nest-sheet-head">
                   <strong>Plate {s.index + 1} — 80 × 80 cm</strong>
-                  <span>{s.pieceCount} piece{s.pieceCount === 1 ? "" : "s"} · {s.utilPct}% used{result.pieces ? ` · ~${fmtTime(plateSeconds(s.index))} · ${fmtM(plateMeters(s.index))} line` : ""}</span>
+                  <span>{s.pieceCount} piece{s.pieceCount === 1 ? "" : "s"} · {s.utilPct}% used{result.pieces ? ` · ~${fmtTime(plateSeconds(s.index))} · ${fmtM(plateMeters(s.index))} filament` : ""}</span>
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s.previewDataUrl} alt={`Plate ${s.index + 1} layout`} />

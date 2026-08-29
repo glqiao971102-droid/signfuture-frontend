@@ -1487,6 +1487,13 @@ a { color: inherit; text-decoration: none; }
 .adm-cost-row strong { color: #eaf2ff; font-variant-numeric: tabular-nums; }
 .adm-cost-row.is-ordered { color: var(--cyan); font-weight: 700; }
 .adm-cost-row.is-ordered strong { color: var(--cyan); }
+.adm-cost-row.is-nest { color: #7ee6b4; margin-top: 3px; padding-top: 6px; border-top: 1px dashed rgba(62, 207, 142, 0.28); }
+.adm-cost-row.is-nest + .adm-cost-row.is-nest { margin-top: 0; padding-top: 0; border-top: 0; }
+.adm-cost-row.is-nest strong { color: #7ee6b4; }
+.adm-cost-row.is-total { margin-top: 4px; padding-top: 7px; border-top: 1px solid rgba(120, 160, 210, 0.28); font-weight: 700; }
+.adm-cost-row.is-total + .adm-cost-row.is-total { margin-top: 0; padding-top: 0; border-top: 0; }
+.adm-cost-row.is-profit, .adm-cost-row.is-profit strong { color: #7ee6b4; }
+.adm-cost-row.is-profit.is-loss, .adm-cost-row.is-profit.is-loss strong { color: #ff9aab; }
 .adm-cost-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
 .edit-detail-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
 .edit-detail-note { margin: 0; font-size: 12px; color: var(--muted); flex: 1 1 240px; }
