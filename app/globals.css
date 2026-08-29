@@ -6247,8 +6247,10 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .prod-driver { font-size: 10.5px; font-weight: 800; margin-top: 3px; padding: 2px 6px; border-radius: 6px; display: inline-block; }
 .prod-driver-ok { color: #7ee6b4; }
 .prod-driver-missing { color: #ffbe70; }
+.prod-photo-added { color: #7ee6b4; }
 .prod-card .prod-driver-ok { background: rgba(62,207,142,0.14); }
 .prod-card .prod-driver-missing { background: rgba(255,168,60,0.16); }
+.prod-card .prod-photo-added { background: rgba(62,207,142,0.18); }
 .prod-driver-late { color: #ff9aab; }
 .prod-card .prod-driver-late { background: rgba(255,86,110,0.18); }
 /* How long a job has sat in Available for Collection / Ready to Ship. */

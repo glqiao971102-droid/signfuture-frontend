@@ -526,12 +526,14 @@ function ProductionCard({
         ) : (
           <div className={`prod-driver ${missClass}`}>⚠ Fill driver info{dw ? ` · pending ${dw.text}` : ""}</div>
         ))}
-      {(lane === "ready" || lane === "shipped") &&
-        (hasPhoto(job) ? (
-          <div className="prod-driver prod-driver-ok">✓ Photo added</div>
-        ) : (
-          <div className="prod-driver prod-driver-missing">⚠ Add photo</div>
-        ))}
+      {Array.isArray(job.qcPhotos) && job.qcPhotos.length > 0 && (
+        <div className="prod-driver prod-photo-added">✓ QC photo added</div>
+      )}
+      {hasPhoto(job) ? (
+        <div className="prod-driver prod-photo-added">✓ Collected photo added</div>
+      ) : lane === "ready" || lane === "shipped" ? (
+        <div className="prod-driver prod-driver-missing">⚠ Add photo</div>
+      ) : null}
       {lane === "ready" && dw && (
         <div className={`prod-dwell prod-dwell-${dw.level}`}>⏱ Awaiting pickup · {dw.text}</div>
       )}
