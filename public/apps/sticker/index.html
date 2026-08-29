@@ -835,6 +835,12 @@
       grid-column: 1 / -1;
     }
 
+    /* `display: grid` above overrides the default [hidden] rule, so restore it —
+       e.g. the Lamination row hides under UV Ink (no lamination). */
+    .summary-line[hidden] {
+      display: none;
+    }
+
     .summary-line strong {
       color: #f7fbff;
       text-align: left;
