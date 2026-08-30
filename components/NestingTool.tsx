@@ -44,6 +44,9 @@ export default function NestingTool() {
   const [gapMm, setGapMm] = useState("10");
   const [rotate, setRotate] = useState(true);
   const [holes, setHoles] = useState(false);
+  const [drain, setDrain] = useState(false);
+  const [drainInfo, setDrainInfo] = useState(false);
+  const [drainZoom, setDrainZoom] = useState(false);
   // When the artwork is drawn 10× smaller (a 1:10 file), scale it up ×10 for the layout.
   const [scaledx10, setScaledx10] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -72,6 +75,7 @@ export default function NestingTool() {
       const qs = new URLSearchParams({
         w: sheetW || "48", h: sheetH || "96", gap: gapIn,
         rot: rotate ? "1" : "0", holes: holes ? "1" : "0",
+        drain: drain ? "1" : "0",
         mscale: scaledx10 ? "10" : "1",
         level: "strong", name: file.name,
       });
@@ -230,6 +234,16 @@ export default function NestingTool() {
             </div>
             <div className="an-opt-row">
               <div className="an-opt-text">
+                <span className="an-opt-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z" /></svg></span>
+                <div className="an-opt-sub">
+                  <span className="an-drain-head">Drain hole<button type="button" className="an-info" aria-label="What is a Drain Hole?" title="What is a Drain Hole?" onClick={() => { setDrainZoom(false); setDrainInfo(true); }}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="10.5" cy="10.5" r="6.5" /><line x1="15.5" y1="15.5" x2="21" y2="21" /><line x1="10.5" y1="7.7" x2="10.5" y2="13.3" /><line x1="7.7" y1="10.5" x2="13.3" y2="10.5" /></svg></button></span>
+                  <em>1 cm half-circle cut at the bottom of each letter</em>
+                </div>
+              </div>
+              <button type="button" role="switch" aria-checked={drain} className={`an-toggle${drain ? " is-on" : ""}`} onClick={() => setDrain(!drain)}><span /></button>
+            </div>
+            <div className="an-opt-row">
+              <div className="an-opt-text">
                 <span className="an-opt-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg></span>
                 <div className="an-opt-sub">
                   <span>File drawn at 1:10 scale</span>
@@ -303,6 +317,62 @@ export default function NestingTool() {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {drainInfo && (
+        <div className="an-dm" onClick={() => setDrainInfo(false)}>
+          <div className="an-dm-card" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="an-dm-close" aria-label="Close" onClick={() => setDrainInfo(false)}>&times;</button>
+            <div className="an-dm-figwrap">
+              <div className={`an-dm-fig${drainZoom ? " zoomed" : ""}`} onClick={() => setDrainZoom((z) => !z)}>
+                <svg viewBox="0 0 900 640" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="an-dm-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#eef3fa" /><stop offset="1" stopColor="#ffffff" /></linearGradient>
+                    <linearGradient id="an-dm-ul" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#3fb0ff" /><stop offset="1" stopColor="#35d8ff" /></linearGradient>
+                    <filter id="an-dm-sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#1c3a66" floodOpacity="0.14" /></filter>
+                  </defs>
+                  <rect x="0" y="0" width="900" height="640" fill="url(#an-dm-bg)" />
+                  <text x="48" y="72" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="42" fill="#12203a">Drain Hole Placement</text>
+                  <rect x="50" y="86" width="150" height="5" rx="2.5" fill="url(#an-dm-ul)" />
+                  <text x="48" y="124" fontFamily="Arial, sans-serif" fontSize="18" fill="#54627a">{"Drain holes are auto-cut at the lowest point of your artwork, so rainwater can't pool inside the letter."}</text>
+                  <g transform="translate(48,158)">
+                    <rect width="380" height="374" rx="22" fill="#ffffff" stroke="#dbe3ef" strokeWidth="1.5" filter="url(#an-dm-sh)" />
+                    <text x="190" y="252" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="210" fill="#8b95a3">A</text>
+                    <path d="M141,252 A9,9 0 0 1 159,252 Z" fill="#ffffff" />
+                    <path d="M221,252 A9,9 0 0 1 239,252 Z" fill="#ffffff" />
+                    <line x1="150" y1="254" x2="150" y2="288" stroke="#2f9bff" strokeWidth="3" strokeDasharray="1 6" strokeLinecap="round" />
+                    <line x1="230" y1="254" x2="230" y2="288" stroke="#2f9bff" strokeWidth="3" strokeDasharray="1 6" strokeLinecap="round" />
+                    <path transform="translate(150,292)" d="M0,0 C6,8 8,12 8,16 a8,8 0 1 1 -16,0 C-8,12 -6,8 0,0 Z" fill="#2f9bff" />
+                    <path transform="translate(230,292)" d="M0,0 C6,8 8,12 8,16 a8,8 0 1 1 -16,0 C-8,12 -6,8 0,0 Z" fill="#2f9bff" />
+                    <line x1="30" y1="318" x2="350" y2="318" stroke="#e4eaf3" strokeWidth="2" />
+                    <circle cx="54" cy="350" r="16" fill="#e8f7ee" stroke="#39c46b" strokeWidth="2" />
+                    <path d="M46,350 l6,6 l11,-13" fill="none" stroke="#2fa356" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <text x="82" y="345" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="22" fill="#1f8f4e">CORRECT</text>
+                    <text x="82" y="367" fontFamily="Arial, sans-serif" fontSize="13.5" fill="#6b7789">Upload artwork in the correct orientation</text>
+                  </g>
+                  <g transform="translate(472,158)">
+                    <rect width="380" height="374" rx="22" fill="#ffffff" stroke="#dbe3ef" strokeWidth="1.5" filter="url(#an-dm-sh)" />
+                    <g transform="rotate(180 190 176)"><text x="190" y="252" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="210" fill="#8b95a3">A</text></g>
+                    <path d="M181,252 A9,9 0 0 1 199,252 Z" fill="#ffffff" />
+                    <line x1="190" y1="254" x2="190" y2="288" stroke="#f0503c" strokeWidth="3" strokeDasharray="1 6" strokeLinecap="round" />
+                    <path transform="translate(190,292)" d="M0,0 C6,8 8,12 8,16 a8,8 0 1 1 -16,0 C-8,12 -6,8 0,0 Z" fill="#f0503c" />
+                    <line x1="30" y1="318" x2="350" y2="318" stroke="#e4eaf3" strokeWidth="2" />
+                    <circle cx="54" cy="350" r="16" fill="#fdecea" stroke="#f0503c" strokeWidth="2" />
+                    <path d="M47,343 l14,14 M61,343 l-14,14" fill="none" stroke="#d63a27" strokeWidth="3.2" strokeLinecap="round" />
+                    <text x="82" y="345" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="22" fill="#c8382a">WRONG</text>
+                    <text x="82" y="367" fontFamily="Arial, sans-serif" fontSize="13.5" fill="#6b7789">Do not rotate or upload upside down</text>
+                  </g>
+                  <g transform="translate(48,556)">
+                    <rect width="804" height="60" rx="14" fill="#fff7e6" stroke="#f0c860" strokeWidth="1.5" />
+                    <circle cx="36" cy="30" r="13" fill="#f6c33c" />
+                    <text x="36" y="35" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="16" fill="#3a2c05">!</text>
+                    <text x="62" y="36" fontFamily="Arial, sans-serif" fontSize="15" fill="#8a6d1f">{"Please check your artwork orientation before uploading — it will not be auto-rotated."}</text>
+                  </g>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       )}
