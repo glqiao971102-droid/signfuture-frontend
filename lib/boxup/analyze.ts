@@ -345,15 +345,34 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       };
       const used = new Set<RasterEntry>();
       const out: RasterEntry[] = [];
+      const recArea = (rc: RasterEntry) => Math.max(0, rc.width_in) * Math.max(0, rc.height_in);
       for (const b of blobs) {
         const inside = recs.filter((rc) => !used.has(rc) && covers(b, rc));
-        if (inside.length >= 2) { out.push(b); inside.forEach((rc) => used.add(rc)); }
+        if (inside.length >= 2) {
+          // Only merge when the blob is a genuinely OVER-SPLIT logo — many comparable
+          // fragments of one shape. If a single covered record already fills most of the
+          // blob, the blob only groups distinct elements bridged by a thin connector (an
+          // UNDERLINE joining two words, a baseline bar) — keep them as separate records.
+          const blobArea = Math.max(1e-6, b.width_in * b.height_in);
+          const maxRecArea = Math.max(...inside.map(recArea));
+          const overSplit = maxRecArea <= 0.6 * blobArea;
+          if (overSplit) { out.push(b); inside.forEach((rc) => used.add(rc)); }
+          else { inside.forEach((rc) => { out.push(colorful ? { ...rc, image_data_url: b.image_data_url } : rc); used.add(rc); }); }
+        }
         // Single clean shape: keep its refined record; borrow the blob's colour
         // thumbnail on a colourful page (so a solid logo isn't shown as a black block).
         else if (inside.length === 1) { out.push(colorful ? { ...inside[0], image_data_url: b.image_data_url } : inside[0]); used.add(inside[0]); }
       }
       for (const rc of recs) if (!used.has(rc)) out.push(rc); // any record no blob covered
-      if (out.length) recs = out;
+      // Drop near-duplicate records (same element detected twice) — same centre & size.
+      const deduped: RasterEntry[] = [];
+      for (const rc of out) {
+        const dup = deduped.find((k) =>
+          Math.abs(k.bbox_in.x_in - rc.bbox_in.x_in) < 0.1 && Math.abs(k.bbox_in.y_in - rc.bbox_in.y_in) < 0.1 &&
+          Math.abs(k.width_in - rc.width_in) < 0.1 && Math.abs(k.height_in - rc.height_in) < 0.1);
+        if (!dup) deduped.push(rc);
+      }
+      if (deduped.length) recs = deduped;
     }
     // Override each logo record's SIZE with the exact vector dimensions (points ->
     // inches, no pixel round-trip), so the reported size equals the AI file exactly.
@@ -476,7 +495,9 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
         total_outline_length_m: designOutlineM,
         path_count_neon: designNeon.length,
         by_color: summarizeNeonColors(designStrokes, scale),
-        dimension_preview_url: buildDimensionPreview(rendered.get(pageNumber) || null, designBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, colorPreview),
+        // Dimension Preview ALWAYS black-on-white — the crisp silhouette is what the
+        // dimension lines read against; a light/coloured render is hard to size against.
+        dimension_preview_url: buildDimensionPreview(rendered.get(pageNumber) || null, designBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, false),
         // "Original" = the same content region in its REAL colours (image only).
         original_preview_url: buildArtworkCrop(rendered.get(pageNumber) || null, designBbox, page.height_pt, renderScales.get(pageNumber) || 1.0, 560, true)?.url ?? null,
         // Signboard wants the WHOLE uploaded artboard, not the trimmed content.
@@ -503,7 +524,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       path_count_neon: pageNeon.length,
       by_color: summarizeNeonColors(pageStrokes, scale),
       designs,
-      dimension_preview_url: single ? buildDimensionPreview(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, colorPreview) : null,
+      dimension_preview_url: single ? buildDimensionPreview(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, scale, renderScales.get(pageNumber) || 1.0, false) : null,
       original_preview_url: single ? (buildArtworkCrop(rendered.get(pageNumber) || null, pageContentBbox, page.height_pt, renderScales.get(pageNumber) || 1.0, 560, true)?.url ?? null) : null,
       artwork_preview_url: single ? (buildArtworkCrop(rendered.get(pageNumber) || null, [0, 0, page.width_pt, page.height_pt], page.height_pt, renderScales.get(pageNumber) || 1.0, 560, colorPreview)?.url ?? null) : null,
       line_preview_url: single ? buildLinePreview(pageStrokes, pageContentBbox) : null,

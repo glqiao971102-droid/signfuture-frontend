@@ -2,7 +2,6 @@
 // path). Operates on an RGB pixel buffer produced by pdfium (lib/pdf/pdfium.ts).
 import { PNG } from "pngjs";
 import { POINTS_PER_INCH, snapDisplayMeasurement, type Bbox } from "@/lib/pdf/vector";
-import { pyRound } from "@/lib/pdf/pyfmt";
 import type { RenderedPage } from "@/lib/pdf/pdfium";
 
 type PxBbox = [number, number, number, number];
@@ -401,6 +400,48 @@ function splitBlobByFills(blob: PxBbox, fillBoxesPx: PxBbox[]): PxBbox[] | null 
   return separateSiblings(letters).map((b) => [Math.round(b[0]), Math.round(b[1]), Math.round(b[2]), Math.round(b[3])] as PxBbox);
 }
 
+// TRUE 2-D connected components of the drawn ink — one box per physically-connected
+// shape (letters that don't touch are separate; a letter joined to an underline is
+// one piece). Only a tiny close (~1 mm) bridges anti-aliasing, so distinct letters
+// with a real gap stay apart. This is the box-up rule: "one record per connected
+// shape; the customer groups pieces with the Group button when they want to."
+function connectedShapeBoxes2D(rgb: Uint8Array, W: number, H: number, closePx: number): PxBbox[] {
+  const ink = new Uint8Array(W * H);
+  for (let p = 0, j = 0; p < W * H; p++, j += 3) if (rgb[j] < 245 || rgb[j + 1] < 245 || rgb[j + 2] < 245) ink[p] = 1;
+  const cp = Math.max(1, closePx);
+  const INF = cp + 1;
+  const d = new Float32Array(W * H);
+  for (let p = 0; p < W * H; p++) d[p] = ink[p] ? 0 : INF;
+  const relax = (p: number, q: number, c: number) => { const v = d[q] + c; if (v < d[p]) d[p] = v; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const p = y * W + x;
+    if (x > 0) relax(p, p - 1, 1); if (y > 0) relax(p, p - W, 1);
+    if (x > 0 && y > 0) relax(p, p - W - 1, 1.414); if (x < W - 1 && y > 0) relax(p, p - W + 1, 1.414); }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const p = y * W + x;
+    if (x < W - 1) relax(p, p + 1, 1); if (y < H - 1) relax(p, p + W, 1);
+    if (x < W - 1 && y < H - 1) relax(p, p + W + 1, 1.414); if (x > 0 && y < H - 1) relax(p, p + W - 1, 1.414); }
+  const dil = new Uint8Array(W * H);
+  for (let p = 0; p < W * H; p++) if (d[p] <= cp) dil[p] = 1;
+  const label = new Int32Array(W * H);
+  const stack = new Int32Array(W * H);
+  const boxes: PxBbox[] = [];
+  let next = 1;
+  for (let s = 0; s < W * H; s++) {
+    if (!dil[s] || label[s]) continue;
+    let sp = 0; stack[sp++] = s; label[s] = next;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    while (sp > 0) {
+      const q = stack[--sp]; const x = q % W, y = (q / W) | 0;
+      if (ink[q]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      for (let dy = -1; dy <= 1; dy++) { const ny = y + dy; if (ny < 0 || ny >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) { const nx = x + dx; if (nx < 0 || nx >= W || (!dx && !dy)) continue;
+          const np = ny * W + nx; if (dil[np] && !label[np]) { label[np] = next; stack[sp++] = np; } } }
+    }
+    next++;
+    if (x1 >= x0 && y1 >= y0) boxes.push([x0, y0, x1, y1]);
+  }
+  return boxes;
+}
+
 export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0, maxItems = 120, renderScale = 1.0, fillGroupsPx: PxBbox[] = [], fillBoxesPx: PxBbox[] = [], logoClustersPx: PxBbox[] = [], clipBoxesPx: PxBbox[] = []): RasterEntry[] {
   const { width: widthPx, height: heightPx, rgb } = page;
   const scale = renderScale || 2.0;
@@ -414,8 +455,8 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
     const cm = Math.min(wIn, hIn) * 2.54;
     return { too_small: cm < 1.2, min_clearance_cm: cm };
   };
+  // Per-row lists of drawn-pixel x positions — used for content bbox + tight-bbox trims.
   const artByRow: number[][] = new Array(heightPx);
-  const rowHasArt: boolean[] = new Array(heightPx);
   for (let y = 0; y < heightPx; y++) {
     const xs: number[] = [];
     const base = y * widthPx * 3;
@@ -424,25 +465,6 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
       if (rgb[i] < 245 || rgb[i + 1] < 245 || rgb[i + 2] < 245) xs.push(x);
     }
     artByRow[y] = xs;
-    rowHasArt[y] = xs.length > 0;
-  }
-
-  const rows: [number, number][] = [];
-  let y = 0;
-  const maxRowGap = Math.max(2, pyRound(4 * scale));
-  while (y < heightPx) {
-    while (y < heightPx && !rowHasArt[y]) y++;
-    if (y >= heightPx) break;
-    const start = y;
-    let lastDark = y;
-    let gap = 0;
-    y++;
-    while (y < heightPx) {
-      if (rowHasArt[y]) { lastDark = y; gap = 0; }
-      else { gap++; if (gap > maxRowGap) break; }
-      y++;
-    }
-    rows.push([start, lastDark]);
   }
 
   const entries: RasterEntry[] = [];
@@ -466,13 +488,14 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
   // The AI file's own grouping is NOT recoverable (Illustrator flattens it away
   // on PDF export), so we always keep shapes separate; the customer joins a
   // logo's pieces with the "Group" button when they want to.
-  const candidateBoxes: PxBbox[] = [];
-  for (const [rowTop, rowBottom] of rows) {
-    if (rowBottom <= rowTop) continue;
-    for (const box of connectedComponentBoxes(artByRow, rowTop, rowBottom)) {
-      if (box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4) candidateBoxes.push(box);
-    }
-  }
+  // TRUE 2-D connected components (a ~1.2 mm close bridges anti-aliasing only), so each
+  // physically-connected shape is one record and distinct letters with a real gap stay
+  // apart — matching the "one record per connected shape, group manually" rule. (The old
+  // row-band grouping bridged neighbouring letters like M+R into one box.)
+  const pxPerRealIn = (renderScale * POINTS_PER_INCH) / scale;
+  const closePx = Math.max(1, Math.round((1.2 / 25.4) * pxPerRealIn));
+  const candidateBoxes: PxBbox[] = connectedShapeBoxes2D(rgb, widthPx, heightPx, closePx)
+    .filter((box) => box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4);
   // Keep pieces of the same compound path (Ctrl+8) together as one record.
   const fillGrouped = mergeByFillGroups(candidateBoxes, fillGroupsPx);
   // Merge outlined letters' inner counters (holes) back into the letter. Parent cap
