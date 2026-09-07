@@ -319,21 +319,54 @@ function clusterHeavyOverlap(boxes: PxBbox[]): PxBbox[] {
 // A counter is a box fully inside a LARGER box. The parent-size cap keeps a real
 // small letter that happens to sit inside a big LOGO's bbox from being swallowed —
 // that must survive as its own record (a logo is far bigger than any letter).
-function mergeCounters(boxes: PxBbox[], maxParentPx: number): PxBbox[] {
+// Background pixels reachable from the image border (flood through near-white).
+// A letter's COUNTER (the hole of d e a o g 8 B …) is background NOT reachable from
+// the border — it's sealed inside the letter — so a shape sitting in it is an inner
+// island, not a free-standing neighbour. Scale-independent (works for a 1in or a 20in
+// letter), unlike an absolute parent-size cap.
+function reachableBgMask(rgb: Uint8Array, W: number, H: number): Uint8Array {
+  const reach = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let sp = 0;
+  const isBg = (p: number) => rgb[p * 3] >= 245 && rgb[p * 3 + 1] >= 245 && rgb[p * 3 + 2] >= 245;
+  const seed = (p: number) => { if (isBg(p) && !reach[p]) { reach[p] = 1; stack[sp++] = p; } };
+  for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + (W - 1)); }
+  while (sp > 0) {
+    const q = stack[--sp], x = q % W, y = (q / W) | 0;
+    if (x > 0) seed(q - 1); if (x < W - 1) seed(q + 1);
+    if (y > 0) seed(q - W); if (y < H - 1) seed(q + W);
+  }
+  return reach;
+}
+
+// Merge a letter's inner COUNTERS/islands back into the letter so a d/e/a/o/g's hole
+// island is one record with the letter — auto, no manual Group. A box is an inner
+// island when the ring just OUTSIDE it is almost never border-reachable background
+// (it's sealed inside a shape); it then merges into the SMALLEST box that contains it
+// (its own letter, never a big logo that merely overlaps its bbox).
+function mergeCounters(boxes: PxBbox[], reachableBg: Uint8Array, W: number, H: number): PxBbox[] {
   const parent = boxes.map((_, i) => i);
   const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
   const inside = (s: PxBbox, big: PxBbox) => s[0] >= big[0] - 1 && s[1] >= big[1] - 1 && s[2] <= big[2] + 1 && s[3] <= big[3] + 1;
+  const enclosed = (b: PxBbox): boolean => {
+    const bw = b[2] - b[0], bh = b[3] - b[1];
+    const m = Math.max(2, Math.round(0.18 * Math.min(bw, bh)));
+    const ex0 = Math.max(0, b[0] - m), ey0 = Math.max(0, b[1] - m), ex1 = Math.min(W - 1, b[2] + m), ey1 = Math.min(H - 1, b[3] + m);
+    const step = Math.max(1, Math.round(Math.min(bw, bh) / 20));
+    let open = 0, checked = 0;
+    for (let x = ex0; x <= ex1; x += step) { checked += 2; if (reachableBg[ey0 * W + x]) open++; if (reachableBg[ey1 * W + x]) open++; }
+    for (let y = ey0; y <= ey1; y += step) { checked += 2; if (reachableBg[y * W + ex0]) open++; if (reachableBg[y * W + ex1]) open++; }
+    return checked > 0 && open / checked < 0.12; // <12% of the ring is open (border-reachable) bg -> sealed inside
+  };
   for (let i = 0; i < boxes.length; i++) {
-    for (let j = i + 1; j < boxes.length; j++) {
-      const ai = boxArea(boxes[i]), aj = boxArea(boxes[j]);
-      const big = ai >= aj ? boxes[i] : boxes[j];
-      const small = ai >= aj ? boxes[j] : boxes[i];
-      const bigMin = Math.min(big[2] - big[0], big[3] - big[1]);
-      // parent must be letter-sized; child strictly smaller and fully enclosed.
-      if (bigMin <= maxParentPx && Math.min(ai, aj) < 0.9 * Math.max(1, Math.max(ai, aj)) && inside(small, big)) {
-        const a = find(i), b = find(j); if (a !== b) parent[b] = a;
-      }
+    if (!enclosed(boxes[i])) continue;
+    let best = -1, bestArea = Infinity;
+    for (let j = 0; j < boxes.length; j++) {
+      if (j === i) continue;
+      if (boxArea(boxes[j]) > boxArea(boxes[i]) && inside(boxes[i], boxes[j]) && boxArea(boxes[j]) < bestArea) { bestArea = boxArea(boxes[j]); best = j; }
     }
+    if (best >= 0) { const a = find(best), b = find(i); if (a !== b) parent[b] = a; }
   }
   const groups = new Map<number, PxBbox>();
   boxes.forEach((b, i) => {
@@ -492,15 +525,21 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
   // physically-connected shape is one record and distinct letters with a real gap stay
   // apart — matching the "one record per connected shape, group manually" rule. (The old
   // row-band grouping bridged neighbouring letters like M+R into one box.)
-  const pxPerRealIn = (renderScale * POINTS_PER_INCH) / scale;
-  const closePx = Math.max(1, Math.round((1.2 / 25.4) * pxPerRealIn));
+  // Close only enough to bridge the render's own anti-aliasing (~1 render px) — NOT a
+  // real-mm distance, which at low DPI rounds up to several px and fuses tightly-kerned
+  // letters (dermalogica's o-g, i-c-a). Tie it to render pixels so a big or a 1:10 sign
+  // behave the same. 1px bridges the AA fringe; real gaps between letters stay open.
+  const closePx = 1;
   const candidateBoxes: PxBbox[] = connectedShapeBoxes2D(rgb, widthPx, heightPx, closePx)
     .filter((box) => box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4);
   // Keep pieces of the same compound path (Ctrl+8) together as one record.
   const fillGrouped = mergeByFillGroups(candidateBoxes, fillGroupsPx);
-  // Merge outlined letters' inner counters (holes) back into the letter. Parent cap
-  // = 3in so a big logo never absorbs a neighbouring letter that sits in its bbox.
-  const groupedBoxes = mergeCounters(fillGrouped, (3.0 / measurementScale) * POINTS_PER_INCH * scale);
+  // Merge each letter's inner counter/island (the hole of d e a o g 8 B …) back into
+  // the letter automatically — an island sealed inside a shape (its surrounding
+  // background can't reach the image border) folds into the smallest box containing it,
+  // at any letter size (no absolute parent-size cap).
+  const reachableBg = reachableBgMask(rgb, widthPx, heightPx);
+  const groupedBoxes = mergeCounters(fillGrouped, reachableBg, widthPx, heightPx);
   // Split blobs that fused a few touching letters into their separate vector letters
   // (e.g. a stacked "A/Y/L" column). Dense logos (many fills) are left whole. Only
   // attempt it on record-sized blobs — the many tiny components (filtered out later)

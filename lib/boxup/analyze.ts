@@ -336,43 +336,33 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
     // holding exactly one record keeps that record (its refined vector size / LED data).
     const colorful = pageIsColorful(r);
     colorfulByPage.set(page.page, colorful);
-    if (r && recs.length) {
+    // Rule A: records ARE the per-connected-shape boxes — never re-merge them here.
+    // (The old blob re-merge, a 6 mm morphological close, fused whole words once the
+    // letters were correctly separated.) We still use the colour-blob ONLY to borrow a
+    // colour thumbnail for a record it uniquely covers, so a solid/gradient logo shows
+    // in colour instead of a black block — it never changes which records exist.
+    if (r && recs.length && colorful) {
       const blobs = recordsFromImageLogos(r, renderScale, scale);
       const covers = (b: RasterEntry, rc: RasterEntry) => {
         const cx = rc.bbox_in.x_in + rc.bbox_in.width_in / 2, cy = rc.bbox_in.y_in + rc.bbox_in.height_in / 2;
         return cx >= b.bbox_in.x_in - 0.05 && cx <= b.bbox_in.x_in + b.width_in + 0.05 &&
           cy >= b.bbox_in.y_in - 0.05 && cy <= b.bbox_in.y_in + b.height_in + 0.05;
       };
-      const used = new Set<RasterEntry>();
-      const out: RasterEntry[] = [];
-      const recArea = (rc: RasterEntry) => Math.max(0, rc.width_in) * Math.max(0, rc.height_in);
-      for (const b of blobs) {
-        const inside = recs.filter((rc) => !used.has(rc) && covers(b, rc));
-        if (inside.length >= 2) {
-          // Only merge when the blob is a genuinely OVER-SPLIT logo — many comparable
-          // fragments of one shape. If a single covered record already fills most of the
-          // blob, the blob only groups distinct elements bridged by a thin connector (an
-          // UNDERLINE joining two words, a baseline bar) — keep them as separate records.
-          const blobArea = Math.max(1e-6, b.width_in * b.height_in);
-          const maxRecArea = Math.max(...inside.map(recArea));
-          const overSplit = maxRecArea <= 0.6 * blobArea;
-          if (overSplit) { out.push(b); inside.forEach((rc) => used.add(rc)); }
-          else { inside.forEach((rc) => { out.push(colorful ? { ...rc, image_data_url: b.image_data_url } : rc); used.add(rc); }); }
-        }
-        // Single clean shape: keep its refined record; borrow the blob's colour
-        // thumbnail on a colourful page (so a solid logo isn't shown as a black block).
-        else if (inside.length === 1) { out.push(colorful ? { ...inside[0], image_data_url: b.image_data_url } : inside[0]); used.add(inside[0]); }
+      for (const rc of recs) {
+        const covering = blobs.filter((b) => covers(b, rc));
+        if (covering.length === 1) rc.image_data_url = covering[0].image_data_url;
       }
-      for (const rc of recs) if (!used.has(rc)) out.push(rc); // any record no blob covered
-      // Drop near-duplicate records (same element detected twice) — same centre & size.
+    }
+    // Drop near-duplicate records (same element detected twice) — same centre & size.
+    if (recs.length) {
       const deduped: RasterEntry[] = [];
-      for (const rc of out) {
+      for (const rc of recs) {
         const dup = deduped.find((k) =>
           Math.abs(k.bbox_in.x_in - rc.bbox_in.x_in) < 0.1 && Math.abs(k.bbox_in.y_in - rc.bbox_in.y_in) < 0.1 &&
           Math.abs(k.width_in - rc.width_in) < 0.1 && Math.abs(k.height_in - rc.height_in) < 0.1);
         if (!dup) deduped.push(rc);
       }
-      if (deduped.length) recs = deduped;
+      recs = deduped;
     }
     // Override each logo record's SIZE with the exact vector dimensions (points ->
     // inches, no pixel round-trip), so the reported size equals the AI file exactly.
