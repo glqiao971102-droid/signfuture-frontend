@@ -3,7 +3,7 @@
 // uses pdfium-WASM rasterization (same engine as the original pypdfium2).
 import { extractPdf } from "@/lib/pdf/extract";
 import { renderPageRgb, type RenderedPage } from "@/lib/pdf/pdfium";
-import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, recordsFromImageLogos, ledLengthForBox, blackFillMask, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
+import { rasterWordDimensions, rasterContentBbox, recordsFromSpec, recordsFromImageLogos, ledLengthForBox, type RasterEntry, type SpecItem } from "@/lib/boxup/raster";
 import { ocrRelabel } from "@/lib/boxup/ocr";
 import {
   PdfPathAnalyzer,
@@ -763,38 +763,11 @@ function buildArtworkCrop(
   return { url: "data:image/png;base64," + PNG.sync.write(out).toString("base64"), dw, dh };
 }
 
-// Solid-black silhouette crop for the Dimension Preview: fills each letter SOLID
-// black (a pixel is black unless it is background reachable from the image border),
-// so outlined/thin/light artwork reads as clear black shapes that are easy to frame
-// and judge against — not faint hollow outlines or the original colour.
-function buildBlackSilhouetteCrop(page: RenderedPage, contentBbox: Bbox, pageHeightPt: number, renderScale = 1.0, maxH = 560): { url: string; dw: number; dh: number } | null {
-  const { width: imgW, height: imgH } = page;
-  // Even-odd fill: letter bodies solid black, inner counters kept as white holes.
-  // Shared with the record thumbnails so both look identical.
-  const black = blackFillMask(page);
-  const px1 = Math.max(0, Math.round(contentBbox[0] * renderScale));
-  const py1 = Math.max(0, Math.round((pageHeightPt - contentBbox[3]) * renderScale));
-  const px2 = Math.min(imgW, Math.round(contentBbox[2] * renderScale));
-  const py2 = Math.min(imgH, Math.round((pageHeightPt - contentBbox[1]) * renderScale));
-  const cw = Math.max(1, px2 - px1), ch = Math.max(1, py2 - py1);
-  const ratio = Math.min(maxH / ch, 1);
-  const dw = Math.max(1, Math.round(cw * ratio)), dh = Math.max(1, Math.round(ch * ratio));
-  const out = new PNG({ width: dw, height: dh });
-  for (let dy = 0; dy < dh; dy++) {
-    const sy = py1 + Math.min(ch - 1, Math.floor((dy / dh) * ch));
-    for (let dx = 0; dx < dw; dx++) {
-      const sx = px1 + Math.min(cw - 1, Math.floor((dx / dw) * cw));
-      const di = (dy * dw + dx) * 4;
-      const v = black[sy * imgW + sx] ? 0 : 255;
-      out.data[di] = v; out.data[di + 1] = v; out.data[di + 2] = v; out.data[di + 3] = 255;
-    }
-  }
-  return { url: "data:image/png;base64," + PNG.sync.write(out).toString("base64"), dw, dh };
-}
-
 function buildDimensionPreview(page: RenderedPage | null, contentBbox: Bbox | null, pageHeightPt: number, scale = 1.0, renderScale = 1.0, _useColor = false): string | null {
   if (!page || contentBbox === null) return null;
-  const crop = buildBlackSilhouetteCrop(page, contentBbox, pageHeightPt, renderScale, 560);
+  // Faithful ORIGINAL artwork, simply recoloured black (page.rgb = the original
+  // shapes normalised to black-on-white, so exact shapes and inner holes are kept).
+  const crop = buildArtworkCrop(page, contentBbox, pageHeightPt, renderScale, 560, false);
   if (!crop) return null;
   const cropUrl = crop.url;
   const dw = crop.dw;
