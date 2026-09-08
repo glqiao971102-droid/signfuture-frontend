@@ -433,6 +433,43 @@ function splitBlobByFills(blob: PxBbox, fillBoxesPx: PxBbox[]): PxBbox[] | null 
   return separateSiblings(letters).map((b) => [Math.round(b[0]), Math.round(b[1]), Math.round(b[2]), Math.round(b[3])] as PxBbox);
 }
 
+// Merge a letter's TITTLE (the dot of i / j, or an umlaut) into the stem right below
+// it, so a dotted letter is ONE record — the dot floats free of the stem so the
+// connected-shape rule would otherwise leave it as its own tiny record. A dot is a
+// small ~square box sitting just above, and horizontally over, a much taller box of
+// similar width (its stem). Scale-independent (all thresholds are relative).
+function mergeTittles(boxes: PxBbox[]): PxBbox[] {
+  const parent = boxes.map((_, i) => i);
+  const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const bw = (b: PxBbox) => b[2] - b[0] + 1, bh = (b: PxBbox) => b[3] - b[1] + 1, bcx = (b: PxBbox) => (b[0] + b[2]) / 2;
+  for (let i = 0; i < boxes.length; i++) {
+    const a = boxes[i], aw = bw(a), ah = bh(a);
+    if (aw <= 0 || ah <= 0) continue;
+    const ratio = aw / ah;
+    if (ratio < 0.4 || ratio > 3) continue; // a tittle is small & compact (square dot or a short dash)
+    let best = -1, bestGap = Infinity;
+    for (let j = 0; j < boxes.length; j++) {
+      if (j === i) continue;
+      const b = boxes[j];
+      if (bh(b) < ah * 1.8) continue;                     // stem must be much taller than the dot
+      if (b[1] <= a[3]) continue;                         // stem starts BELOW the dot's bottom
+      const gap = b[1] - a[3];
+      if (gap > ah * 2.5) continue;                       // dot sits close above the stem
+      if (bcx(a) < b[0] - aw * 0.3 || bcx(a) > b[2] + aw * 0.3) continue; // dot centred over the stem
+      if (aw < bw(b) * 0.35 || aw > bw(b) * 2.8) continue; // dot ≈ stem width (not over a wide letter)
+      if (gap < bestGap) { bestGap = gap; best = j; }
+    }
+    if (best >= 0) { const ra = find(i), rb = find(best); if (ra !== rb) parent[ra] = rb; }
+  }
+  const groups = new Map<number, PxBbox>();
+  boxes.forEach((b, i) => {
+    const r = find(i), cur = groups.get(r);
+    if (!cur) groups.set(r, [b[0], b[1], b[2], b[3]]);
+    else { cur[0] = Math.min(cur[0], b[0]); cur[1] = Math.min(cur[1], b[1]); cur[2] = Math.max(cur[2], b[2]); cur[3] = Math.max(cur[3], b[3]); }
+  });
+  return [...groups.values()];
+}
+
 // TRUE 2-D connected components of the drawn ink — one box per physically-connected
 // shape (letters that don't touch are separate; a letter joined to an underline is
 // one piece). Only a tiny close (~1 mm) bridges anti-aliasing, so distinct letters
@@ -556,7 +593,8 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
     if (parts && parts.length >= 2) splitBoxes.push(...parts);
     else splitBoxes.push(box);
   }
-  const mergedBoxes = splitBoxes.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  // Fold each i/j tittle (dot) into the stem below it, then sort top-to-bottom.
+  const mergedBoxes = mergeTittles(splitBoxes).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
   // Snap each logo record to its vector-fill cluster box, so its reported size
   // matches the AI file (the raster box under-measures light-edged logos). For each
   // logo cluster, the raster candidate that overlaps it most IS the logo -> replace
