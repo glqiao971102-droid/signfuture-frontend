@@ -613,6 +613,9 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
     }
   }
   {
+    // Even-odd fill mask (letter bodies solid black, counters white) — one per page,
+    // so each record thumbnail shows a solid black letter WITH its inner hole.
+    const bfMask = blackFillMask(page);
     for (const rawBox of mergedBoxes) {
       const isLogo = snappedLogos.has(rawBox) || snappedFills.has(rawBox);
       // Compute this record's own-shape mask ONCE and reuse it for the thumbnail,
@@ -676,7 +679,7 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
         // Mask the thumbnail to this record's shape (neighbours clipped in the box
         // are whitened). Crop the ORIGINAL box so the letter keeps a little margin.
         // Big boxes (maskInfo === null) skip masking — a plain crop, no extra flood.
-        const cropUrl = rasterCropDataUrl(page, rawBox, 150, maskInfo != null, maskInfo);
+        const cropUrl = rasterCropDataUrl(page, rawBox, 150, maskInfo != null, maskInfo, false, bfMask);
         entries.push({
           label,
           image_data_url: cropUrl,
@@ -1026,7 +1029,62 @@ function downscaleRgb(src: Uint8Array, sw: number, sh: number, dw: number, dh: n
 
 type MaskInfo = { mask: Uint8Array; width: number; height: number; x1: number; y1: number };
 
-function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false, precomputedMask: MaskInfo | null = null, colorPixels = false): string {
+// Page-level EVEN-ODD fill mask: 1 = solid black (ink + letter BODIES), 0 = white
+// (outside + inner COUNTERS). Seal thin ink (<253, dilate 1px), label free regions,
+// BFS each region's depth from the border counting ink barriers crossed; odd depth =
+// body (black), even = outside/counter (white). Lets a letter render solid black while
+// keeping its inner hole. Computed once per page and reused for every thumbnail.
+export function blackFillMask(page: RenderedPage): Uint8Array {
+  const { width: W, height: H, rgb } = page;
+  const N = W * H;
+  const SEAL = 2, INF = SEAL + 1;
+  const d = new Float32Array(N);
+  for (let p = 0; p < N; p++) d[p] = (rgb[p * 3] < 253 || rgb[p * 3 + 1] < 253 || rgb[p * 3 + 2] < 253) ? 0 : INF;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const p = y * W + x;
+    if (x > 0 && d[p - 1] + 1 < d[p]) d[p] = d[p - 1] + 1; if (y > 0 && d[p - W] + 1 < d[p]) d[p] = d[p - W] + 1; }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const p = y * W + x;
+    if (x < W - 1 && d[p + 1] + 1 < d[p]) d[p] = d[p + 1] + 1; if (y < H - 1 && d[p + W] + 1 < d[p]) d[p] = d[p + W] + 1; }
+  const sealed = new Uint8Array(N);
+  for (let p = 0; p < N; p++) if (d[p] <= SEAL) sealed[p] = 1;
+  const label = new Int32Array(N);
+  const stk = new Int32Array(N);
+  let nextLabel = 0;
+  const outsideLabels = new Set<number>();
+  for (let s = 0; s < N; s++) {
+    if (sealed[s] || label[s]) continue;
+    nextLabel++;
+    let sp = 0; stk[sp++] = s; label[s] = nextLabel; let border = false;
+    while (sp > 0) {
+      const q = stk[--sp], x = q % W, y = (q / W) | 0;
+      if (x === 0 || y === 0 || x === W - 1 || y === H - 1) border = true;
+      if (x > 0 && !sealed[q - 1] && !label[q - 1]) { label[q - 1] = nextLabel; stk[sp++] = q - 1; }
+      if (x < W - 1 && !sealed[q + 1] && !label[q + 1]) { label[q + 1] = nextLabel; stk[sp++] = q + 1; }
+      if (y > 0 && !sealed[q - W] && !label[q - W]) { label[q - W] = nextLabel; stk[sp++] = q - W; }
+      if (y < H - 1 && !sealed[q + W] && !label[q + W]) { label[q + W] = nextLabel; stk[sp++] = q + W; }
+    }
+    if (border) outsideLabels.add(nextLabel);
+  }
+  const adj = new Map<number, Set<number>>();
+  const link = (a: number, b: number) => { if (a === b) return; (adj.get(a) ?? adj.set(a, new Set()).get(a)!).add(b); (adj.get(b) ?? adj.set(b, new Set()).get(b)!).add(a); };
+  const R = SEAL + 1;
+  for (let p = 0; p < N; p++) {
+    if (!sealed[p]) continue;
+    const x = p % W, y = (p / W) | 0;
+    const near: number[] = [];
+    for (let yy = Math.max(0, y - R); yy <= Math.min(H - 1, y + R); yy++)
+      for (let xx = Math.max(0, x - R); xx <= Math.min(W - 1, x + R); xx++) { const L = label[yy * W + xx]; if (L && !near.includes(L)) near.push(L); }
+    for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) link(near[i], near[j]);
+  }
+  const depth = new Map<number, number>();
+  const dq: number[] = [];
+  outsideLabels.forEach((l) => { depth.set(l, 0); dq.push(l); });
+  for (let qi = 0; qi < dq.length; qi++) { const l = dq[qi], dl = depth.get(l)!; for (const nb of adj.get(l) ?? []) if (!depth.has(nb)) { depth.set(nb, dl + 1); dq.push(nb); } }
+  const black = new Uint8Array(N);
+  for (let p = 0; p < N; p++) { const L = label[p]; if (L === 0) black[p] = 1; else { const dep = depth.get(L); black[p] = (dep === undefined ? 1 : dep % 2 === 1) ? 1 : 0; } }
+  return black;
+}
+
+function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, maskShape = false, precomputedMask: MaskInfo | null = null, colorPixels = false, fillMask: Uint8Array | null = null): string {
   const { width: imgW, height: imgH, rgb } = page;
   // Detection/mask uses the normalised black-on-white buffer; the pixels we PAINT
   // come from the real-colour buffer when colorPixels is set (image/bitmap logos).
@@ -1046,13 +1104,20 @@ function rasterCropDataUrl(page: RenderedPage, bboxPx: PxBbox, maxSide = 150, ma
       const gx = cx1 + xx;
       const gy = cy1 + yy;
       let r: number, g: number, b: number;
-      let inMask = true;
-      if (selectedMask) {
-        const { mask, width: mw, x1: mx, y1: my } = selectedMask;
-        inMask = mx <= gx && gx <= x2 && my <= gy && gy <= y2 && !!mask[(gy - my) * mw + (gx - mx)];
+      if (fillMask && !colorPixels) {
+        // Solid-black-with-holes: this record's letter (inside its bbox) painted from the
+        // even-odd fill; pad/neighbours outside the bbox stay white.
+        const on = gx >= x1 && gx <= x2 && gy >= y1 && gy <= y2 && fillMask[gy * imgW + gx];
+        r = g = b = on ? 0 : 255;
+      } else {
+        let inMask = true;
+        if (selectedMask) {
+          const { mask, width: mw, x1: mx, y1: my } = selectedMask;
+          inMask = mx <= gx && gx <= x2 && my <= gy && gy <= y2 && !!mask[(gy - my) * mw + (gx - mx)];
+        }
+        if (selectedMask && !inMask) { r = 255; g = 255; b = 255; }
+        else { const i = (gy * imgW + gx) * 3; r = src[i]; g = src[i + 1]; b = src[i + 2]; }
       }
-      if (selectedMask && !inMask) { r = 255; g = 255; b = 255; }
-      else { const i = (gy * imgW + gx) * 3; r = src[i]; g = src[i + 1]; b = src[i + 2]; }
       const o = (yy * cw + xx) * 3;
       crop[o] = r; crop[o + 1] = g; crop[o + 2] = b;
     }
