@@ -770,30 +770,63 @@ function buildArtworkCrop(
 function buildBlackSilhouetteCrop(page: RenderedPage, contentBbox: Bbox, pageHeightPt: number, renderScale = 1.0, maxH = 560): { url: string; dw: number; dh: number } | null {
   const { width: imgW, height: imgH, rgb } = page;
   const N = imgW * imgH;
-  // Ink = any drawn (non-near-white) pixel. SEAL thin outline strokes by dilating the
-  // ink ~2px (chamfer distance) so the border flood can't leak through a hairline stroke
-  // into the letter body — otherwise outlined letters stay hollow instead of filling.
-  const SEAL = 4;
+  // Ink = any drawn (non-near-white, <253 to catch faint AA) pixel, sealed 1px so a
+  // hairline outline is a continuous barrier. Then EVEN-ODD fill: label the free (non-
+  // ink) regions, BFS their depth from the OUTSIDE by counting ink barriers crossed, and
+  // fill odd-depth regions (letter BODIES) black while even-depth (outside + COUNTERS)
+  // stay white — so letters read as solid black WITH their inner holes preserved.
+  const SEAL = 1;
   const INF = SEAL + 1;
   const d = new Float32Array(N);
-  // Catch even faint anti-aliased stroke pixels (< 253) as ink, so a hairline outline
-  // is a continuous barrier and its enclosed body fills instead of leaking to white.
   for (let p = 0; p < N; p++) d[p] = (rgb[p * 3] < 253 || rgb[p * 3 + 1] < 253 || rgb[p * 3 + 2] < 253) ? 0 : INF;
   for (let y = 0; y < imgH; y++) for (let x = 0; x < imgW; x++) { const p = y * imgW + x;
     if (x > 0 && d[p - 1] + 1 < d[p]) d[p] = d[p - 1] + 1; if (y > 0 && d[p - imgW] + 1 < d[p]) d[p] = d[p - imgW] + 1; }
   for (let y = imgH - 1; y >= 0; y--) for (let x = imgW - 1; x >= 0; x--) { const p = y * imgW + x;
     if (x < imgW - 1 && d[p + 1] + 1 < d[p]) d[p] = d[p + 1] + 1; if (y < imgH - 1 && d[p + imgW] + 1 < d[p]) d[p] = d[p + imgW] + 1; }
-  const sealed = new Uint8Array(N); // ink or within SEAL px of ink = a continuous barrier
+  const sealed = new Uint8Array(N);
   for (let p = 0; p < N; p++) if (d[p] <= SEAL) sealed[p] = 1;
-  // Reachable "outside" = non-sealed pixels connected to the image border.
-  const reach = new Uint8Array(N);
+  // Label free (non-sealed) regions (4-conn). Track which touch the image border.
+  const label = new Int32Array(N);
   const stk = new Int32Array(N);
-  let sp = 0;
-  const seed = (p: number) => { if (!sealed[p] && !reach[p]) { reach[p] = 1; stk[sp++] = p; } };
-  for (let x = 0; x < imgW; x++) { seed(x); seed((imgH - 1) * imgW + x); }
-  for (let y = 0; y < imgH; y++) { seed(y * imgW); seed(y * imgW + (imgW - 1)); }
-  while (sp > 0) { const q = stk[--sp], x = q % imgW, y = (q / imgW) | 0;
-    if (x > 0) seed(q - 1); if (x < imgW - 1) seed(q + 1); if (y > 0) seed(q - imgW); if (y < imgH - 1) seed(q + imgW); }
+  let nextLabel = 0;
+  const outsideLabels = new Set<number>();
+  for (let s = 0; s < N; s++) {
+    if (sealed[s] || label[s]) continue;
+    nextLabel++;
+    let sp = 0; stk[sp++] = s; label[s] = nextLabel; let touchesBorder = false;
+    while (sp > 0) {
+      const q = stk[--sp], x = q % imgW, y = (q / imgW) | 0;
+      if (x === 0 || y === 0 || x === imgW - 1 || y === imgH - 1) touchesBorder = true;
+      if (x > 0 && !sealed[q - 1] && !label[q - 1]) { label[q - 1] = nextLabel; stk[sp++] = q - 1; }
+      if (x < imgW - 1 && !sealed[q + 1] && !label[q + 1]) { label[q + 1] = nextLabel; stk[sp++] = q + 1; }
+      if (y > 0 && !sealed[q - imgW] && !label[q - imgW]) { label[q - imgW] = nextLabel; stk[sp++] = q - imgW; }
+      if (y < imgH - 1 && !sealed[q + imgW] && !label[q + imgW]) { label[q + imgW] = nextLabel; stk[sp++] = q + imgW; }
+    }
+    if (touchesBorder) outsideLabels.add(nextLabel);
+  }
+  // Adjacency between free regions separated by ink: for each sealed pixel, all free
+  // region labels within (SEAL+1)px are mutually adjacent (one barrier apart).
+  const adj = new Map<number, Set<number>>();
+  const link = (a: number, b: number) => { if (a === b) return; (adj.get(a) ?? adj.set(a, new Set()).get(a)!).add(b); (adj.get(b) ?? adj.set(b, new Set()).get(b)!).add(a); };
+  const R = SEAL + 1;
+  for (let p = 0; p < N; p++) {
+    if (!sealed[p]) continue;
+    const x = p % imgW, y = (p / imgW) | 0;
+    const near: number[] = [];
+    for (let yy = Math.max(0, y - R); yy <= Math.min(imgH - 1, y + R); yy++)
+      for (let xx = Math.max(0, x - R); xx <= Math.min(imgW - 1, x + R); xx++) {
+        const L = label[yy * imgW + xx]; if (L && !near.includes(L)) near.push(L);
+      }
+    for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) link(near[i], near[j]);
+  }
+  // BFS region depth from the outside (depth 0).
+  const depth = new Map<number, number>();
+  const dq: number[] = [];
+  outsideLabels.forEach((l) => { depth.set(l, 0); dq.push(l); });
+  for (let qi = 0; qi < dq.length; qi++) {
+    const l = dq[qi], dl = depth.get(l)!;
+    for (const nb of adj.get(l) ?? []) if (!depth.has(nb)) { depth.set(nb, dl + 1); dq.push(nb); }
+  }
   const px1 = Math.max(0, Math.round(contentBbox[0] * renderScale));
   const py1 = Math.max(0, Math.round((pageHeightPt - contentBbox[3]) * renderScale));
   const px2 = Math.min(imgW, Math.round(contentBbox[2] * renderScale));
@@ -806,7 +839,13 @@ function buildBlackSilhouetteCrop(page: RenderedPage, contentBbox: Bbox, pageHei
     const sy = py1 + Math.min(ch - 1, Math.floor((dy / dh) * ch));
     for (let dx = 0; dx < dw; dx++) {
       const sx = px1 + Math.min(cw - 1, Math.floor((dx / dw) * cw));
-      const black = !reach[sy * imgW + sx]; // everything not outside-white -> solid black letter
+      const si = sy * imgW + sx;
+      const L = label[si];
+      // ink -> black; free region -> black if its depth is ODD (a letter body), white if
+      // EVEN (the outside or an enclosed counter). Unreached free defaults to body (black).
+      let black: boolean;
+      if (L === 0) black = true; // sealed ink
+      else { const dep = depth.get(L); black = dep === undefined ? true : dep % 2 === 1; }
       const di = (dy * dw + dx) * 4;
       const v = black ? 0 : 255;
       out.data[di] = v; out.data[di + 1] = v; out.data[di + 2] = v; out.data[di + 3] = 255;
