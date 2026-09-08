@@ -5,6 +5,8 @@ import {
   STAINLESS_GRADE_FIELD,
   HIDE_SIDE_FINISHING_FIELD,
 } from "@/lib/boxup/stainless-fields";
+import { BASE_FINISH_PICKER_FIELD } from "@/lib/boxup/base-finish-field";
+import { HIDE_DRAIN_HOLE_FIELD } from "@/lib/boxup/hide-drain-hole-field";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +35,9 @@ const { GET, POST } = boxUpRoutes({
     STAINLESS_COLOUR_OPTIONS,
   ],
   // No paint picker: the returns take their colour from the stainless finish.
-  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD],
+  // Stainless replaces extraFields wholesale, so the base-finish picker (part of
+  // the shared backlit preset) must be re-added here explicitly.
+  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD, BASE_FINISH_PICKER_FIELD, HIDE_DRAIN_HOLE_FIELD],
 });
 
 export { GET, POST };

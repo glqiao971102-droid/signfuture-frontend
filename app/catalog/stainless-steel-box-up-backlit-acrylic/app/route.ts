@@ -6,6 +6,8 @@ import {
   HIDE_SIDE_FINISHING_FIELD,
 } from "@/lib/boxup/stainless-fields";
 import { BASE_ACRYLIC_FIELD } from "@/lib/boxup/base-acrylic-field";
+import { BASE_FINISH_PICKER_FIELD } from "@/lib/boxup/base-finish-field";
+import { HIDE_DRAIN_HOLE_FIELD } from "@/lib/boxup/hide-drain-hole-field";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +37,7 @@ const { GET, POST } = boxUpRoutes({
   ],
   // No paint picker (returns take their colour from the stainless finish), plus
   // the 1cm clear-acrylic backing plate that lights with the LED.
-  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD, BASE_ACRYLIC_FIELD],
+  extraFields: [STAINLESS_GRADE_FIELD, HIDE_SIDE_FINISHING_FIELD, BASE_ACRYLIC_FIELD, BASE_FINISH_PICKER_FIELD, HIDE_DRAIN_HOLE_FIELD],
 });
 
 export { GET, POST };

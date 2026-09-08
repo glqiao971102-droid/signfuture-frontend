@@ -1,5 +1,6 @@
 import type { BoxUpVariant } from "@/lib/boxup/variant";
 import { PAINT_SWATCH_FIELD } from "@/lib/boxup/paint-swatches";
+import { HIDE_DRAIN_HOLE_FIELD } from "@/lib/boxup/hide-drain-hole-field";
 
 /**
  * Shared configuration for front-and-back lit Box Up products.
@@ -31,5 +32,6 @@ export const FRONT_BACKLIT_PRESET: Omit<
         `<option value="3mm ACP Board">10cm Screw with Nut</option>`,
     },
   ],
-  extraFields: [PAINT_SWATCH_FIELD],
+  // Drain Hole is frontlit/channel-only, so the front & backlit variants hide it.
+  extraFields: [PAINT_SWATCH_FIELD, HIDE_DRAIN_HOLE_FIELD],
 };
