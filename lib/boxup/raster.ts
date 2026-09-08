@@ -1117,8 +1117,23 @@ export function blackFillMask(page: RenderedPage): Uint8Array {
   const dq: number[] = [];
   outsideLabels.forEach((l) => { depth.set(l, 0); dq.push(l); });
   for (let qi = 0; qi < dq.length; qi++) { const l = dq[qi], dl = depth.get(l)!; for (const nb of adj.get(l) ?? []) if (!depth.has(nb)) { depth.set(nb, dl + 1); dq.push(nb); } }
+  // "Open" free pixels = outside or an inner counter (even depth) — these stay white,
+  // and so does any sealed HALO pixel next to them, so a filled letter is NOT fattened
+  // outward and its hole is kept. Interior halo (between ink and a body) fills black.
+  const openFree = new Uint8Array(N);
+  for (let p = 0; p < N; p++) { const L = label[p]; if (L) { const dep = depth.get(L); if (dep !== undefined && dep % 2 === 0) openFree[p] = 1; } }
   const black = new Uint8Array(N);
-  for (let p = 0; p < N; p++) { const L = label[p]; if (L === 0) black[p] = 1; else { const dep = depth.get(L); black[p] = (dep === undefined ? 1 : dep % 2 === 1) ? 1 : 0; } }
+  const HR = SEAL + 1;
+  for (let p = 0; p < N; p++) {
+    const L = label[p];
+    if (L) { const dep = depth.get(L); black[p] = (dep === undefined ? 1 : dep % 2 === 1) ? 1 : 0; continue; } // free region
+    if (d[p] === 0) { black[p] = 1; continue; } // raw ink -> always black
+    // sealed halo: white if it borders an open (outside/counter) region, else black.
+    const x = p % W, y = (p / W) | 0; let nearOpen = false;
+    for (let yy = Math.max(0, y - HR); yy <= Math.min(H - 1, y + HR) && !nearOpen; yy++)
+      for (let xx = Math.max(0, x - HR); xx <= Math.min(W - 1, x + HR); xx++) { if (openFree[yy * W + xx]) { nearOpen = true; break; } }
+    black[p] = nearOpen ? 0 : 1;
+  }
   return black;
 }
 
