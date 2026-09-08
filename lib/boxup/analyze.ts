@@ -763,9 +763,61 @@ function buildArtworkCrop(
   return { url: "data:image/png;base64," + PNG.sync.write(out).toString("base64"), dw, dh };
 }
 
-function buildDimensionPreview(page: RenderedPage | null, contentBbox: Bbox | null, pageHeightPt: number, scale = 1.0, renderScale = 1.0, useColor = false): string | null {
+// Solid-black silhouette crop for the Dimension Preview: fills each letter SOLID
+// black (a pixel is black unless it is background reachable from the image border),
+// so outlined/thin/light artwork reads as clear black shapes that are easy to frame
+// and judge against — not faint hollow outlines or the original colour.
+function buildBlackSilhouetteCrop(page: RenderedPage, contentBbox: Bbox, pageHeightPt: number, renderScale = 1.0, maxH = 560): { url: string; dw: number; dh: number } | null {
+  const { width: imgW, height: imgH, rgb } = page;
+  const N = imgW * imgH;
+  // Ink = any drawn (non-near-white) pixel. SEAL thin outline strokes by dilating the
+  // ink ~2px (chamfer distance) so the border flood can't leak through a hairline stroke
+  // into the letter body — otherwise outlined letters stay hollow instead of filling.
+  const SEAL = 4;
+  const INF = SEAL + 1;
+  const d = new Float32Array(N);
+  // Catch even faint anti-aliased stroke pixels (< 253) as ink, so a hairline outline
+  // is a continuous barrier and its enclosed body fills instead of leaking to white.
+  for (let p = 0; p < N; p++) d[p] = (rgb[p * 3] < 253 || rgb[p * 3 + 1] < 253 || rgb[p * 3 + 2] < 253) ? 0 : INF;
+  for (let y = 0; y < imgH; y++) for (let x = 0; x < imgW; x++) { const p = y * imgW + x;
+    if (x > 0 && d[p - 1] + 1 < d[p]) d[p] = d[p - 1] + 1; if (y > 0 && d[p - imgW] + 1 < d[p]) d[p] = d[p - imgW] + 1; }
+  for (let y = imgH - 1; y >= 0; y--) for (let x = imgW - 1; x >= 0; x--) { const p = y * imgW + x;
+    if (x < imgW - 1 && d[p + 1] + 1 < d[p]) d[p] = d[p + 1] + 1; if (y < imgH - 1 && d[p + imgW] + 1 < d[p]) d[p] = d[p + imgW] + 1; }
+  const sealed = new Uint8Array(N); // ink or within SEAL px of ink = a continuous barrier
+  for (let p = 0; p < N; p++) if (d[p] <= SEAL) sealed[p] = 1;
+  // Reachable "outside" = non-sealed pixels connected to the image border.
+  const reach = new Uint8Array(N);
+  const stk = new Int32Array(N);
+  let sp = 0;
+  const seed = (p: number) => { if (!sealed[p] && !reach[p]) { reach[p] = 1; stk[sp++] = p; } };
+  for (let x = 0; x < imgW; x++) { seed(x); seed((imgH - 1) * imgW + x); }
+  for (let y = 0; y < imgH; y++) { seed(y * imgW); seed(y * imgW + (imgW - 1)); }
+  while (sp > 0) { const q = stk[--sp], x = q % imgW, y = (q / imgW) | 0;
+    if (x > 0) seed(q - 1); if (x < imgW - 1) seed(q + 1); if (y > 0) seed(q - imgW); if (y < imgH - 1) seed(q + imgW); }
+  const px1 = Math.max(0, Math.round(contentBbox[0] * renderScale));
+  const py1 = Math.max(0, Math.round((pageHeightPt - contentBbox[3]) * renderScale));
+  const px2 = Math.min(imgW, Math.round(contentBbox[2] * renderScale));
+  const py2 = Math.min(imgH, Math.round((pageHeightPt - contentBbox[1]) * renderScale));
+  const cw = Math.max(1, px2 - px1), ch = Math.max(1, py2 - py1);
+  const ratio = Math.min(maxH / ch, 1);
+  const dw = Math.max(1, Math.round(cw * ratio)), dh = Math.max(1, Math.round(ch * ratio));
+  const out = new PNG({ width: dw, height: dh });
+  for (let dy = 0; dy < dh; dy++) {
+    const sy = py1 + Math.min(ch - 1, Math.floor((dy / dh) * ch));
+    for (let dx = 0; dx < dw; dx++) {
+      const sx = px1 + Math.min(cw - 1, Math.floor((dx / dw) * cw));
+      const black = !reach[sy * imgW + sx]; // everything not outside-white -> solid black letter
+      const di = (dy * dw + dx) * 4;
+      const v = black ? 0 : 255;
+      out.data[di] = v; out.data[di + 1] = v; out.data[di + 2] = v; out.data[di + 3] = 255;
+    }
+  }
+  return { url: "data:image/png;base64," + PNG.sync.write(out).toString("base64"), dw, dh };
+}
+
+function buildDimensionPreview(page: RenderedPage | null, contentBbox: Bbox | null, pageHeightPt: number, scale = 1.0, renderScale = 1.0, _useColor = false): string | null {
   if (!page || contentBbox === null) return null;
-  const crop = buildArtworkCrop(page, contentBbox, pageHeightPt, renderScale, 560, useColor);
+  const crop = buildBlackSilhouetteCrop(page, contentBbox, pageHeightPt, renderScale, 560);
   if (!crop) return null;
   const cropUrl = crop.url;
   const dw = crop.dw;
