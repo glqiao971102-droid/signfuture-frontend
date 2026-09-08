@@ -928,6 +928,25 @@ function JobModal({
           </div>
         )}
 
+        {/* Shipped (delivered) lane: read-only view of the driver / courier
+            details that were filled in at the "Ready to Ship" step. */}
+        {laneOf(job) === "delivered" && job.deliveryNote && job.deliveryNote.trim() && (
+          <div className="prod-driver-box">
+            <div className="prod-modal-label">
+              Driver / Delivery details <span className="prod-driver-ok">✓ shipped</span>
+            </div>
+            {driver0.courier || driver0.tracking || driver0.phone ? (
+              <div className="prod-modal-grid">
+                {driver0.courier && <div><span>Courier</span>{driver0.courier}</div>}
+                {driver0.tracking && <div><span>Tracking No</span>{driver0.tracking}</div>}
+                {driver0.phone && <div><span>Contact</span>{driver0.phone}</div>}
+              </div>
+            ) : (
+              <p className="adm-card-sub" style={{ margin: "6px 0 0" }}>{job.deliveryNote}</p>
+            )}
+          </div>
+        )}
+
         {(laneOf(job) === "qc" || qcPhotos.length > 0) && (
           <>
             <label className="prod-modal-label">
