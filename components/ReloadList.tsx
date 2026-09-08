@@ -125,9 +125,10 @@ export default function ReloadList() {
 
   async function download(tx: WalletTransaction) {
     // "Billing To" now comes from the member's real WooCommerce billing
-    // address rather than a locally cached address book.
-    const billingTo = [(user?.name ?? "Guest").toUpperCase()];
+    // address rather than a locally cached address book. Bill to the COMPANY
+    // name when set (same as the order invoice), else the member's name.
     const b = user?.billing;
+    const billingTo = [((b?.company || user?.name) ?? "Guest").toUpperCase()];
     if (b) {
       if (b.address_1) billingTo.push(b.address_1.toUpperCase());
       if (b.address_2) billingTo.push(b.address_2.toUpperCase());

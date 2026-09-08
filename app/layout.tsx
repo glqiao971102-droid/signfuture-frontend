@@ -4,6 +4,7 @@ import { CartProvider } from "@/components/CartProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import AgentBanner from "@/components/AgentBanner";
 import Tracker from "@/components/Tracker";
+import CompanyPrompt from "@/components/CompanyPrompt";
 
 export const metadata: Metadata = {
   title: "Sign Calculators — Banner · Neon Line · 3D Box Up",
@@ -28,6 +29,7 @@ export default function RootLayout({
           <CartProvider>
             <Tracker />
             <AgentBanner />
+            <CompanyPrompt />
             {children}
           </CartProvider>
         </AuthProvider>
