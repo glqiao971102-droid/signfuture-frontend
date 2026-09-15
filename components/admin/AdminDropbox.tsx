@@ -52,6 +52,10 @@ export default function AdminDropbox() {
   const [openLoading, setOpenLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [zipping, setZipping] = useState<number | null>(null);
+  // Download a whole month (all order folders) as one zip.
+  const [dlMonth, setDlMonth] = useState("");
+  const [zippingMonth, setZippingMonth] = useState(false);
+  const [monthMsg, setMonthMsg] = useState<string | null>(null);
 
   // Config
   const [rootPath, setRootPath] = useState("");
@@ -191,6 +195,34 @@ export default function AdminDropbox() {
   const activeCount = folders.filter((f) => !f.done).length;
   const doneCount = folders.filter((f) => f.done).length;
 
+  // Months present in SF Dropbox (from each folder's leading date), newest first.
+  const months = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of folders) {
+      const mo = /^(\d{4}-\d{2})/.exec(f.folderLabel ?? "")?.[1];
+      if (mo) m.set(mo, (m.get(mo) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => (a.month < b.month ? 1 : -1));
+  }, [folders]);
+  useEffect(() => {
+    if (!dlMonth && months.length) setDlMonth(months[0].month);
+  }, [months, dlMonth]);
+
+  async function downloadMonth() {
+    if (!dlMonth) return;
+    setZippingMonth(true);
+    setMonthMsg(null);
+    try {
+      await api.adminDropboxDownloadMonthZip(dlMonth);
+    } catch (e) {
+      setMonthMsg(e instanceof Error ? e.message : "Could not download that month.");
+    } finally {
+      setZippingMonth(false);
+    }
+  }
+
   // Files/sub-folders at the current path inside the open order.
   const curPathStr = path.join("/");
   const { subDirs, filesHere } = useMemo(() => {
@@ -305,6 +337,37 @@ export default function AdminDropbox() {
               {showCfg ? "Hide settings" : "Settings"}
             </button>
           </div>
+
+          {months.length > 0 && (
+            <div className="dbx-bar" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span className="adm-card-sub">Download a whole month (keeps every order&apos;s folder):</span>
+              <select
+                className="adm-input"
+                style={{ maxWidth: 240 }}
+                value={dlMonth}
+                onChange={(e) => setDlMonth(e.target.value)}
+              >
+                {months.map((m) => (
+                  <option key={m.month} value={m.month}>
+                    {m.month} — {m.count} order{m.count === 1 ? "" : "s"}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="hero-btn ghost"
+                disabled={zippingMonth || !dlMonth}
+                onClick={downloadMonth}
+              >
+                {zippingMonth ? "Preparing…" : "↓ Download month ZIP"}
+              </button>
+              {monthMsg && (
+                <span className="adm-card-sub" style={{ color: "#ff8f8f" }}>
+                  {monthMsg}
+                </span>
+              )}
+            </div>
+          )}
 
           {showCfg && (
             <form className="adm-card" onSubmit={saveConfig}>

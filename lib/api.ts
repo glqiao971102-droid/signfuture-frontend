@@ -1274,6 +1274,45 @@ export const api = {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
+  /** Download a whole month of SF Dropbox as one ZIP (per-order folders kept). */
+  async adminDropboxDownloadMonthZip(month: string) {
+    const token = getToken();
+    const res = await fetch(
+      `${API_BASE}/api/v1/admin/dropbox/zip-month?month=${encodeURIComponent(month)}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(res.status, body?.message ?? "Could not download that month.", null);
+    }
+    const filename = `SF Dropbox ${month}.zip`;
+    // Stream to disk when supported (a month can be large); else buffer to a blob.
+    type Picker = (o: {
+      suggestedName?: string;
+    }) => Promise<{ createWritable: () => Promise<WritableStream<Uint8Array>> }>;
+    const picker = (window as unknown as { showSaveFilePicker?: Picker }).showSaveFilePicker;
+    if (picker && res.body) {
+      let handle: { createWritable: () => Promise<WritableStream<Uint8Array>> } | null = null;
+      try {
+        handle = await picker({ suggestedName: filename });
+      } catch (e) {
+        if ((e as { name?: string }).name === "AbortError") return;
+      }
+      if (handle) {
+        const writable = await handle.createWritable();
+        await res.body.pipeTo(writable);
+        return;
+      }
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
 
   // ----- Admin: customer detail -----
 
