@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
+import { useAuth } from "@/components/AuthProvider";
 import {
   api,
   type MemberProfile,
@@ -25,6 +26,7 @@ function formatDate(value: string | null): string {
 const SETTABLE = ["Diamond", "Gold", "Silver", "customer"] as const;
 
 export default function AdminCustomerDetail({ id }: { id: number }) {
+  const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [nativeOrders, setNativeOrders] = useState<AdminUserNativeOrder[]>([]);
@@ -208,6 +210,58 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
     }
   }
 
+  // Remove admin (demote) + optionally hand the downline to another admin.
+  const [removingAdmin, setRemovingAdmin] = useState(false);
+  const [savingRemove, setSavingRemove] = useState(false);
+  const [inheritSearch, setInheritSearch] = useState("");
+  const [inheritResults, setInheritResults] = useState<AdminUserRow[]>([]);
+  const [searchingInherit, setSearchingInherit] = useState(false);
+  const [inheritTarget, setInheritTarget] = useState<{ id: number; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!removingAdmin) return;
+    const term = inheritSearch.trim();
+    if (term.length < 1) {
+      setInheritResults([]);
+      return;
+    }
+    setSearchingInherit(true);
+    const t = setTimeout(() => {
+      api
+        .adminUsers({ search: term, role: "admin", perPage: 10 })
+        .then((r) => setInheritResults(r.data))
+        .catch(() => setInheritResults([]))
+        .finally(() => setSearchingInherit(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [inheritSearch, removingAdmin]);
+
+  async function removeAdmin() {
+    if (
+      !confirm(
+        `Remove admin access from ${profile?.name || "this member"}? They become a normal member — orders, wallet, tier and referral code are kept.`,
+      )
+    )
+      return;
+    setSavingRemove(true);
+    setAdminMsg(null);
+    try {
+      const r = await api.adminRemoveAdmin(id, inheritTarget?.id);
+      setRemovingAdmin(false);
+      setInheritTarget(null);
+      setInheritSearch("");
+      setInheritResults([]);
+      setAdminMsg(
+        `Admin access removed.${r.reassigned ? ` ${r.reassigned} downline member(s) moved to ${inheritTarget?.name ?? "the new admin"}.` : ""}`,
+      );
+      await load();
+    } catch (err) {
+      setAdminMsg(err instanceof Error ? err.message : "Could not remove admin.");
+    } finally {
+      setSavingRemove(false);
+    }
+  }
+
   if (loading) return <div className="adm-wrap"><p>Loading customer…</p></div>;
   if (error || !profile)
     return (
@@ -216,6 +270,9 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
         <Link href="/admin/users" className="adm-edit-link">← Back to customers</Link>
       </div>
     );
+
+  // You can't strip your own admin access (would lock yourself out).
+  const isSelf = !!currentUser && currentUser.id === profile.id;
 
   return (
     <div className="adm-wrap">
@@ -510,6 +567,122 @@ export default function AdminCustomerDetail({ id }: { id: number }) {
             </em>
           )}
         </div>
+
+        {/* Remove admin (demote) — not shown on your own account. */}
+        {profile.isAdmin && !isSelf && (
+          <div className="adm-tier-control">
+            <span className="adm-key-label">Remove admin</span>
+            {!removingAdmin ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <em className="adm-card-sub">
+                  Revokes admin access — becomes a normal member. Orders, wallet, tier and
+                  referral code are kept.
+                </em>
+                <button
+                  type="button"
+                  className="hero-btn ghost"
+                  onClick={() => setRemovingAdmin(true)}
+                >
+                  Remove admin
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10, maxWidth: 460 }}>
+                {downlineTotal > 0 ? (
+                  <>
+                    <em className="adm-card-sub">
+                      Hand this admin&apos;s {downlineTotal} downline member
+                      {downlineTotal === 1 ? "" : "s"} to another admin (optional):
+                    </em>
+                    {inheritTarget ? (
+                      <div className="adm-cons-current">
+                        <span>
+                          Reassign to: <strong>{inheritTarget.name}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          className="hero-btn ghost"
+                          style={{ marginTop: 6 }}
+                          onClick={() => setInheritTarget(null)}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          className="adm-input"
+                          type="search"
+                          placeholder="Search admin to inherit the downline…"
+                          value={inheritSearch}
+                          onChange={(e) => setInheritSearch(e.target.value)}
+                        />
+                        {inheritSearch.trim() && (
+                          <div className="adm-cons-results">
+                            {searchingInherit && <div className="adm-card-sub">Searching…</div>}
+                            {!searchingInherit && inheritResults.length === 0 && (
+                              <div className="adm-card-sub">No admins match.</div>
+                            )}
+                            {inheritResults
+                              .filter((c) => c.id !== id)
+                              .map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  className="adm-cons-result"
+                                  onClick={() => {
+                                    setInheritTarget({
+                                      id: c.id,
+                                      name: c.login || c.email || `User ${c.id}`,
+                                    });
+                                    setInheritSearch("");
+                                    setInheritResults([]);
+                                  }}
+                                >
+                                  <span className="adm-cons-name">{c.login || c.email}</span>
+                                  <span className="adm-cons-meta">
+                                    {c.email} · #{c.memberNo || c.id}
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                        <em className="adm-card-sub">
+                          Leave blank to keep them under {profile.name || "this member"}.
+                        </em>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <em className="adm-card-sub">This admin has no downline.</em>
+                )}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="hero-btn primary"
+                    disabled={savingRemove}
+                    onClick={removeAdmin}
+                  >
+                    {savingRemove ? "Removing…" : "Confirm remove admin"}
+                  </button>
+                  <button
+                    type="button"
+                    className="hero-btn ghost"
+                    disabled={savingRemove}
+                    onClick={() => {
+                      setRemovingAdmin(false);
+                      setInheritTarget(null);
+                      setInheritSearch("");
+                      setInheritResults([]);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {profile.isAdmin && (

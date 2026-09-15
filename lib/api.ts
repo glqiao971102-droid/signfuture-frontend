@@ -1328,6 +1328,18 @@ export const api = {
     );
   },
 
+  /**
+   * Revokes a member's admin role (they become a normal member; orders, wallet,
+   * tier and referral code are kept). `reassignTo`, when given, hands their
+   * downline (members referred by them) to that admin.
+   */
+  adminRemoveAdmin(id: number, reassignTo?: number) {
+    return request<{ success: boolean; isAdmin: boolean; reassigned: number }>(
+      `/api/v1/admin/users/${id}/remove-admin`,
+      { method: "POST", body: JSON.stringify(reassignTo ? { reassignTo } : {}) },
+    );
+  },
+
   /** Members referred by this admin (their downline). */
   adminDownline(id: number, page = 1) {
     return request<{
