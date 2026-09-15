@@ -136,6 +136,12 @@ export default function AdminDashboard() {
   const [from, setFrom] = useState<string>(() => thisMonthRange().from);
   const [to, setTo] = useState<string>(() => thisMonthRange().to);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // SF Dropbox: download a whole month (all order folders) as one zip.
+  const [dbxMonth, setDbxMonth] = useState<string>(() =>
+    new Date().toLocaleDateString("en-CA").slice(0, 7),
+  );
+  const [dbxZipping, setDbxZipping] = useState(false);
+  const [dbxMsg, setDbxMsg] = useState<string | null>(null);
   // Which category rows are expanded to show their products.
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   // The revenue trend chart always shows the full YEAR (Jan → now) so it stays
@@ -191,6 +197,19 @@ export default function AdminDashboard() {
     }
   }
 
+  async function downloadDropboxMonth() {
+    if (!dbxMonth) return;
+    setDbxZipping(true);
+    setDbxMsg(null);
+    try {
+      await api.adminDropboxDownloadMonthZip(dbxMonth);
+    } catch (e) {
+      setDbxMsg(e instanceof Error ? e.message : "Could not download that month.");
+    } finally {
+      setDbxZipping(false);
+    }
+  }
+
   const rangeLabel =
     mode === "month" ? "this month" : mode === "year" ? "this year" : `${from || "start"} → ${to || "today"}`;
 
@@ -228,6 +247,33 @@ export default function AdminDashboard() {
         <button type="button" className="adm-filter" disabled={downloading !== null} onClick={() => download("products")}>
           ↓ Products CSV
         </button>
+        {/* SF Dropbox: a whole month (every order's folder) as one ZIP. */}
+        <span
+          className="dash-dbx-month"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          title="All SF Dropbox order folders for this month (+ an Other/ folder of un-ordered uploads by email) as one ZIP"
+        >
+          <input
+            type="month"
+            className="adm-input"
+            style={{ width: 148 }}
+            value={dbxMonth}
+            onChange={(e) => setDbxMonth(e.target.value)}
+          />
+          <button
+            type="button"
+            className="adm-filter"
+            disabled={dbxZipping || !dbxMonth}
+            onClick={downloadDropboxMonth}
+          >
+            {dbxZipping ? "Preparing…" : "↓ SF Dropbox month ZIP"}
+          </button>
+        </span>
+        {dbxMsg && (
+          <span className="adm-card-sub" style={{ color: "#ff8f8f" }}>
+            {dbxMsg}
+          </span>
+        )}
       </div>
     </div>
   );
