@@ -1349,6 +1349,25 @@ export const api = {
     }>(`/api/v1/admin/users/${id}/downline?page=${page}`);
   },
 
+  // ----- Admin: uploaded-artwork storage (backup / cleanup) -----
+
+  /** Uploaded calculator/product artwork grouped by month (Malaysia time). */
+  adminArtworkMonths() {
+    return request<{
+      months: { month: string; files: number; sizeMB: number }[];
+      totalMB: number;
+    }>("/api/v1/admin/artwork/months");
+  },
+
+  /** Fetches a month's artwork as a .zip (authed); the caller streams/saves it. */
+  adminArtworkArchive(month: string) {
+    const token = getToken();
+    return fetch(
+      `${API_BASE}/api/v1/admin/artwork/archive?month=${encodeURIComponent(month)}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+  },
+
   // ----- Admin: wallet audit -----
 
   adminWalletSummary() {

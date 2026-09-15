@@ -153,6 +153,69 @@ export default function AdminVisitors() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
+  // Uploaded-artwork storage (backup): list months + download a month as a zip.
+  const [artworkMonths, setArtworkMonths] = useState<
+    { month: string; files: number; sizeMB: number }[] | null
+  >(null);
+  const [artworkTotalMB, setArtworkTotalMB] = useState<number | null>(null);
+  const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null);
+  const [artworkMsg, setArtworkMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .adminArtworkMonths()
+      .then((r) => {
+        setArtworkMonths(r.months);
+        setArtworkTotalMB(r.totalMB);
+      })
+      .catch(() => setArtworkMonths([]));
+  }, []);
+
+  async function downloadMonth(month: string) {
+    setDownloadingMonth(month);
+    setArtworkMsg(null);
+    try {
+      const res = await api.adminArtworkArchive(month);
+      if (!res.ok) {
+        setArtworkMsg(`Download failed (${res.status}).`);
+        return;
+      }
+      const filename = `artwork-${month}.zip`;
+      // Stream straight to a file when the browser supports it (avoids buffering
+      // a large — up to ~1GB — zip in memory); otherwise fall back to a blob.
+      type Picker = (opts: {
+        suggestedName?: string;
+      }) => Promise<{ createWritable: () => Promise<WritableStream<Uint8Array>> }>;
+      const picker = (window as unknown as { showSaveFilePicker?: Picker }).showSaveFilePicker;
+      if (picker && res.body) {
+        let handle: { createWritable: () => Promise<WritableStream<Uint8Array>> } | null = null;
+        try {
+          handle = await picker({ suggestedName: filename });
+        } catch (e) {
+          if ((e as { name?: string }).name === "AbortError") return; // user cancelled
+        }
+        if (handle) {
+          const writable = await handle.createWritable();
+          await res.body.pipeTo(writable);
+          return;
+        }
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      setArtworkMsg(e instanceof Error ? e.message : "Download failed.");
+    } finally {
+      setDownloadingMonth(null);
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -177,6 +240,58 @@ export default function AdminVisitors() {
       <div className="adm-page-head">
         <h1>Visitors</h1>
         <p>Who came to the site each day, what they viewed, and how long they stayed.</p>
+      </div>
+
+      {/* Uploaded-artwork storage: back a month up as a .zip before clearing space. */}
+      <div className="adm-card" style={{ marginBottom: 16 }}>
+        <div className="adm-card-head-row">
+          <h2>Uploaded artwork — backup</h2>
+          {artworkTotalMB != null && (
+            <span className="adm-card-sub">{artworkTotalMB} MB on server</span>
+          )}
+        </div>
+        <p className="adm-card-sub" style={{ margin: "0 0 10px" }}>
+          Customer-uploaded artwork files, grouped by upload month. Download a month as a
+          .zip to keep a backup. (Confirmed orders keep their own copy in SF Dropbox.)
+        </p>
+        {artworkMonths === null ? (
+          <div className="adm-card-sub">Loading…</div>
+        ) : artworkMonths.length === 0 ? (
+          <div className="adm-card-sub">No uploaded artwork on the server.</div>
+        ) : (
+          <div className="adm-table-scroll">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Files</th>
+                  <th>Size</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {artworkMonths.map((m) => (
+                  <tr key={m.month}>
+                    <td>{m.month}</td>
+                    <td>{m.files}</td>
+                    <td>{m.sizeMB} MB</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="adm-filter"
+                        disabled={downloadingMonth === m.month}
+                        onClick={() => downloadMonth(m.month)}
+                      >
+                        {downloadingMonth === m.month ? "Preparing…" : "↓ Download ZIP"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {artworkMsg && <p className="adm-card-sub">{artworkMsg}</p>}
       </div>
 
       <div className="vis-toolbar">
