@@ -263,6 +263,18 @@ function summarizeNeonColors(strokes: Stroke[], scale = 1.0): ColorRow[] {
   return [...byColor.values()].sort((a, b) => b.length_m - a.length_m);
 }
 
+/**
+ * Total stroke length (points) with a fallback: if the artwork has NO
+ * neon-coloured strokes, measure ALL stroked paths instead. Many customers draw
+ * the tube layout in plain black/grey and pick the neon colour in the UI, so
+ * reporting 0 for a black design is wrong — we still want the total line length.
+ * When neon-coloured strokes ARE present we keep the old behaviour (colour-drawn
+ * designs are measured by their neon strokes only, ignoring black guides).
+ */
+function neonLengthPt(all: Stroke[], neon: Stroke[]): number {
+  return (neon.length ? neon : all).reduce((a, s) => a + s.lengthPt, 0);
+}
+
 // ---------------------------------------------------------------- parser
 class PdfPathAnalyzer {
   ctm: Mat = [1, 0, 0, 1, 0, 0];
@@ -406,7 +418,12 @@ class PdfPathAnalyzer {
       else if (op === "S" || op === "s") {
         if (op === "s") this.closePath();
         this.stroke(pageIndex);
-      } else if (["n", "f", "F", "f*", "B", "B*", "b", "b*"].includes(op)) this.clearPath();
+      } else if (op === "B" || op === "B*" || op === "b" || op === "b*") {
+        // Fill-AND-stroke: the outline is still a drawn line, so measure its
+        // stroke (the fill is irrelevant to neon). Lowercase closes the path.
+        if (op === "b" || op === "b*") this.closePath();
+        this.stroke(pageIndex);
+      } else if (["n", "f", "F", "f*"].includes(op)) this.clearPath();
     } catch {
       this.clearPath();
     }
@@ -602,11 +619,11 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
 
   const totalPtAll = analyzer.strokes.reduce((a, s) => a + s.lengthPt, 0);
   const neonStrokes = analyzer.strokes.filter((s) => isNeonColor(s.color));
-  const totalPtNeon = neonStrokes.reduce((a, s) => a + s.lengthPt, 0);
+  const totalPtNeon = neonLengthPt(analyzer.strokes, neonStrokes);
   const imageBbox = unionBbox(analyzer.images);
   const clipBbox = chooseClipBbox(analyzer.clips, imageBbox);
-  const contentBbox = clipBbox || imageBbox || unionBbox(neonStrokes);
   const allStrokedBbox = unionBbox(analyzer.strokes);
+  const contentBbox = clipBbox || imageBbox || unionBbox(neonStrokes) || allStrokedBbox;
 
   const artboards: NeonArtboard[] = [];
   for (const page of pages) {
@@ -617,8 +634,9 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
     const pageClips = analyzer.clips.filter((c) => c.page === pageNumber);
     const pageImageBbox = unionBbox(pageImages);
     const pageClipBbox = chooseClipBbox(pageClips, pageImageBbox);
-    const pageContentBbox = pageClipBbox || pageImageBbox || unionBbox(pageNeon);
-    if (pageContentBbox === null && pageNeon.length === 0) continue;
+    const pageContentBbox =
+      pageClipBbox || pageImageBbox || unionBbox(pageNeon) || unionBbox(pageStrokes);
+    if (pageContentBbox === null && pageStrokes.length === 0) continue;
     const designBboxes = designBboxesForPage(pageClips, pageImages, pageNeon, [page.width_pt, page.height_pt]);
     const designs: NeonDesign[] = [];
     designBboxes.forEach((designBbox, idx) => {
@@ -630,7 +648,7 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
         page: pageNumber,
         design: designIndex,
         content_bbox_in: bboxToInches(designBbox, scale),
-        total_length_m_neon: designNeon.reduce((a, s) => a + s.lengthPt, 0) * METERS_PER_POINT * scale,
+        total_length_m_neon: neonLengthPt(designStrokes, designNeon) * METERS_PER_POINT * scale,
         path_count_neon: designNeon.length,
         by_color: summarizeNeonColors(designStrokes, scale),
         dimension_preview_url: buildDimensionPreview(designStrokes, designBbox, scale),
@@ -645,7 +663,7 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
       content_bbox_in: bboxToInches(pageContentBbox, scale),
       clipping_bbox_in: bboxToInches(pageClipBbox, scale),
       design_image_bbox_in: bboxToInches(pageImageBbox, scale),
-      total_length_m_neon: pageNeon.reduce((a, s) => a + s.lengthPt, 0) * METERS_PER_POINT * scale,
+      total_length_m_neon: neonLengthPt(pageStrokes, pageNeon) * METERS_PER_POINT * scale,
       path_count_neon: pageNeon.length,
       by_color: summarizeNeonColors(pageStrokes, scale),
       designs,
