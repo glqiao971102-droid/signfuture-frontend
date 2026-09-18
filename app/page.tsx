@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import NoticePopup from "@/components/NoticePopup";
 import AccountPanel from "@/components/AccountPanel";
 import AnnouncementCarousel from "@/components/AnnouncementCarousel";
 import { LikeFollowCard, ContactCard } from "@/components/SocialBoxes";
@@ -26,6 +27,7 @@ const CAT_META: Record<string, CatMeta> = {
 export default function HomePage() {
   return (
     <>
+      <NoticePopup />
       <Nav />
       <main className="home-main">
         {/* Row 1: hero box (left) + account/social rail (right) — equal height.
