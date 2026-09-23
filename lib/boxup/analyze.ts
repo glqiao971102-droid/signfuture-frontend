@@ -99,12 +99,21 @@ export type BoxupResult = {
 // into its parts — and since letters and logos can't be told apart by geometry
 // alone, the user chose to keep logos whole (touching letters can be split by hand
 // with the Group button). MAX_RENDER_SCALE = 1.0 keeps everything at native res.
-const RENDER_PIXEL_BUDGET = 48_000_000;
+// Cap the raster at this many pixels. The rasteriser holds the RGB buffer AND the
+// connected-component passes each allocate an Int32Array(W*H) label + stack, so a
+// serverless function's memory is the real limit — a giant artboard (e.g. a
+// 180x112in / 104 MP page) otherwise OOMs mid-analysis and the whole route 500s
+// (no price). 24 MP keeps the peak (~rgb + 2xInt32) a few hundred MB.
+const RENDER_PIXEL_BUDGET = 24_000_000;
 const MAX_RENDER_SCALE = 1.0;
 function computeRenderScale(widthPt: number, heightPt: number): number {
   const area = Math.max(1, widthPt * heightPt);
+  // Downscale oversized pages to fit the pixel budget; never upscale past 1x.
+  // (The old Math.max(1.0, s) floor DEFEATED the cap: a page bigger than the
+  //  budget clamped back to 1x and blew up memory. Keep a tiny floor so a truly
+  //  enormous artboard still renders, just at low res, rather than crashing.)
   const s = Math.sqrt(RENDER_PIXEL_BUDGET / area);
-  return Math.max(1.0, Math.min(MAX_RENDER_SCALE, s));
+  return Math.max(0.1, Math.min(MAX_RENDER_SCALE, s));
 }
 
 // A logo/illustration is a DENSE cluster of overlapping vector fills (a mascot =
