@@ -451,12 +451,30 @@ function mergeTittles(boxes: PxBbox[]): PxBbox[] {
     for (let j = 0; j < boxes.length; j++) {
       if (j === i) continue;
       const b = boxes[j];
-      if (bh(b) < ah * 1.8) continue;                     // stem must be much taller than the dot
+      // The dot must be MUCH smaller than the stem — a real tittle is a small mark,
+      // not a whole stacked glyph part. Without this, one component of a tall CJK
+      // character (e.g. the top of 皇) was accepted as a "tittle" and fused onto the
+      // character BELOW it, swallowing a whole glyph (the big 学). Require the dot's
+      // height AND area to be well under the stem's (a real i-dot is ~20%).
+      if (ah > bh(b) * 0.4) continue;                     // dot height <= 40% of stem height
+      if (bw(a) * bh(a) > bw(b) * bh(b) * 0.35) continue; // dot area <= 35% of stem area
       if (b[1] <= a[3]) continue;                         // stem starts BELOW the dot's bottom
       const gap = b[1] - a[3];
       if (gap > ah * 2.5) continue;                       // dot sits close above the stem
       if (bcx(a) < b[0] - aw * 0.3 || bcx(a) > b[2] + aw * 0.3) continue; // dot centred over the stem
       if (aw < bw(b) * 0.35 || aw > bw(b) * 2.8) continue; // dot ≈ stem width (not over a wide letter)
+      // Never merge ACROSS an intervening shape: if another box sits in the vertical
+      // gap between the dot and this stem and overlaps the dot's column, that box —
+      // not this far stem — is what's below the dot. Merging past it fuses unrelated
+      // glyphs (this is how 皇's top jumped past 皇's bottom onto the 学 under it).
+      let blocked = false;
+      for (let k = 0; k < boxes.length; k++) {
+        if (k === i || k === j) continue;
+        const c = boxes[k];
+        if (c[3] <= a[3] || c[1] >= b[1]) continue;       // c not vertically between dot & stem
+        if (Math.min(a[2], c[2]) - Math.max(a[0], c[0]) > 0) { blocked = true; break; } // c in the column
+      }
+      if (blocked) continue;
       if (gap < bestGap) { bestGap = gap; best = j; }
     }
     if (best >= 0) { const ra = find(i), rb = find(best); if (ra !== rb) parent[ra] = rb; }
