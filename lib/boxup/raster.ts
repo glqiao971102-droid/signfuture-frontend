@@ -359,11 +359,17 @@ function mergeCounters(boxes: PxBbox[], reachableBg: Uint8Array, W: number, H: n
     for (let y = ey0; y <= ey1; y += step) { checked += 2; if (reachableBg[y * W + ex0]) open++; if (reachableBg[y * W + ex1]) open++; }
     return checked > 0 && open / checked < 0.12; // <12% of the ring is open (border-reachable) bg -> sealed inside
   };
+  // A near-full-canvas shape is a FRAME / border / background rectangle, not a glyph.
+  // Its bbox contains every letter, and a frame's ink seals the interior from the
+  // border so every letter reads as "enclosed" — without this guard a framed wording
+  // collapses into ONE giant record. A real letter whose counter another box is is
+  // never canvas-sized, so never let content fold into such a shape.
+  const isFrame = (b: PxBbox) => (b[2] - b[0] + 1) >= 0.85 * W && (b[3] - b[1] + 1) >= 0.85 * H;
   for (let i = 0; i < boxes.length; i++) {
     if (!enclosed(boxes[i])) continue;
     let best = -1, bestArea = Infinity;
     for (let j = 0; j < boxes.length; j++) {
-      if (j === i) continue;
+      if (j === i || isFrame(boxes[j])) continue;
       if (boxArea(boxes[j]) > boxArea(boxes[i]) && inside(boxes[i], boxes[j]) && boxArea(boxes[j]) < bestArea) { bestArea = boxArea(boxes[j]); best = j; }
     }
     if (best >= 0) { const a = find(best), b = find(i); if (a !== b) parent[b] = a; }
@@ -594,7 +600,16 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
   // background can't reach the image border) folds into the smallest box containing it,
   // at any letter size (no absolute parent-size cap).
   const reachableBg = reachableBgMask(rgb, widthPx, heightPx);
-  const groupedBoxes = mergeCounters(fillGrouped, reachableBg, widthPx, heightPx);
+  const countered = mergeCounters(fillGrouped, reachableBg, widthPx, heightPx);
+  // Drop a FRAME / border rectangle: a near-full-canvas box that WRAPS 2+ separate
+  // content boxes. Artwork sometimes has a bounding rectangle / cut-line around the
+  // whole design; it's not a manufacturable letter, and its outline seals the interior
+  // (see mergeCounters). A real full-bleed logo has its own counters merged in, so it
+  // wraps none — only a frame wraps the letters, so requiring 2+ contained boxes keeps
+  // real single graphics safe. Left in, it shows as a spurious full-width "Letter".
+  const nearCanvasBox = (b: PxBbox) => b[2] - b[0] + 1 >= 0.85 * widthPx && b[3] - b[1] + 1 >= 0.85 * heightPx;
+  const wraps = (big: PxBbox, s: PxBbox) => s !== big && s[0] >= big[0] - 1 && s[1] >= big[1] - 1 && s[2] <= big[2] + 1 && s[3] <= big[3] + 1;
+  const groupedBoxes = countered.filter((b) => !(nearCanvasBox(b) && countered.filter((o) => wraps(b, o)).length >= 2));
   // Split blobs that fused a few touching letters into their separate vector letters
   // (e.g. a stacked "A/Y/L" column). Dense logos (many fills) are left whole. Only
   // attempt it on record-sized blobs — the many tiny components (filtered out later)
