@@ -457,13 +457,14 @@ function mergeTittles(boxes: PxBbox[]): PxBbox[] {
     for (let j = 0; j < boxes.length; j++) {
       if (j === i) continue;
       const b = boxes[j];
-      // The dot must be MUCH smaller than the stem — a real tittle is a small mark,
-      // not a whole stacked glyph part. Without this, one component of a tall CJK
-      // character (e.g. the top of 皇) was accepted as a "tittle" and fused onto the
-      // character BELOW it, swallowing a whole glyph (the big 学). Require the dot's
-      // height AND area to be well under the stem's (a real i-dot is ~20%).
-      if (ah > bh(b) * 0.4) continue;                     // dot height <= 40% of stem height
-      if (bw(a) * bh(a) > bw(b) * bh(b) * 0.35) continue; // dot area <= 35% of stem area
+      // The dot must be MUCH smaller than the stem — a real tittle is a small mark
+      // (an i-dot is ~15-20% of its stem), not a whole glyph. Without a tight cap, a
+      // CJK glyph part (the top of 皇) fused onto the char below (big 学), AND normal
+      // letters above a GIANT glyph got swallowed (a 4.4in "LEVEL" letter above an
+      // 11.5in "3" is 38% of it — slipped under a 40% cap). Keep it to real-tittle
+      // proportions: dot height <= 30% AND area <= 15% of the stem.
+      if (ah > bh(b) * 0.3) continue;                     // dot height <= 30% of stem height
+      if (bw(a) * bh(a) > bw(b) * bh(b) * 0.15) continue; // dot area <= 15% of stem area
       if (b[1] <= a[3]) continue;                         // stem starts BELOW the dot's bottom
       const gap = b[1] - a[3];
       if (gap > ah * 2.5) continue;                       // dot sits close above the stem
