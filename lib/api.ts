@@ -1826,6 +1826,10 @@ export type AdminStats = {
   };
   revenueByMonth: { month: string; orders: number; revenue: number }[];
   statusBreakdown: { status: string; orders: number; revenue: number }[];
+  /** Native orders placed by agents in the range, grouped by agent (revenue desc). */
+  agentBreakdown: { agent: string; orders: number; revenue: number }[];
+  /** Sales by each agent's own downline: orders grouped by the customer's consultant (referred_by). */
+  agentSales?: { agent: string; orders: number; revenue: number }[];
   topProducts: { name: string; orders: number; qty: number; revenue: number }[];
   /** Native revenue grouped by product category, each with its products (drill-down). */
   categoryBreakdown: {

@@ -410,6 +410,92 @@ export default function AdminDashboard() {
           )}
         </section>
 
+        {/* ---- Agent-placed orders: staff placing on a customer's behalf (代理下单) ---- */}
+        <section className="adm-card">
+          <div className="adm-card-head-row">
+            <h2>Agent-placed orders (代理)</h2>
+            <span className="dash-mom">{rangeLabel}</span>
+          </div>
+          {(() => {
+            const agents = data.agentBreakdown ?? [];
+            if (agents.length === 0)
+              return <p className="adm-card-sub">No agent-placed orders in this range.</p>;
+            const maxAgentRev = Math.max(1, ...agents.map((a) => a.revenue));
+            const totalAgentRev = agents.reduce((s, a) => s + a.revenue, 0);
+            const totalAgentOrders = agents.reduce((s, a) => s + a.orders, 0);
+            return (
+              <>
+                <div className="dash-rank">
+                  {agents.map((a, i) => (
+                    <div className="dash-rank-row" key={i}>
+                      <div className="dash-rank-main">
+                        <span className="dash-rank-name">{a.agent}</span>
+                        <span className="dash-rank-sub">
+                          {a.orders} order{a.orders === 1 ? "" : "s"}
+                        </span>
+                        <div className="dash-rank-bar">
+                          <div style={{ width: `${(a.revenue / maxAgentRev) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="dash-rank-value">{rm(a.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="dash-status-row" style={{ marginTop: 10, fontWeight: 700 }}>
+                  <span className="dash-status-name">
+                    Total · {agents.length} agent{agents.length === 1 ? "" : "s"}
+                  </span>
+                  <span className="dash-status-count">{totalAgentOrders}</span>
+                  <span className="dash-status-rev">{rm(totalAgentRev)}</span>
+                </div>
+              </>
+            );
+          })()}
+        </section>
+
+        {/* ---- Sales by agent — each agent's own customers' orders (referred_by) ---- */}
+        <section className="adm-card">
+          <div className="adm-card-head-row">
+            <h2>Sales by agent</h2>
+            <span className="dash-mom">{rangeLabel}</span>
+          </div>
+          {(() => {
+            const agents = data.agentSales ?? [];
+            if (agents.length === 0)
+              return <p className="adm-card-sub">No orders in this range.</p>;
+            const maxAgentRev = Math.max(1, ...agents.map((a) => a.revenue));
+            const totalAgentRev = agents.reduce((s, a) => s + a.revenue, 0);
+            const totalAgentOrders = agents.reduce((s, a) => s + a.orders, 0);
+            return (
+              <>
+                <div className="dash-rank">
+                  {agents.map((a, i) => (
+                    <div className="dash-rank-row" key={i}>
+                      <div className="dash-rank-main">
+                        <span className="dash-rank-name">{a.agent}</span>
+                        <span className="dash-rank-sub">
+                          {a.orders} order{a.orders === 1 ? "" : "s"}
+                        </span>
+                        <div className="dash-rank-bar">
+                          <div style={{ width: `${(a.revenue / maxAgentRev) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="dash-rank-value">{rm(a.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="dash-status-row" style={{ marginTop: 10, fontWeight: 700 }}>
+                  <span className="dash-status-name">
+                    Total · {agents.length} agent{agents.length === 1 ? "" : "s"}
+                  </span>
+                  <span className="dash-status-count">{totalAgentOrders}</span>
+                  <span className="dash-status-rev">{rm(totalAgentRev)}</span>
+                </div>
+              </>
+            );
+          })()}
+        </section>
+
         {/* ---- Production volume (area products in sq ft, others in pcs) ---- */}
         <section className="adm-card">
           <div className="adm-card-head-row">
