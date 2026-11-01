@@ -453,43 +453,43 @@ export default function AdminDashboard() {
           })()}
         </section>
 
-        {/* ---- Sales by agent — each agent's own customers' orders (referred_by) ---- */}
+        {/* ---- Sales by customer — every ordering user's total spend (all listed) ---- */}
         <section className="adm-card">
           <div className="adm-card-head-row">
-            <h2>Sales by agent</h2>
+            <h2>Sales by customer</h2>
             <span className="dash-mom">{rangeLabel}</span>
           </div>
           {(() => {
-            const agents = data.agentSales ?? [];
-            if (agents.length === 0)
+            const customers = data.customerSales ?? [];
+            if (customers.length === 0)
               return <p className="adm-card-sub">No orders in this range.</p>;
-            const maxAgentRev = Math.max(1, ...agents.map((a) => a.revenue));
-            const totalAgentRev = agents.reduce((s, a) => s + a.revenue, 0);
-            const totalAgentOrders = agents.reduce((s, a) => s + a.orders, 0);
+            const maxCustRev = Math.max(1, ...customers.map((c) => c.revenue));
+            const totalCustRev = customers.reduce((s, c) => s + c.revenue, 0);
+            const totalCustOrders = customers.reduce((s, c) => s + c.orders, 0);
             return (
               <>
                 <div className="dash-rank">
-                  {agents.map((a, i) => (
+                  {customers.map((c, i) => (
                     <div className="dash-rank-row" key={i}>
                       <div className="dash-rank-main">
-                        <span className="dash-rank-name">{a.agent}</span>
+                        <span className="dash-rank-name">{c.customer}</span>
                         <span className="dash-rank-sub">
-                          {a.orders} order{a.orders === 1 ? "" : "s"}
+                          {c.orders} order{c.orders === 1 ? "" : "s"}
                         </span>
                         <div className="dash-rank-bar">
-                          <div style={{ width: `${(a.revenue / maxAgentRev) * 100}%` }} />
+                          <div style={{ width: `${(c.revenue / maxCustRev) * 100}%` }} />
                         </div>
                       </div>
-                      <span className="dash-rank-value">{rm(a.revenue)}</span>
+                      <span className="dash-rank-value">{rm(c.revenue)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="dash-status-row" style={{ marginTop: 10, fontWeight: 700 }}>
                   <span className="dash-status-name">
-                    Total · {agents.length} agent{agents.length === 1 ? "" : "s"}
+                    Total · {customers.length} customer{customers.length === 1 ? "" : "s"}
                   </span>
-                  <span className="dash-status-count">{totalAgentOrders}</span>
-                  <span className="dash-status-rev">{rm(totalAgentRev)}</span>
+                  <span className="dash-status-count">{totalCustOrders}</span>
+                  <span className="dash-status-rev">{rm(totalCustRev)}</span>
                 </div>
               </>
             );
