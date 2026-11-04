@@ -16,15 +16,46 @@ const TIERS = [
 /** iPay88's own minimum test transaction is MYR 1.00. */
 const MIN_TOPUP = 1;
 
-// Only Stripe is offered for now. (iPay88 is temporarily hidden.)
-const METHODS: { id: PaymentProvider; label: string; hint: string }[] = [
+// Stripe is live for everyone. iPay88 (FPX online banking + e-wallets) is shown
+// as "Coming soon" to the public, but can be unlocked with a test password for
+// live testing before the public launch.
+const IPAY88_TEST_PASSWORD = "971102";
+const METHODS: { id: PaymentProvider; label: string; hint: string; soon?: boolean }[] = [
   { id: "stripe", label: "Credit / Debit Card", hint: "Visa, Mastercard, Amex" },
+  {
+    id: "ipay88",
+    label: "Online Banking / E-Wallet",
+    hint: "FPX, Touch 'n Go, GrabPay, Boost…",
+    soon: true,
+  },
 ];
 
 export default function CustomTopUp() {
   const { user, openLogin } = useAuth();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentProvider>("stripe");
+  // iPay88 stays "coming soon" to the public until it's unlocked with the test
+  // password — lets us run live payments before the public launch.
+  const [ipayUnlocked, setIpayUnlocked] = useState(false);
+
+  // Choosing a method. The "coming soon" iPay88 option asks for the test
+  // password; a wrong answer leaves it locked and the method unchanged.
+  function selectMethod(m: (typeof METHODS)[number]) {
+    if (m.id === "ipay88" && m.soon && !ipayUnlocked) {
+      const pw = window.prompt(
+        "Online Banking / E-Wallet is in testing. Enter the test password to use it:",
+      );
+      if (pw === null) return; // cancelled
+      if (pw.trim() === IPAY88_TEST_PASSWORD) {
+        setIpayUnlocked(true);
+        setMethod("ipay88");
+      } else {
+        window.alert("Incorrect password. This payment option is coming soon.");
+      }
+      return;
+    }
+    setMethod(m.id);
+  }
 
   // Prefill from ?amount= (e.g. a tier card's "Top up RM 10,000" button).
   useEffect(() => {
@@ -152,21 +183,62 @@ export default function CustomTopUp() {
 
       <fieldset className="pay-methods">
         <legend>Payment method</legend>
-        {METHODS.map((m) => (
-          <label key={m.id} className={`pay-method${method === m.id ? " is-active" : ""}`}>
-            <input
-              type="radio"
-              name="topup-method"
-              value={m.id}
-              checked={method === m.id}
-              onChange={() => setMethod(m.id)}
-            />
-            <span className="pay-method-body">
-              <strong>{m.label}</strong>
-              <em>{m.hint}</em>
-            </span>
-          </label>
-        ))}
+        {METHODS.map((m) => {
+          const locked = m.soon && !ipayUnlocked;
+          return (
+            <label
+              key={m.id}
+              className={`pay-method${method === m.id ? " is-active" : ""}`}
+              style={locked ? { opacity: 0.65 } : undefined}
+            >
+              <input
+                type="radio"
+                name="topup-method"
+                value={m.id}
+                checked={method === m.id}
+                onChange={() => selectMethod(m)}
+              />
+              <span className="pay-method-body">
+                <strong>
+                  {m.label}
+                  {locked && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#b45309",
+                        background: "#fef3c7",
+                        padding: "1px 7px",
+                        borderRadius: 999,
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      Coming soon
+                    </span>
+                  )}
+                  {m.id === "ipay88" && ipayUnlocked && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#047857",
+                        background: "#d1fae5",
+                        padding: "1px 7px",
+                        borderRadius: 999,
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      Test mode
+                    </span>
+                  )}
+                </strong>
+                <em>{m.hint}</em>
+              </span>
+            </label>
+          );
+        })}
       </fieldset>
 
       {error && (
