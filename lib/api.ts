@@ -786,6 +786,11 @@ export const api = {
     });
   },
 
+  /** Public MYR 1.00 iPay88 activation-test checkout (no auth needed). */
+  ipay88Test() {
+    return request<PaymentInitiation>("/api/v1/payments/ipay88-test");
+  },
+
   /** Uploads a bank-transfer receipt and returns its stored URL. */
   async uploadReceipt(file: File) {
     const form = new FormData();
