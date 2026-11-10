@@ -15,6 +15,8 @@ const TIERS = [
 
 /** iPay88's own minimum test transaction is MYR 1.00. */
 const MIN_TOPUP = 1;
+/** iPay88's per-transaction ceiling for this merchant is MYR 20,000. */
+const MAX_TOPUP = 20000;
 
 // iPay88 (FPX online banking + e-wallets) is the primary online payment;
 // Stripe remains available for credit/debit cards.
@@ -52,6 +54,13 @@ export default function CustomTopUp() {
     }
     if (num < MIN_TOPUP) {
       setError(`Please enter at least RM ${MIN_TOPUP.toFixed(2)}.`);
+      return;
+    }
+    if (num > MAX_TOPUP) {
+      setError(
+        `The maximum online top-up is RM ${MAX_TOPUP.toLocaleString("en-MY")} per transaction. ` +
+          `For a larger amount, please pay by bank transfer below or split it into several top-ups.`,
+      );
       return;
     }
 
@@ -127,6 +136,7 @@ export default function CustomTopUp() {
         <input
           type="number"
           min={MIN_TOPUP}
+          max={MAX_TOPUP}
           step={50}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
