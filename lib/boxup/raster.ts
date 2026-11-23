@@ -537,7 +537,7 @@ function connectedShapeBoxes2D(rgb: Uint8Array, W: number, H: number, closePx: n
   return boxes;
 }
 
-export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0, maxItems = 120, renderScale = 1.0, fillGroupsPx: PxBbox[] = [], fillBoxesPx: PxBbox[] = [], logoClustersPx: PxBbox[] = [], clipBoxesPx: PxBbox[] = []): RasterEntry[] {
+export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0, maxItems = 120, renderScale = 1.0, fillGroupsPx: PxBbox[] = [], fillBoxesPx: PxBbox[] = [], logoClustersPx: PxBbox[] = [], clipBoxesPx: PxBbox[] = [], glyphCellsPx: PxBbox[] = []): RasterEntry[] {
   const { width: widthPx, height: heightPx, rgb } = page;
   const scale = renderScale || 2.0;
   // LED clearance = the letter's own MINIMUM overall dimension (its shortest side).
@@ -594,8 +594,11 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
   const closePx = 1;
   const candidateBoxes: PxBbox[] = connectedShapeBoxes2D(rgb, widthPx, heightPx, closePx)
     .filter((box) => box[2] - box[0] + 1 >= 4 && box[3] - box[1] + 1 >= 4);
-  // Keep pieces of the same compound path (Ctrl+8) together as one record.
-  const fillGrouped = mergeByFillGroups(candidateBoxes, fillGroupsPx);
+  // Keep pieces of the same compound path (Ctrl+8) together as one record, plus each
+  // near-square CJK glyph cell (disconnected strokes of one character — no AI grouping
+  // survives PDF export, so we rebuild the cell from the vector fills in analyze.ts).
+  const mergeGroupsPx = glyphCellsPx.length ? fillGroupsPx.concat(glyphCellsPx) : fillGroupsPx;
+  const fillGrouped = mergeByFillGroups(candidateBoxes, mergeGroupsPx);
   // Merge each letter's inner counter/island (the hole of d e a o g 8 B …) back into
   // the letter automatically — an island sealed inside a shape (its surrounding
   // background can't reach the image border) folds into the smallest box containing it,
@@ -620,10 +623,26 @@ export function rasterWordDimensions(page: RenderedPage, measurementScale = 1.0,
   // of fills is a detailed illustration where letter-splitting doesn't apply, and
   // the per-blob fill scan would be far too slow — skip it there.
   const canSplit = fillBoxesPx.length > 0 && fillBoxesPx.length <= 4000;
+  // A box that IS a merged CJK glyph cell must NOT be split back into its strokes — that
+  // would undo the character merge. Protect ONLY a box that matches a cell closely: it
+  // must lie essentially INSIDE the cell (>=0.75 of the box) AND fill most of it
+  // (>=0.6 of the cell). A blob that merely CONTAINS a cell but spills past it — e.g. a
+  // tight "I"+"A" that touch into one component around the "A" cell — fails the first
+  // test, so it still splits into its real letters.
+  const isGlyphCell = (box: PxBbox): boolean => {
+    if (!glyphCellsPx.length) return false;
+    const a = boxArea(box);
+    if (a <= 0) return false;
+    for (const cell of glyphCellsPx) {
+      const ov = overlapArea(box, cell);
+      if (ov >= 0.75 * a && ov >= 0.6 * boxArea(cell)) return true;
+    }
+    return false;
+  };
   const splitBoxes: PxBbox[] = [];
   for (const box of groupedBoxes) {
     const recordSized = box[2] - box[0] + 1 >= minRecordPx && box[3] - box[1] + 1 >= minRecordPx;
-    const parts = canSplit && recordSized ? splitBlobByFills(box, fillBoxesPx) : null;
+    const parts = canSplit && recordSized && !isGlyphCell(box) ? splitBlobByFills(box, fillBoxesPx) : null;
     if (parts && parts.length >= 2) splitBoxes.push(...parts);
     else splitBoxes.push(box);
   }

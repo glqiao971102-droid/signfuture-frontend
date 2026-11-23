@@ -206,6 +206,83 @@ function denseFillClusters(boxes: Bbox[], minFills = 15): Bbox[] {
   return result;
 }
 
+// A CJK character (and any near-square multi-piece mark) is drawn as several
+// DISCONNECTED stroke fills — 湘 = 氵 + 相, 煲 = 保 over 火 — with no grouping metadata
+// (an Illustrator Ctrl+G group is flattened away on PDF export). Raster detection then
+// makes each stroke its own record, shattering one character into 2–4 records (and its
+// dots into tiny specks), which mis-prices the sign. We cluster the page's individual
+// vector fills by proximity and keep a cluster as ONE glyph cell only when the merged
+// box is NEAR-SQUARE — the shape of a CJK character. Those cells are fed into
+// mergeByFillGroups (the same path Ctrl+8 compound paths use) so each character becomes
+// one record with its true bounding box.
+//
+// The square gate is the safety net, and it's why this can't regress Latin or logos:
+//   • Latin letters are tightly kerned, so they cluster too — but a run of letters merges
+//     to a WIDE box (ar >> 1), which is rejected, so every letter stays its own record.
+//   • A vertically-stacked pair merges TALL (ar << 1) and is rejected.
+//   • A cluster that accidentally spans two characters is non-square and is rejected,
+//     leaving those pieces exactly as they are today (no worse, never fused wrongly).
+// Net: this can only CORRECT a shattered near-square glyph; it never creates a merge
+// that fuses things which should stay separate. Fills in POINTS, y-up, like analyzer.fills.
+function squareGlyphClusters(fillsPt: Bbox[], pageWpt: number, pageHpt: number): Bbox[] {
+  const n = fillsPt.length;
+  if (n < 2 || n > 600) return []; // agglomerative (~O(n^3)); a detailed illustration isn't CJK wording
+  const maxdim = (b: Bbox) => Math.max(b[2] - b[0], b[3] - b[1]);
+  // Euclidean gap between two boxes (0 when they overlap).
+  const gap = (a: Bbox, b: Bbox) => {
+    const gx = Math.max(0, Math.max(a[0], b[0]) - Math.min(a[2], b[2]));
+    const gy = Math.max(0, Math.max(a[1], b[1]) - Math.min(a[3], b[3]));
+    return Math.hypot(gx, gy);
+  };
+  const uni = (a: Bbox, b: Bbox): Bbox => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])];
+  // Each fill starts as its own cell. We can't use plain proximity clustering: Latin
+  // kerning (and the gap between two text rows) is TIGHTER than the gaps between a CJK
+  // character's own strokes, so a single-linkage pass chains the whole design into one
+  // blob. Instead we agglomerate smallest-gap-first with a CELL-SIZE CAP: a merge is
+  // allowed only when the resulting box is at most ~1.4x the larger partner's size. A
+  // character's strokes include one near-full-span stroke, so its pieces stay within
+  // that cap and coalesce into the one cell; absorbing a SECOND character would ~double
+  // the extent and is blocked. This confines every cluster to a single glyph cell and
+  // works for horizontal rows AND vertical columns, with no chaining.
+  type Cell = { box: Bbox; count: number; alive: boolean };
+  const cells: Cell[] = fillsPt.map((b) => ({ box: [b[0], b[1], b[2], b[3]] as Bbox, count: 1, alive: true }));
+  const CAP = 1.4;      // a cell may grow to at most 1.4x its larger member — ~one glyph
+  for (;;) {
+    let bi = -1, bj = -1, bestGap = Infinity;
+    for (let i = 0; i < cells.length; i++) {
+      if (!cells[i].alive) continue;
+      for (let j = i + 1; j < cells.length; j++) {
+        if (!cells[j].alive) continue;
+        const A = cells[i].box, B = cells[j].box;
+        const dA = maxdim(A), dB = maxdim(B);
+        const near = 0.5 * Math.max(dA, dB); // only nearby pieces, relative to glyph size
+        const g = gap(A, B);
+        if (g > near || g >= bestGap) continue;
+        const U = uni(A, B);
+        if (maxdim(U) > CAP * Math.max(dA, dB)) continue; // would outgrow one glyph cell
+        bestGap = g; bi = i; bj = j;
+      }
+    }
+    if (bi < 0) break;
+    cells[bi].box = uni(cells[bi].box, cells[bj].box);
+    cells[bi].count += cells[bj].count;
+    cells[bj].alive = false;
+  }
+  const out: Bbox[] = [];
+  for (const c of cells) {
+    if (!c.alive || c.count < 2) continue; // a single-fill letter is left untouched
+    const w = c.box[2] - c.box[0], h = c.box[3] - c.box[1];
+    if (w <= 0 || h <= 0) continue;
+    if (w > pageWpt * 0.85 && h > pageHpt * 0.85) continue; // a frame / the whole design
+    const ar = w / h;
+    // Near-square only (a CJK cell is ~1:1). Backs up the cap: any wide (merged Latin
+    // run) or tall (stacked pair) cluster that slipped through is dropped, so its pieces
+    // stay as separate records — this can only fix a shatter, never fuse wrongly.
+    if (ar >= 0.6 && ar <= 1.7) out.push([c.box[0], c.box[1], c.box[2], c.box[3]]);
+  }
+  return out;
+}
+
 // A ".spec.json" exported from Illustrator by Specify-Export.jsx: each record's
 // exact grouping, size and position (artboard-relative points, y-down from top).
 export type BoxupSpec = {
@@ -318,6 +395,12 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       .map((f) => f.bbox);
     // Individual fills let raster detection split a few touching letters apart.
     const fillBoxesPx: Bbox[] = pageFillsPt.map(toPx);
+    // Keep each CJK character (disconnected strokes with no AI grouping) whole: its
+    // near-square glyph cell is both a merge group (like a Ctrl+8 compound path) AND a
+    // split guard (so splitBlobByFills doesn't shatter the merged character back into its
+    // strokes). Only near-square clusters qualify, so Latin wording / non-square logos
+    // are untouched.
+    const glyphCellsPx: Bbox[] = squareGlyphClusters(pageFillsPt, page.width_pt, page.height_pt).map(toPx);
     // Dense fill clusters = logos; their union bbox is the logo's true size (matches
     // the AI file). Raster logo records get snapped to these so light-edged logos
     // aren't under-measured. Exclude any near-full-page cluster (background/text).
@@ -333,7 +416,7 @@ export async function analyzeBoxup(bytes: Uint8Array, fileName: string, measurem
       .map((c) => c.bbox)
       .filter((b) => !((b[2] - b[0]) > page.width_pt * 0.85 && (b[3] - b[1]) > page.height_pt * 0.85))
       .map(toPx);
-    let recs = r ? rasterWordDimensions(r, scale, 120, renderScale, fillGroupsPx as [number, number, number, number][], fillBoxesPx as [number, number, number, number][], logoClustersPx as [number, number, number, number][], clipBoxesPx as [number, number, number, number][]) : [];
+    let recs = r ? rasterWordDimensions(r, scale, 120, renderScale, fillGroupsPx as [number, number, number, number][], fillBoxesPx as [number, number, number, number][], logoClustersPx as [number, number, number, number][], clipBoxesPx as [number, number, number, number][], glyphCellsPx as [number, number, number, number][]) : [];
     // Group over-split LOGO pieces back into whole logos. An Illustrator GROUP (Ctrl+G)
     // is flattened on PDF export, so a multi-piece logo (e.g. a lotus of 12 petals)
     // arrives as many separate fills with no grouping metadata and detects as many
