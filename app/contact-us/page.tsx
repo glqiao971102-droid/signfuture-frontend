@@ -46,7 +46,7 @@ export default function ContactUsPage() {
             <span className="category-glyph lg">✆</span>
             <div>
               <h1>Contact Us</h1>
-              <p>SIGN FUTURE INDUSTRY SDN. BHD.</p>
+              <p>SIGN FUTURE INDUSTRY SDN. BHD. · Company Reg. No. (SSM) 201401045570</p>
             </div>
           </div>
         </section>

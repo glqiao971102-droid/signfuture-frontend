@@ -6702,3 +6702,36 @@ button.cart-addr-choice:disabled { opacity: 0.4; cursor: not-allowed; }
 .m-tree-link.is-soon { opacity: 0.55; pointer-events: none; }
 .m-tree-link .soon-tag { margin-left: 8px; }
 .m-tree-section { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted, #8fa7c5); margin: 14px 0 4px; padding: 0 2px; }
+
+/* Legal / policy pages (Terms, Privacy, Shipping, Return & Refund). */
+.legal-doc {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.legal-block {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+.legal-block h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: var(--text);
+}
+.legal-block p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+.legal-block p:last-child { margin-bottom: 0; }
+.legal-block a { color: var(--cyan); }
+.legal-entity {
+  background: var(--panel-strong);
+  border-color: var(--line);
+}
+.legal-entity p strong { color: var(--text); }
