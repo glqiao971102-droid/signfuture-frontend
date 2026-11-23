@@ -14,7 +14,6 @@ export default function Footer() {
             Signage &amp; printing made simple — measure, configure, and price
             banners, neon line, and 3D LED box-up letters in one place.
           </p>
-          <p className="footer-note">Free delivery within Peninsular Malaysia.</p>
         </div>
 
         <div className="footer-col">

@@ -83,7 +83,7 @@ const POLICIES: Record<string, Policy> = {
     sections: [
       {
         h: "Coverage",
-        p: ["We provide free delivery within Peninsular Malaysia."],
+        p: ["We deliver within Malaysia. Any delivery charge is shown before you confirm your order."],
       },
       {
         h: "Processing Time",
