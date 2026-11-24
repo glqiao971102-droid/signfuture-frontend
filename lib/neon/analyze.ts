@@ -275,6 +275,36 @@ function neonLengthPt(all: Stroke[], neon: Stroke[]): number {
   return (neon.length ? neon : all).reduce((a, s) => a + s.lengthPt, 0);
 }
 
+/**
+ * Some artworks mix a HAIRLINE acrylic-cut outline (a thin line, e.g. 1pt — the
+ * shape the acrylic board is cut to) with much THICKER neon-tube paths (e.g. 18pt).
+ * In that case the acrylic board follows the thin cut line, and only the thick paths
+ * are neon tubes. Split the strokes by width ONLY when there is a clear bimodal gap
+ * (the thickest ≥ 3x the thinnest, and the thin group is genuine hairline ≤ 4pt);
+ * otherwise return null so uniform / black-drawn designs keep the colour-based
+ * behaviour unchanged. `cut` drives the content/acrylic bbox, `tube` the neon length.
+ */
+function splitCutAndTube(strokes: Stroke[]): { cut: Stroke[]; tube: Stroke[] } | null {
+  const widths = strokes.map((s) => s.widthPt).filter((w) => w > 0);
+  const uniq = [...new Set(widths.map((w) => Math.round(w * 100) / 100))].sort((a, b) => a - b);
+  if (uniq.length < 2) return null;
+  // The widest ratio gap between consecutive stroke widths is where cut meets tube.
+  let splitAt = -1, bestRatio = 1;
+  for (let i = 1; i < uniq.length; i++) {
+    const r = uniq[i] / uniq[i - 1];
+    if (r > bestRatio) { bestRatio = r; splitAt = uniq[i]; }
+  }
+  if (bestRatio < 4) return null; // no clear thin/thick separation -> leave as-is
+  const cut = strokes.filter((s) => s.widthPt < splitAt);
+  const tube = strokes.filter((s) => s.widthPt >= splitAt);
+  if (!cut.length || !tube.length) return null;
+  const cutMax = Math.max(...cut.map((s) => s.widthPt));
+  // The thin group must be a genuine hairline cut (<=4pt and well under the tubes),
+  // not merely a slightly-thinner tube.
+  if (cutMax > 4 || cutMax >= splitAt * 0.6) return null;
+  return { cut, tube };
+}
+
 // ---------------------------------------------------------------- parser
 class PdfPathAnalyzer {
   ctm: Mat = [1, 0, 0, 1, 0, 0];
@@ -619,11 +649,16 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
 
   const totalPtAll = analyzer.strokes.reduce((a, s) => a + s.lengthPt, 0);
   const neonStrokes = analyzer.strokes.filter((s) => isNeonColor(s.color));
-  const totalPtNeon = neonLengthPt(analyzer.strokes, neonStrokes);
   const imageBbox = unionBbox(analyzer.images);
   const clipBbox = chooseClipBbox(analyzer.clips, imageBbox);
   const allStrokedBbox = unionBbox(analyzer.strokes);
-  const contentBbox = clipBbox || imageBbox || unionBbox(neonStrokes) || allStrokedBbox;
+  // Thin acrylic-cut outline + thick neon tubes: the acrylic board follows the thin
+  // cut line and only the thick paths are neon. Falls back to the colour/clip logic
+  // when there is no clear thin/thick split.
+  const split = splitCutAndTube(analyzer.strokes);
+  const totalPtNeon = split ? split.tube.reduce((a, s) => a + s.lengthPt, 0) : neonLengthPt(analyzer.strokes, neonStrokes);
+  const cutBbox = split ? unionBbox(split.cut) : null;
+  const contentBbox = cutBbox || clipBbox || imageBbox || unionBbox(neonStrokes) || allStrokedBbox;
 
   const artboards: NeonArtboard[] = [];
   for (const page of pages) {
@@ -634,8 +669,12 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
     const pageClips = analyzer.clips.filter((c) => c.page === pageNumber);
     const pageImageBbox = unionBbox(pageImages);
     const pageClipBbox = chooseClipBbox(pageClips, pageImageBbox);
+    // Thin cut line -> acrylic bbox, thick paths -> neon tubes (see splitCutAndTube).
+    const pageSplit = splitCutAndTube(pageStrokes);
+    const pageCutBbox = pageSplit ? unionBbox(pageSplit.cut) : null;
+    const pageNeonLenPt = pageSplit ? pageSplit.tube.reduce((a, s) => a + s.lengthPt, 0) : neonLengthPt(pageStrokes, pageNeon);
     const pageContentBbox =
-      pageClipBbox || pageImageBbox || unionBbox(pageNeon) || unionBbox(pageStrokes);
+      pageCutBbox || pageClipBbox || pageImageBbox || unionBbox(pageNeon) || unionBbox(pageStrokes);
     if (pageContentBbox === null && pageStrokes.length === 0) continue;
     const designBboxes = designBboxesForPage(pageClips, pageImages, pageNeon, [page.width_pt, page.height_pt]);
     const designs: NeonDesign[] = [];
@@ -643,13 +682,16 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
       const designIndex = idx + 1;
       const designStrokes = strokesForBbox(pageStrokes, designBbox);
       const designNeon = designStrokes.filter((s) => isNeonColor(s.color));
+      const designSplit = splitCutAndTube(designStrokes);
+      const designCutBbox = designSplit ? unionBbox(designSplit.cut) : null;
+      const designNeonLenPt = designSplit ? designSplit.tube.reduce((a, s) => a + s.lengthPt, 0) : neonLengthPt(designStrokes, designNeon);
       designs.push({
         name: `Design ${designIndex}`,
         page: pageNumber,
         design: designIndex,
-        content_bbox_in: bboxToInches(designBbox, scale),
-        total_length_m_neon: neonLengthPt(designStrokes, designNeon) * METERS_PER_POINT * scale,
-        path_count_neon: designNeon.length,
+        content_bbox_in: bboxToInches(designCutBbox || designBbox, scale),
+        total_length_m_neon: designNeonLenPt * METERS_PER_POINT * scale,
+        path_count_neon: (designSplit ? designSplit.tube : designNeon).length,
         by_color: summarizeNeonColors(designStrokes, scale),
         dimension_preview_url: buildDimensionPreview(designStrokes, designBbox, scale),
         line_preview_url: buildLinePreview(designStrokes, designBbox),
@@ -663,8 +705,8 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
       content_bbox_in: bboxToInches(pageContentBbox, scale),
       clipping_bbox_in: bboxToInches(pageClipBbox, scale),
       design_image_bbox_in: bboxToInches(pageImageBbox, scale),
-      total_length_m_neon: neonLengthPt(pageStrokes, pageNeon) * METERS_PER_POINT * scale,
-      path_count_neon: pageNeon.length,
+      total_length_m_neon: pageNeonLenPt * METERS_PER_POINT * scale,
+      path_count_neon: (pageSplit ? pageSplit.tube : pageNeon).length,
       by_color: summarizeNeonColors(pageStrokes, scale),
       designs,
       dimension_preview_url: single ? buildDimensionPreview(pageStrokes, pageContentBbox, scale) : null,
@@ -676,7 +718,7 @@ export async function analyzeNeon(bytes: Uint8Array, fileName: string, measureme
     file: fileName,
     pages,
     path_count_all: analyzer.strokes.length,
-    path_count_neon: neonStrokes.length,
+    path_count_neon: (split ? split.tube : neonStrokes).length,
     measurement_scale: scale,
     content_bbox_in: bboxToInches(contentBbox, scale),
     clipping_bbox_in: bboxToInches(clipBbox, scale),
