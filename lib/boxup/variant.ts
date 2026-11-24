@@ -91,6 +91,13 @@ const brand = (html: string, v: BoxUpVariant) => {
   // printed layer-by-layer. Every 3D-printer variant is named "3D Printer (...)".
   if (!v.name.startsWith("3D Printer")) {
     out = out.replace(/<!--FILAMENT-START-->[\s\S]*?<!--FILAMENT-END-->/g, "");
+    // The metal box-up products (stainless steel, EG, aluminium channel) only offer
+    // the 7-working-day standard and the 4-working-day express collect dates — the
+    // faster 3/2/next-day options don't apply to their fabrication. Drop those three
+    // buttons; the client JS that references data-collect="next" etc. no-ops when they
+    // are absent, and the 7-day option stays pre-selected. The 3D Printer variants keep
+    // the full set.
+    out = out.replace(/<button type="button" class="collect-date-option[^"]*" data-collect="(?:quick3|rush2|next)"[\s\S]*?<\/button>/g, "");
   }
   if (v.litMode) {
     // The 3D preview reads this off the body when it builds the scene.
