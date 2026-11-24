@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import ArtworkUpload from "@/components/ArtworkUpload";
 import { api } from "@/lib/api";
 import { BEVEL_PRICE } from "@/lib/acrylicBevelPrices";
 
@@ -136,6 +137,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
   const [agreed, setAgreed] = useState(false);
   const [artwork, setArtwork] = useState("");
   const [artworkFile, setArtworkFile] = useState<File | null>(null);
+  const [artworkQty, setArtworkQty] = useState("");
   const [added, setAdded] = useState(false);
   const [viewerSrc, setViewerSrc] = useState<string | null>(null);
   const [collectDates, setCollectDates] = useState<Record<string, string>>({});
@@ -188,7 +190,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
         artworks = [{ url: __up.url, name: artworkFile.name }];
       } catch { /* keep going; artwork can be re-attached later */ }
     }
-    add({ artworks, label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · ${collectOpt.label}` });
+    add({ artworks, label: PRODUCT_NAME, href: PRODUCT_HREF, price: total, image: "/products/acrylic-bevel-edge-frame-hero.png", meta: `Material: ${material} · Thickness: ${thickness} · Size: ${sizeOpt.label} · Finishing: ${finishing} · Qty: ${qty} · Artwork: ${artworkQty} · ${collectOpt.label}` });
     setAdded(true);
   };
 
@@ -280,15 +282,12 @@ export default function AcrylicBevelEdgeFrameProduct() {
             </select>
           </div>
 
-          <label className="xprod-artwork">
-            <span>Upload your Artwork</span>
-            <input
-              type="file"
-              accept=".ai,.pdf,.jpg,.jpeg,.png,.zip"
-              onChange={(e) => { const f = e.target.files?.[0] ?? null; setArtworkFile(f); setArtwork(f?.name ?? ""); }}
-            />
-            {artwork && <span className="xprod-artwork-name">✓ {artwork}</span>}
-          </label>
+          <ArtworkUpload
+            qty={artworkQty}
+            onQty={setArtworkQty}
+            fileName={artwork}
+            onFile={(f) => { setArtworkFile(f); setArtwork(f?.name ?? ""); }}
+          />
 
           {/* Collect Date sits last in the form, matching the Inkjet pages. */}
           <div className="xprod-collectp">
@@ -373,7 +372,7 @@ export default function AcrylicBevelEdgeFrameProduct() {
                 <span>I agree to the <a href="#" onClick={(e) => e.preventDefault()}>Terms and Conditions</a></span>
               </label>
 
-              <button type="button" className="xprod-addcart" disabled={!agreed || !artwork} onClick={addToCart}>
+              <button type="button" className="xprod-addcart" disabled={!agreed || !artworkQty || !artwork} onClick={addToCart}>
                 Add to Cart
               </button>
 
