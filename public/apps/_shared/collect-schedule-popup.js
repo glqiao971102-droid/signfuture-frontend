@@ -105,7 +105,7 @@
       '<div class="sf-collect-pop-card" style="position:relative;max-width:min(1040px,95vw);max-height:92vh;overflow:auto;background:#060d1c;border:1px solid rgba(53,216,255,0.42);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,0.6);">' +
       '<button type="button" class="sf-collect-pop-close" aria-label="Close" style="position:absolute;top:10px;right:10px;z-index:2;width:40px;height:40px;border-radius:50%;border:1px solid rgba(53,216,255,0.55);background:#0a1830;color:#dbeeff;font-size:22px;line-height:36px;text-align:center;cursor:pointer;padding:0;">&times;</button>' +
       '<img class="sf-collect-pop-img" alt="Collect date schedule" style="display:block;width:100%;height:auto;border-radius:16px 16px 0 0;background:#060d1c;">' +
-      '<div class="sf-collect-pop-note" style="padding:14px 18px 18px;color:#eaf4ff;font-size:14px;line-height:1.55;"></div>' +
+      '<div class="sf-collect-pop-note" style="padding:14px 18px 18px;color:#eaf4ff;font-size:14px;line-height:1.55;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;"></div>' +
       '</div>';
     document.body.appendChild(o);
     o.querySelector(".sf-collect-pop-close").addEventListener("click", closePop);
@@ -130,7 +130,10 @@
       html = '<div style="font-weight:700;color:#aee9ff;">📅 Find today’s row in the board above for your collection day.</div>' +
         '<div style="margin-top:6px;color:#9fb4d0;font-size:12.5px;">Sundays and public holidays are skipped.</div>';
     }
-    o.querySelector(".sf-collect-pop-note").innerHTML = html;
+    o.querySelector(".sf-collect-pop-note").innerHTML =
+      '<div style="flex:1 1 220px;min-width:0;">' + html + '</div>' +
+      '<button type="button" class="sf-collect-pop-ok" style="flex:0 0 auto;margin-left:auto;padding:11px 32px;border-radius:11px;border:1px solid rgba(53,216,255,0.65);background:linear-gradient(135deg,#1f6fff,#35d8ff);color:#061024;font-weight:800;font-size:15px;letter-spacing:0.05em;cursor:pointer;box-shadow:0 6px 18px rgba(31,111,255,0.4);">OK</button>';
+    o.querySelector(".sf-collect-pop-ok").addEventListener("click", closePop);
     o.style.display = "flex";
     place(o);
     lockParent(true);
