@@ -32,7 +32,14 @@ export default function CompanyPrompt() {
   }, []);
 
   const companyName = (user?.billing?.company || "").trim();
-  const show = mounted && !loading && !!user && !companyName;
+  // Dev convenience: skip the blocking gate on localhost so the storefront can be
+  // browsed/tested without entering company details. Production (the real host) still
+  // shows it — invoices there must bill to a company name.
+  const isLocalDev =
+    mounted &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const show = mounted && !loading && !!user && !companyName && !isLocalDev;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
